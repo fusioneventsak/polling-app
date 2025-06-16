@@ -133,6 +133,7 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
                 variant={getConfirmButtonVariant()}
                 onClick={onConfirm}
                 loading={loading}
+                disabled={loading}
                 className="flex-1"
               >
                 {confirmText}
