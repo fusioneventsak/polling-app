@@ -171,7 +171,7 @@ export const AdminPage: React.FC = () => {
   };
 
   const handleDisplayActivity = (activityId: string) => {
-    navigate(`/display/${selectedRoom?.code}/${activityId}`);
+    navigate(`/display/${selectedRoom?.code}`);
   };
 
   const handleReorderActivities = async (activityIds: string[]) => {
