@@ -18,12 +18,14 @@ import {
 import type { Room, RoomSettings } from '../types';
 
 interface RoomSettingsProps {
-  room: Room;
-  onSave: (roomId: string, settings: RoomSettings) => Promise<boolean>;
-  onClose: () => void;
+  room?: Room;
+  onSave: (roomData: any) => Promise<void> | void;
+  onCancel: () => void;
 }
 
-export const RoomSettings: React.FC<RoomSettingsProps> = ({ room, onSave, onClose }) => {
+export const RoomSettings: React.FC<RoomSettingsProps> = ({ room, onSave, onCancel }) => {
+  const [name, setName] = useState(room?.name || '');
+  const [description, setDescription] = useState(room?.description || '');
   const [settings, setSettings] = useState<RoomSettings>(room.settings || {
     theme: {
       primary_color: '#2563eb',
@@ -124,9 +126,12 @@ export const RoomSettings: React.FC<RoomSettingsProps> = ({ room, onSave, onClos
   const handleSave = async () => {
     setSaving(true);
     try {
-      const success = await onSave(room.id, settings);
-      if (success) {
-        onClose();
+      if (room) {
+        // Update existing room
+        await onSave({ settings });
+      } else {
+        // Create new room
+        await onSave({ name, description, settings });
       }
     } catch (error) {
       console.error('Failed to save settings:', error);
@@ -210,6 +215,7 @@ export const RoomSettings: React.FC<RoomSettingsProps> = ({ room, onSave, onClos
             </div>
             
             <Button variant="ghost" onClick={onClose}>
+            <Button variant="ghost" onClick={onCancel}>
               <X className="w-5 h-5" />
             </Button>
           </div>
@@ -217,6 +223,42 @@ export const RoomSettings: React.FC<RoomSettingsProps> = ({ room, onSave, onClos
           {/* Content */}
           <div className="flex-1 overflow-y-auto p-6">
             <AnimatePresence mode="wait">
+              {!room && (
+                <motion.div
+                  key="basic-info"
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  className="space-y-6 mb-8"
+                >
+                  <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-2">
+                      Room Name
+                    </label>
+                    <input
+                      type="text"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder="Enter room name"
+                      className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-2">
+                      Description (Optional)
+                    </label>
+                    <textarea
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                      placeholder="Enter room description"
+                      rows={3}
+                      className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                </motion.div>
+              )}
+
               {activeTab === 'theme' && (
                 <motion.div
                   key="theme"
@@ -398,7 +440,7 @@ export const RoomSettings: React.FC<RoomSettingsProps> = ({ room, onSave, onClos
                       Organization Logo
                     </label>
                     <ImageUpload
-                      roomCode={room.code}
+                      roomCode={room?.code || 'temp'}
                       currentImageUrl={settings.branding?.logo_url}
                       onImageUploaded={(url) => updateBranding({ logo_url: url })}
                       onImageRemoved={() => updateBranding({ logo_url: '' })}
@@ -506,12 +548,12 @@ export const RoomSettings: React.FC<RoomSettingsProps> = ({ room, onSave, onClos
             </div>
             
             <div className="flex gap-3">
-              <Button variant="ghost" onClick={onClose}>
+              <Button variant="ghost" onClick={onCancel}>
                 Cancel
               </Button>
               <Button onClick={handleSave} loading={saving}>
                 <Save className="w-4 h-4" />
-                Save Settings
+                {room ? 'Save Settings' : 'Create Room'}
               </Button>
             </div>
           </div>

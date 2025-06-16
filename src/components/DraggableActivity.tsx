@@ -40,6 +40,27 @@ export const DraggableActivity: React.FC<DraggableActivityProps> = ({
   isDragging,
   dragHandleProps
 }) => {
+  const [isStarting, setIsStarting] = useState(false);
+  const [isStopping, setIsStopping] = useState(false);
+
+  const handleStart = async () => {
+    setIsStarting(true);
+    try {
+      await onStart(roomId, activity.id);
+    } finally {
+      setIsStarting(false);
+    }
+  };
+
+  const handleStop = async () => {
+    setIsStopping(true);
+    try {
+      await onStop(activity.id);
+    } finally {
+      setIsStopping(false);
+    }
+  };
+
   const getActivityIcon = (type: ActivityType) => {
     switch (type) {
       case 'poll': return MessageSquare;
@@ -129,18 +150,22 @@ export const DraggableActivity: React.FC<DraggableActivityProps> = ({
           <Button
             variant="danger"
             size="sm"
-            onClick={() => onStop(activity.id)}
+            onClick={handleStop}
+            loading={isStopping}
+            disabled={isStopping}
           >
             <Square className="w-4 h-4" />
-            Stop
+            {isStopping ? 'Stopping...' : 'Stop'}
           </Button>
         ) : (
           <Button
             size="sm"
-            onClick={() => onStart(roomId, activity.id)}
+            onClick={handleStart}
+            loading={isStarting}
+            disabled={isStarting}
           >
             <Play className="w-4 h-4" />
-            Start
+            {isStarting ? 'Starting...' : 'Start'}
           </Button>
         )}
         

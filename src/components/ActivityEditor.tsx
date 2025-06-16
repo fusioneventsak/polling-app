@@ -4,30 +4,41 @@ import { Button } from './Button';
 import { Card } from './Card';
 import { ImageUpload } from './ImageUpload';
 import { Plus, Trash2, Check, X } from 'lucide-react';
-import type { Activity, ActivityType } from '../types';
+import { roomService } from '../services/roomService';
+import type { Activity, ActivityType, CreateActivityData } from '../types';
 
 interface ActivityEditorProps {
-  activity: Activity;
-  onSave: (activityId: string, updates: { title?: string; description?: string; media_url?: string; options?: Array<{ text: string; is_correct?: boolean; media_url?: string }> }) => Promise<boolean>;
+  roomId: string;
+  activity?: Activity | null;
+  onSave: (activity: Activity) => void;
   onCancel: () => void;
 }
 
-export const ActivityEditor: React.FC<ActivityEditorProps> = ({ activity, onSave, onCancel }) => {
-  const [title, setTitle] = useState(activity.title);
-  const [description, setDescription] = useState(activity.description || '');
-  const [mediaUrl, setMediaUrl] = useState(activity.media_url || '');
+export const ActivityEditor: React.FC<ActivityEditorProps> = ({ 
+  roomId, 
+  activity, 
+  onSave, 
+  onCancel 
+}) => {
+  const [title, setTitle] = useState(activity?.title || '');
+  const [description, setDescription] = useState(activity?.description || '');
+  const [type, setType] = useState<ActivityType>(activity?.type || 'poll');
+  const [mediaUrl, setMediaUrl] = useState(activity?.media_url || '');
   const [options, setOptions] = useState(
-    activity.options?.map(opt => ({ 
+    activity?.options?.map(opt => ({ 
       text: opt.text, 
-      isCorrect: opt.is_correct,
+      isCorrect: opt.is_correct || false,
       mediaUrl: opt.media_url || ''
-    })) || []
+    })) || [
+      { text: '', isCorrect: false, mediaUrl: '' },
+      { text: '', isCorrect: false, mediaUrl: '' }
+    ]
   );
   const [saving, setSaving] = useState(false);
 
   const addOption = () => {
     if (options.length < 6) {
-      setOptions(prev => [...prev, { text: '', isCorrect: false }]);
+      setOptions(prev => [...prev, { text: '', isCorrect: false, mediaUrl: '' }]);
     }
   };
 
@@ -58,19 +69,36 @@ export const ActivityEditor: React.FC<ActivityEditorProps> = ({ activity, onSave
 
     setSaving(true);
     try {
-      const success = await onSave(activity.id, {
-        title,
-        description,
-        media_url: mediaUrl,
-        options: options.map(opt => ({
-          text: opt.text,
-          is_correct: opt.isCorrect || false,
-          media_url: opt.mediaUrl || undefined
-        }))
-      });
-
-      if (success) {
-        onCancel();
+      if (activity) {
+        // Update existing activity
+        const updatedActivity = await roomService.updateActivity(activity.id, {
+          title,
+          description,
+          media_url: mediaUrl,
+          options: options.map(opt => ({
+            text: opt.text,
+            is_correct: opt.isCorrect,
+            media_url: opt.mediaUrl || undefined
+          }))
+        });
+        onSave(updatedActivity);
+      } else {
+        // Create new activity
+        const activityData: CreateActivityData = {
+          room_id: roomId,
+          type,
+          title,
+          description,
+          media_url: mediaUrl,
+          options: options.map(opt => ({
+            text: opt.text,
+            is_correct: opt.isCorrect,
+            media_url: opt.mediaUrl || undefined
+          }))
+        };
+        
+        const newActivity = await roomService.createActivity(activityData);
+        onSave(newActivity);
       }
     } catch (error) {
       console.error('Failed to save activity:', error);
@@ -87,9 +115,29 @@ export const ActivityEditor: React.FC<ActivityEditorProps> = ({ activity, onSave
       className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
     >
       <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-        <h2 className="text-2xl font-bold text-white mb-6">Edit Activity</h2>
+        <h2 className="text-2xl font-bold text-white mb-6">
+          {activity ? 'Edit Activity' : 'Create Activity'}
+        </h2>
         
         <div className="space-y-6">
+          {!activity && (
+            <div>
+              <label className="block text-sm font-medium text-slate-300 mb-2">
+                Activity Type
+              </label>
+              <select
+                value={type}
+                onChange={(e) => setType(e.target.value as ActivityType)}
+                className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="poll">Poll</option>
+                <option value="trivia">Trivia</option>
+                <option value="quiz">Quiz</option>
+                <option value="survey">Survey</option>
+              </select>
+            </div>
+          )}
+
           <div>
             <label className="block text-sm font-medium text-slate-300 mb-2">
               Title
@@ -121,7 +169,7 @@ export const ActivityEditor: React.FC<ActivityEditorProps> = ({ activity, onSave
               Activity Media (Optional)
             </label>
             <ImageUpload
-              roomCode={activity.room?.code || ''}
+              roomCode="temp" // We'll use a temp code for now
               currentImageUrl={mediaUrl}
               onImageUploaded={setMediaUrl}
               onImageRemoved={() => setMediaUrl('')}
@@ -147,7 +195,7 @@ export const ActivityEditor: React.FC<ActivityEditorProps> = ({ activity, onSave
                       className="flex-1 px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                     
-                    {(activity.type === 'trivia' || activity.type === 'quiz') && (
+                    {(type === 'trivia' || type === 'quiz') && (
                       <Button
                         variant={option.isCorrect ? 'primary' : 'ghost'}
                         size="sm"
@@ -171,7 +219,7 @@ export const ActivityEditor: React.FC<ActivityEditorProps> = ({ activity, onSave
                   
                   <div>
                     <ImageUpload
-                      roomCode={activity.room?.code || ''}
+                      roomCode="temp" // We'll use a temp code for now
                       currentImageUrl={option.mediaUrl || ''}
                       onImageUploaded={(url) => updateOptionMedia(index, url)}
                       onImageRemoved={() => updateOptionMedia(index, '')}
@@ -207,7 +255,7 @@ export const ActivityEditor: React.FC<ActivityEditorProps> = ({ activity, onSave
             className="flex-1"
           >
             <Check className="w-4 h-4" />
-            Save Changes
+            {activity ? 'Save Changes' : 'Create Activity'}
           </Button>
           <Button
             variant="ghost"

@@ -12,6 +12,21 @@ import { RoomSettings } from '../components/RoomSettings';
 import { DraggableActivity } from '../components/DraggableActivity';
 import { roomService } from '../services/roomService';
 import type { Room, Activity, CreateRoomData } from '../types';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { DragDropContext, Droppable, Draggable, DropResult } from 'react-beautiful-dnd';
+import { Plus, Settings, Play, Square, Trash2, Edit, Users, BarChart3, ArrowLeft } from 'lucide-react';
+import { Layout } from '../components/Layout';
+import { Button } from '../components/Button';
+import { Card } from '../components/Card';
+import { LoadingSpinner } from '../components/LoadingSpinner';
+import { ConfirmationModal } from '../components/ConfirmationModal';
+import { ActivityEditor } from '../components/ActivityEditor';
+import { RoomSettings } from '../components/RoomSettings';
+import { DraggableActivity } from '../components/DraggableActivity';
+import { roomService } from '../services/roomService';
+import { supabase } from '../lib/supabase';
+import type { Room, Activity, CreateRoomData } from '../types';
 
 export const AdminPage: React.FC = () => {
   const navigate = useNavigate();
@@ -33,11 +48,74 @@ export const AdminPage: React.FC = () => {
     loadRooms();
   }, []);
 
+  // Set up real-time subscriptions for admin updates
+  useEffect(() => {
+    if (!supabase) return;
+
+    console.log('Setting up admin real-time subscriptions');
+
+    // Create a unique channel for admin updates
+    const channelName = `admin-updates-${Date.now()}`;
+    const adminChannel = supabase.channel(channelName);
+    
+    // Subscribe to all room changes
+    adminChannel
+      .on('postgres_changes', 
+        { event: '*', schema: 'public', table: 'rooms' },
+        (payload) => {
+          console.log('Admin: Room change received:', payload);
+          loadRooms();
+        }
+      )
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'activities' },
+        (payload) => {
+          console.log('Admin: Activity change received:', payload);
+          loadRooms();
+        }
+      )
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'activity_options' },
+        (payload) => {
+          console.log('Admin: Activity options change received:', payload);
+          loadRooms();
+        }
+      )
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'participant_responses' },
+        (payload) => {
+          console.log('Admin: Response change received:', payload);
+          loadRooms();
+        }
+      )
+      .subscribe((status, err) => {
+        console.log('Admin subscription status:', status);
+        if (err) {
+          console.error('Admin subscription error:', err);
+        }
+        if (status === 'SUBSCRIBED') {
+          console.log('✅ Admin real-time subscriptions active');
+        }
+      });
+
+    return () => {
+      console.log('Cleaning up admin subscriptions');
+      adminChannel.unsubscribe();
+    };
+  }, []);
   const loadRooms = async () => {
     try {
       setLoading(true);
       const roomsData = await roomService.getAllRooms();
       setRooms(roomsData);
+      
+      // Update selected room if it exists
+      if (selectedRoom) {
+        const updatedSelectedRoom = roomsData.find(room => room.id === selectedRoom.id);
+        if (updatedSelectedRoom) {
+          setSelectedRoom(updatedSelectedRoom);
+        }
+      }
     } catch (err) {
       setError('Failed to load rooms');
       console.error('Error loading rooms:', err);
@@ -96,19 +174,10 @@ export const AdminPage: React.FC = () => {
     if (!selectedRoom) return;
     
     try {
+      console.log('Starting activity:', activityId, 'in room:', selectedRoom.id);
       await roomService.startActivity(selectedRoom.id, activityId);
-      const updatedRoom = {
-        ...selectedRoom,
-        current_activity_id: activityId,
-        activities: selectedRoom.activities.map(activity => ({
-          ...activity,
-          is_active: activity.id === activityId
-        }))
-      };
-      setSelectedRoom(updatedRoom);
-      setRooms(prev => prev.map(room => 
-        room.id === selectedRoom.id ? updatedRoom : room
-      ));
+      console.log('Activity started successfully');
+      // Real-time updates will handle the UI refresh
     } catch (err) {
       setError('Failed to start activity');
       console.error('Error starting activity:', err);
@@ -119,20 +188,10 @@ export const AdminPage: React.FC = () => {
     if (!selectedRoom) return;
     
     try {
+      console.log('Ending activity:', activityId);
       await roomService.endActivity(activityId);
-      const updatedRoom = {
-        ...selectedRoom,
-        current_activity_id: null,
-        current_activity_type: null,
-        activities: selectedRoom.activities.map(activity => ({
-          ...activity,
-          is_active: false
-        }))
-      };
-      setSelectedRoom(updatedRoom);
-      setRooms(prev => prev.map(room => 
-        room.id === selectedRoom.id ? updatedRoom : room
-      ));
+      console.log('Activity ended successfully');
+      // Real-time updates will handle the UI refresh
     } catch (err) {
       setError('Failed to end activity');
       console.error('Error ending activity:', err);
