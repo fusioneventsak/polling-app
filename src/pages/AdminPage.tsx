@@ -3,7 +3,7 @@ import { Plus, Users, Play, Square, Trash2, Edit3, MoreVertical, ExternalLink, B
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card } from '../components/Card';
 import { Button } from '../components/Button';
-import { RoomEditor } from '../components/RoomEditor';
+import { RoomSettings } from '../components/RoomSettings';
 import { ActivityEditor } from '../components/ActivityEditor';
 import { roomService } from '../services/roomService';
 import { supabase } from '../lib/supabase';
@@ -598,7 +598,7 @@ export const AdminPage: React.FC = () => {
       {/* Modals */}
       <AnimatePresence>
         {showCreateRoom && (
-          <RoomEditor
+          <RoomSettings
             onSave={handleCreateRoom}
             onCancel={() => setShowCreateRoom(false)}
           />
