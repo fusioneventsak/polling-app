@@ -12,7 +12,9 @@ const FixedPoll3DVisualization: React.FC<{
   options: any[];
   totalResponses: number;
   themeColors: any;
-}> = ({ options, totalResponses, themeColors }) => {
+  activityTitle?: string;
+  activityMedia?: string;
+}> = ({ options, totalResponses, themeColors, activityTitle, activityMedia }) => {
   if (!options || options.length === 0) {
     return (
       <motion.div
@@ -44,8 +46,23 @@ const FixedPoll3DVisualization: React.FC<{
       {/* Simple 2D visualization instead of 3D to avoid font errors */}
       <div className="h-full flex flex-col p-8">
         <div className="text-center mb-8">
+          {/* Activity Media */}
+          {activityMedia && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mb-6"
+            >
+              <img
+                src={activityMedia}
+                alt="Activity media"
+                className="max-w-sm mx-auto rounded-lg shadow-lg"
+              />
+            </motion.div>
+          )}
+          
           <h3 className="text-2xl font-bold text-white mb-2">
-            {totalResponses > 0 ? 'Live Poll Results' : 'Poll Options'}
+            {totalResponses > 0 ? 'Live Poll Results' : (activityTitle || 'Poll Options')}
           </h3>
           <p className="text-slate-400">
             {totalResponses > 0 ? `${totalResponses} total responses` : 'Waiting for responses...'}
@@ -67,6 +84,17 @@ const FixedPoll3DVisualization: React.FC<{
                   transition={{ delay: index * 0.1 }}
                   className="bg-slate-800/50 rounded-lg p-4 border border-slate-600"
                 >
+                  {/* Option Media */}
+                  {option.media_url && (
+                    <div className="mb-4">
+                      <img
+                        src={option.media_url}
+                        alt="Option media"
+                        className="w-full max-w-xs mx-auto rounded-md"
+                      />
+                    </div>
+                  )}
+                  
                   <div className="text-center mb-4">
                     <h4 className="text-white font-medium text-sm mb-2">{option.text}</h4>
                     <div className="text-2xl font-bold text-blue-400">{percentage}%</div>
@@ -639,6 +667,8 @@ export const DisplayPage: React.FC = () => {
             <FixedPoll3DVisualization 
               options={activeActivity.options || []} 
               totalResponses={activeActivity.total_responses || 0}
+              activityTitle={activeActivity.title}
+              activityMedia={activeActivity.media_url}
               themeColors={{
                 primaryColor: '#3b82f6',
                 secondaryColor: '#8b5cf6', 
