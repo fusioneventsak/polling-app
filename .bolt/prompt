@@ -1,5 +1,275 @@
-For all designs I ask you to make, have them be beautiful, not cookie cutter. Make webpages that are fully featured and worthy for production.
+# Real-time Polling Application - Bolt.new Project Prompt
 
-By default, this template supports JSX syntax with Tailwind CSS classes, React hooks, and Lucide React for icons. Do not install other packages for UI themes, icons, etc unless absolutely necessary or I request them.
+## Project Overview
+Create a production-ready, real-time polling application that allows users to create interactive polls with multimedia support, join using room codes, and see live results. The app should be visually stunning, fully responsive, and built with modern web technologies.
 
-Use icons from lucide-react for logos.
+## Core Features & Requirements
+
+### 1. **Poll Creation & Management**
+- Create polls with custom questions and multiple choice options
+- Support for multimedia attachments (images for questions and options)
+- Generate unique 4-digit room codes for easy sharing
+- Poll activation/deactivation controls for hosts
+- Real-time participant count tracking
+- Poll results visualization with animated charts
+
+### 2. **Real-time Participation**
+- Join polls using room codes
+- Live voting with immediate result updates
+- Prevent duplicate voting from same session
+- Real-time participant notifications
+- Smooth animations for vote updates
+
+### 3. **User Experience**
+- **Beautiful, Production-Ready Design**: Not cookie-cutter - create stunning, modern interfaces
+- Fully responsive across all devices
+- Intuitive navigation and user flows
+- Loading states and smooth transitions
+- Error handling with user-friendly messages
+- Accessibility compliance (WCAG 2.1 AA)
+
+## Technical Stack & Architecture
+
+### **Frontend**
+- **Framework**: React 18+ with TypeScript
+- **Styling**: Tailwind CSS (use utility classes only - no custom CSS)
+- **Icons**: Lucide React exclusively
+- **State Management**: React hooks (useState, useEffect, useContext)
+- **Build Tool**: Vite
+- **Real-time**: Socket.IO client
+
+### **Backend** 
+- **Runtime**: Node.js with Express
+- **Real-time**: Socket.IO server
+- **Data Storage**: In-memory (for demo) with clear migration path to database
+- **File Upload**: Support for image uploads with validation
+- **CORS**: Properly configured for development
+
+### **Real-time Subscription System**
+The app uses Socket.IO for bidirectional real-time communication:
+
+#### **Connection Management**
+```javascript
+// Client connects to server
+socket = io('http://localhost:3001');
+
+// Server tracks connections
+io.on('connection', (socket) => {
+  console.log('User connected:', socket.id);
+});
+```
+
+#### **Event-Driven Architecture**
+- **Poll Events**: `poll_created`, `poll_updated`, `poll_activated`, `poll_deactivated`
+- **Voting Events**: `vote_cast`, `results_updated`
+- **Participant Events**: `user_joined`, `user_left`, `participant_count_updated`
+- **Room Events**: `join_room`, `leave_room`
+
+#### **Room-Based Broadcasting**
+```javascript
+// Join specific poll room
+socket.join(`poll_${pollId}`);
+
+// Broadcast to room participants
+io.to(`poll_${pollId}`).emit('results_updated', updatedPoll);
+```
+
+#### **Automatic Reconnection**
+- Handle connection drops gracefully
+- Restore user state on reconnection
+- Show connection status to users
+
+## Development Best Practices
+
+### **Code Organization**
+```
+src/
+├── components/           # Reusable UI components
+│   ├── ui/              # Base UI components (buttons, inputs, etc.)
+│   ├── poll/            # Poll-specific components
+│   └── layout/          # Layout components
+├── hooks/               # Custom React hooks
+├── utils/               # Utility functions
+├── types/               # TypeScript type definitions
+├── context/             # React context providers
+└── pages/               # Page components
+```
+
+### **Component Architecture**
+- **Atomic Design**: Build small, reusable components
+- **Props Interface**: Properly typed with TypeScript
+- **Error Boundaries**: Wrap components with error handling
+- **Performance**: Use React.memo and useMemo for optimization
+
+### **State Management Patterns**
+```typescript
+// Centralized poll state
+interface PollState {
+  currentPoll: Poll | null;
+  participants: number;
+  connectionStatus: 'connected' | 'disconnected' | 'connecting';
+  loading: boolean;
+  error: string | null;
+}
+```
+
+### **Real-time Data Flow**
+1. **User Action** → Component state update
+2. **Emit Event** → Send to Socket.IO server
+3. **Server Processing** → Validate and update data
+4. **Broadcast** → Send updates to all room participants
+5. **Client Update** → Update UI with new data
+
+## Styling Guidelines
+
+### **Design System**
+- **Color Palette**: Modern, accessible color scheme with proper contrast ratios
+- **Typography**: Clean, readable fonts with proper hierarchy
+- **Spacing**: Consistent spacing using Tailwind's spacing scale
+- **Animations**: Smooth, purposeful animations (not overdone)
+- **Components**: Consistent button styles, form elements, and cards
+
+### **Responsive Design**
+- **Mobile-first**: Design for mobile, enhance for desktop
+- **Breakpoints**: sm (640px), md (768px), lg (1024px), xl (1280px)
+- **Touch-friendly**: Minimum 44px touch targets
+- **Performance**: Optimize images and minimize bundle size
+
+### **Visual Excellence**
+- **Gradients**: Use modern gradient backgrounds where appropriate
+- **Shadows**: Subtle shadows for depth and hierarchy
+- **Micro-interactions**: Hover states, loading spinners, success animations
+- **Data Visualization**: Beautiful charts for poll results (consider using Chart.js or recharts)
+
+## File Upload & Media Handling
+
+### **Image Upload System**
+```typescript
+// File validation
+const validateFile = (file: File) => {
+  const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+  const maxSize = 10 * 1024 * 1024; // 10MB
+  
+  return allowedTypes.includes(file.type) && file.size <= maxSize;
+};
+
+// Upload progress tracking
+const [uploadProgress, setUploadProgress] = useState(0);
+```
+
+### **Storage Strategy**
+- **Development**: Local file system with proper organization
+- **Production Ready**: Clear path to cloud storage (AWS S3, Cloudinary)
+- **Optimization**: Automatic image compression and resizing
+- **Security**: File type validation and size limits
+
+## Performance Optimization
+
+### **Frontend Optimization**
+- **Code Splitting**: Lazy load components where appropriate
+- **Bundle Analysis**: Monitor bundle size and dependencies
+- **Image Optimization**: Proper image formats and lazy loading
+- **Memoization**: Prevent unnecessary re-renders
+
+### **Real-time Optimization**
+- **Debouncing**: Prevent spam clicking and rapid updates
+- **Efficient Updates**: Only send necessary data changes
+- **Connection Pooling**: Manage Socket.IO connections efficiently
+- **Memory Management**: Clean up event listeners on unmount
+
+## Security Considerations
+
+### **Input Validation**
+- Sanitize all user inputs
+- Validate file uploads thoroughly
+- Implement rate limiting for API calls
+- Prevent XSS and injection attacks
+
+### **Socket.IO Security**
+```javascript
+// Validate events server-side
+socket.on('cast_vote', (data) => {
+  if (!validateVoteData(data)) {
+    socket.emit('error', 'Invalid vote data');
+    return;
+  }
+  // Process vote...
+});
+```
+
+## Testing Strategy
+
+### **Unit Testing**
+- Test individual components in isolation
+- Mock Socket.IO connections for testing
+- Test utility functions and hooks
+- Validate TypeScript types
+
+### **Integration Testing**
+- Test real-time functionality end-to-end
+- Verify file upload workflows
+- Test responsive design across devices
+- Validate accessibility features
+
+## Deployment Considerations
+
+### **Environment Configuration**
+```env
+# Frontend (.env)
+VITE_SOCKET_URL=http://localhost:3001
+VITE_API_URL=http://localhost:3001
+VITE_MAX_FILE_SIZE=10485760
+
+# Backend (.env)
+PORT=3001
+CORS_ORIGIN=http://localhost:5173
+MAX_FILE_SIZE=10485760
+```
+
+### **Production Readiness**
+- Environment-specific configurations
+- Proper error logging and monitoring
+- Health check endpoints
+- Database migration scripts (when moving from in-memory)
+- CDN setup for static assets
+
+## Key Development Notes
+
+### **Always Address Real-time Subscription**
+Every feature must consider real-time implications:
+- How does this update other users?
+- What events need to be emitted?
+- How do we handle connection issues?
+- What's the fallback behavior?
+
+### **Socket.IO Event Naming Convention**
+```javascript
+// Use descriptive, action-based names
+'poll:created'
+'poll:updated' 
+'vote:cast'
+'user:joined'
+'room:participant_count_changed'
+```
+
+### **Error Handling Pattern**
+```typescript
+try {
+  const result = await pollService.createPoll(pollData);
+  socket.emit('poll:created', result);
+} catch (error) {
+  console.error('Poll creation failed:', error);
+  socket.emit('error', { message: 'Failed to create poll' });
+}
+```
+
+## Success Metrics
+
+- **Performance**: < 100ms real-time update latency
+- **Reliability**: 99.9% uptime for Socket.IO connections
+- **User Experience**: Smooth animations and transitions
+- **Accessibility**: WCAG 2.1 AA compliance
+- **Mobile**: Fully functional on all device sizes
+- **Code Quality**: TypeScript strict mode, comprehensive error handling
+
+Remember: This is a production-worthy application that showcases modern web development practices. Every component should be beautiful, every interaction should be smooth, and every feature should work flawlessly in real-time.
