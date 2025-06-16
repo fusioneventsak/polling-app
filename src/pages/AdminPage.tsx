@@ -171,7 +171,9 @@ export const AdminPage: React.FC = () => {
   };
 
   const handleDisplayActivity = (activityId: string) => {
-    navigate(`/display/${selectedRoom?.code}`);
+    if (selectedRoom?.code) {
+      window.open(`/display/${selectedRoom.code}`, '_blank');
+    }
   };
 
   const handleReorderActivities = async (activityIds: string[]) => {
