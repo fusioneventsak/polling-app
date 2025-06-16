@@ -28,6 +28,7 @@ export const AdminPage: React.FC = () => {
     type: 'room' | 'activity';
     id: string;
     name: string;
+    loading?: boolean;
   } | null>(null);
 
   useEffect(() => {
@@ -140,6 +141,10 @@ export const AdminPage: React.FC = () => {
   const handleDeleteActivity = async (activityId: string) => {
     try {
       console.log('Admin: Starting activity deletion:', activityId);
+      
+      // Show loading state
+      setDeleteConfirmation(prev => prev ? { ...prev, loading: true } : null);
+      
       await roomService.deleteActivity(activityId);
       console.log('Admin: Activity deleted, refreshing rooms');
       
@@ -157,6 +162,7 @@ export const AdminPage: React.FC = () => {
       setDeleteConfirmation(null);
       console.log('Admin: Activity deletion completed');
     } catch (err) {
+      setDeleteConfirmation(prev => prev ? { ...prev, loading: false } : null);
       setError('Failed to delete activity');
       console.error('Error deleting activity:', err);
     }
@@ -539,6 +545,7 @@ export const AdminPage: React.FC = () => {
             message={`Are you sure you want to delete "${deleteConfirmation.name}"? This action cannot be undone.`}
             confirmText="Delete"
             variant="danger"
+            loading={deleteConfirmation.loading}
             onConfirm={() => {
               if (deleteConfirmation.type === 'room') {
                 handleDeleteRoom(deleteConfirmation.id);

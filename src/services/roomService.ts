@@ -376,29 +376,7 @@ export const roomService = {
     try {
       console.log('Deleting activity:', activityId);
       
-      // First, delete all participant responses for this activity
-      const { error: responsesError } = await supabase
-        .from('participant_responses')
-        .delete()
-        .eq('activity_id', activityId);
-      
-      if (responsesError) {
-        console.error('Error deleting participant responses:', responsesError);
-        throw responsesError;
-      }
-      
-      // Then delete all activity options (this should cascade, but let's be explicit)
-      const { error: optionsError } = await supabase
-        .from('activity_options')
-        .delete()
-        .eq('activity_id', activityId);
-      
-      if (optionsError) {
-        console.error('Error deleting activity options:', optionsError);
-        throw optionsError;
-      }
-      
-      // Finally, delete the activity itself
+      // Delete the activity - this should cascade to delete options and responses
       const { error } = await supabase
         .from('activities')
         .delete()
