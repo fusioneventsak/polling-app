@@ -5,7 +5,7 @@ import { supabase } from '../lib/supabase';
 import { roomService } from '../services/roomService';
 import { useTheme } from '../components/ThemeProvider';
 import { Poll3DVisualization } from '../components/Poll3DVisualization';
-import { Users, BarChart, Clock, MessageSquare, HelpCircle, Cloud, Trophy, Target, Calendar, Activity as ActivityIcon } from 'lucide-react';
+import { Users, BarChart, Clock, MessageSquare, HelpCircle, Cloud, Trophy, Target, Calendar, Activity as ActivityIcon, TrendingUp, CheckCircle } from 'lucide-react';
 import type { ActivityType, Room, Activity } from '../types';
 
 export const DisplayPage: React.FC = () => {
@@ -16,29 +16,33 @@ export const DisplayPage: React.FC = () => {
   const [lastUpdateTime, setLastUpdateTime] = useState<Date>(new Date());
   const { applyTheme, resetTheme } = useTheme();
 
-  // Find the current active activity with improved logic
+  // Improved logic to find the current active activity
   const activeActivity = React.useMemo(() => {
     if (!currentRoom) return null;
     
-    // First check if there's a room.current_activity_id that matches an active activity
+    // Priority 1: Check room.current_activity_id first (most authoritative)
     if (currentRoom.current_activity_id) {
       const currentActivity = currentRoom.activities?.find(a => 
-        a.id === currentRoom.current_activity_id && a.is_active
+        a.id === currentRoom.current_activity_id
       ) as Activity | undefined;
-      if (currentActivity) {
-        console.log('DisplayPage: Found active activity via current_activity_id:', currentActivity.id);
+      
+      // Verify the activity is actually marked as active
+      if (currentActivity && currentActivity.is_active) {
+        console.log('DisplayPage: Found active activity via current_activity_id:', currentActivity.id, currentActivity.title);
         return currentActivity;
+      } else if (currentActivity) {
+        console.log('DisplayPage: Warning - current_activity_id points to inactive activity:', currentActivity.id);
       }
     }
     
-    // Fallback: Find any activity marked as active
+    // Priority 2: Fallback to any activity marked as active (in case of data inconsistency)
     const flaggedActive = currentRoom.activities?.find(a => a.is_active) as Activity | undefined;
     if (flaggedActive) {
-      console.log('DisplayPage: Found active activity via is_active flag:', flaggedActive.id);
+      console.log('DisplayPage: Found active activity via is_active flag (fallback):', flaggedActive.id, flaggedActive.title);
       return flaggedActive;
     }
     
-    console.log('DisplayPage: No active activity found');
+    console.log('DisplayPage: No active activity found - showing dashboard');
     return null;
   }, [currentRoom?.current_activity_id, currentRoom?.activities]);
 
@@ -73,17 +77,19 @@ export const DisplayPage: React.FC = () => {
 
         setCurrentRoom(room);
 
-        // Log activity status for debugging
+        // Enhanced activity status debugging
         const activeByFlag = room.activities?.filter(a => a.is_active) || [];
         const activeByCurrent = room.current_activity_id ? 
           room.activities?.find(a => a.id === room.current_activity_id) : null;
         
         console.log('DisplayPage: Activity status analysis:', {
           totalActivities: room.activities?.length || 0,
+          currentActivityId: room.current_activity_id,
           activeByFlag: activeByFlag.map(a => ({ id: a.id, title: a.title })),
-          activeByCurrent: activeByCurrent ? { id: activeByCurrent.id, title: activeByCurrent.title } : null,
-          roomCurrentActivityId: room.current_activity_id,
-          mismatch: activeByFlag.length > 1 || (activeByFlag.length === 1 && activeByFlag[0].id !== room.current_activity_id)
+          activeByCurrent: activeByCurrent ? 
+            { id: activeByCurrent.id, title: activeByCurrent.title, isActive: activeByCurrent.is_active } : null,
+          inconsistency: activeByFlag.length > 1 || 
+            (activeByFlag.length === 1 && room.current_activity_id && activeByFlag[0].id !== room.current_activity_id)
         });
       } else {
         console.log('DisplayPage: Room not found for code:', pollId);
@@ -118,7 +124,7 @@ export const DisplayPage: React.FC = () => {
     };
   }, [currentRoom?.settings, applyTheme, resetTheme]);
 
-  // Enhanced real-time subscriptions
+  // Enhanced real-time subscriptions with immediate updates
   useEffect(() => {
     if (!pollId || !currentRoom || !supabase) return;
 
@@ -145,7 +151,7 @@ export const DisplayPage: React.FC = () => {
           newCurrentActivityType: payload.new?.current_activity_type
         });
         
-        // Immediate reload without delay for room changes
+        // Immediate reload for room changes - no delay
         await loadRoom(true);
       }
     );
@@ -207,7 +213,7 @@ export const DisplayPage: React.FC = () => {
     };
   }, [currentRoom?.id, loadRoom]);
 
-  // Backup periodic refresh (reduced frequency since we have better real-time)
+  // Reduced backup periodic refresh since real-time should handle most updates
   useEffect(() => {
     if (!currentRoom) return;
     
@@ -257,6 +263,166 @@ export const DisplayPage: React.FC = () => {
     };
   };
 
+  const formatTime = (date: Date) => {
+    return date.toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: true
+    });
+  };
+
+  // Dashboard Component for when no activity is active
+  const Dashboard = () => {
+    const stats = getRoomStats();
+    if (!stats || !currentRoom) return null;
+
+    return (
+      <div className="h-screen w-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 flex flex-col">
+        {/* Header */}
+        <div className="p-8 text-center border-b border-slate-700/50">
+          <motion.h1 
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="text-4xl font-bold text-white mb-2"
+          >
+            {currentRoom.name}
+          </motion.h1>
+          <div className="flex items-center justify-center gap-6 text-slate-300">
+            <span className="text-lg">Room Code: <span className="font-mono font-bold text-blue-400">{currentRoom.code}</span></span>
+            <span className="text-lg">{formatTime(currentTime)}</span>
+          </div>
+        </div>
+
+        <div className="flex-1 p-8">
+          {/* Stats Overview */}
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+            className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8"
+          >
+            <div className="bg-slate-800/50 backdrop-blur-sm rounded-lg p-6 border border-slate-700/50">
+              <div className="flex items-center gap-3">
+                <Users className="w-8 h-8 text-blue-400" />
+                <div>
+                  <p className="text-2xl font-bold text-white">{stats.participants}</p>
+                  <p className="text-slate-400">Participants</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-slate-800/50 backdrop-blur-sm rounded-lg p-6 border border-slate-700/50">
+              <div className="flex items-center gap-3">
+                <Target className="w-8 h-8 text-green-400" />
+                <div>
+                  <p className="text-2xl font-bold text-white">{stats.totalActivities}</p>
+                  <p className="text-slate-400">Total Activities</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-slate-800/50 backdrop-blur-sm rounded-lg p-6 border border-slate-700/50">
+              <div className="flex items-center gap-3">
+                <CheckCircle className="w-8 h-8 text-purple-400" />
+                <div>
+                  <p className="text-2xl font-bold text-white">{stats.completedActivities}</p>
+                  <p className="text-slate-400">Completed</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-slate-800/50 backdrop-blur-sm rounded-lg p-6 border border-slate-700/50">
+              <div className="flex items-center gap-3">
+                <TrendingUp className="w-8 h-8 text-orange-400" />
+                <div>
+                  <p className="text-2xl font-bold text-white">{stats.totalResponses}</p>
+                  <p className="text-slate-400">Total Responses</p>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+
+          {/* Activity Overview */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="bg-slate-800/50 backdrop-blur-sm rounded-lg border border-slate-700/50 p-6"
+          >
+            <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
+              <BarChart className="w-6 h-6 text-blue-400" />
+              Activity Overview
+            </h2>
+
+            {allActivities.length > 0 ? (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {allActivities.map((activity, index) => {
+                  const Icon = getActivityIcon(activity.type);
+                  return (
+                    <motion.div
+                      key={activity.id}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: 0.3 + index * 0.1 }}
+                      className="bg-slate-700/50 rounded-lg p-4 border border-slate-600/50"
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-start gap-3 flex-1">
+                          <Icon className="w-5 h-5 text-blue-400 mt-1" />
+                          <div className="flex-1 min-w-0">
+                            <h3 className="font-semibold text-white truncate">{activity.title}</h3>
+                            <p className="text-sm text-slate-400">{getActivityTypeLabel(activity.type)}</p>
+                            {activity.description && (
+                              <p className="text-sm text-slate-500 mt-1 truncate">{activity.description}</p>
+                            )}
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-lg font-bold text-white">{activity.total_responses || 0}</p>
+                          <p className="text-xs text-slate-400">responses</p>
+                        </div>
+                      </div>
+                      {activity.total_responses > 0 && (
+                        <div className="mt-3 bg-slate-600/50 rounded-full h-2">
+                          <div 
+                            className="bg-blue-500 h-2 rounded-full transition-all duration-500"
+                            style={{ 
+                              width: `${Math.min(100, (activity.total_responses / Math.max(stats.participants, 1)) * 100)}%` 
+                            }}
+                          />
+                        </div>
+                      )}
+                    </motion.div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="text-center py-12">
+                <Target className="w-16 h-16 mx-auto text-slate-600 mb-4" />
+                <p className="text-xl text-slate-400 mb-2">No Activities Yet</p>
+                <p className="text-slate-500">Activities will appear here when they are created</p>
+              </div>
+            )}
+          </motion.div>
+
+          {/* Waiting Message */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.4 }}
+            className="text-center mt-8"
+          >
+            <div className="inline-flex items-center gap-3 px-6 py-3 bg-blue-900/30 border border-blue-600/50 rounded-full">
+              <div className="w-3 h-3 bg-blue-500 rounded-full animate-pulse"></div>
+              <span className="text-blue-200 text-lg">Waiting for activity to start...</span>
+            </div>
+          </motion.div>
+        </div>
+      </div>
+    );
+  };
+
   if (loading) {
     return (
       <div className="h-screen w-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 flex items-center justify-center">
@@ -272,179 +438,72 @@ export const DisplayPage: React.FC = () => {
     return (
       <div className="h-screen w-screen bg-gradient-to-br from-slate-900 via-red-900 to-slate-900 flex items-center justify-center">
         <div className="text-center">
-          <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-            <Users className="w-8 h-8 text-red-400" />
-          </div>
-          <h2 className="text-2xl font-bold text-white mb-2">Room Not Found</h2>
-          <p className="text-red-400">Room code "{pollId}" does not exist or is not active.</p>
+          <div className="w-16 h-16 border-4 border-red-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <h1 className="text-2xl font-bold text-white mb-2">Room Not Found</h1>
+          <p className="text-red-300">Unable to find room with code: {pollId}</p>
         </div>
       </div>
     );
   }
 
-  // Get theme colors
-  const themeColors = {
-    primary: currentRoom.settings?.theme?.primary_color || '#3B82F6',
-    secondary: currentRoom.settings?.theme?.secondary_color || '#1E40AF',
-    accent: currentRoom.settings?.theme?.accent_color || '#60A5FA',
-    text: currentRoom.settings?.theme?.text_color || '#FFFFFF'
-  };
+  // Show dashboard when no activity is active
+  if (!activeActivity) {
+    return <Dashboard />;
+  }
 
-  const roomStats = getRoomStats();
-
+  // Show active activity
   return (
     <div className="h-screen w-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 overflow-hidden">
-      {/* Header */}
-      <div className="absolute top-0 left-0 right-0 z-10 p-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-white">{currentRoom.name}</h1>
-            <p className="text-slate-300">{currentRoom.description}</p>
-          </div>
-          
-          <div className="flex items-center gap-6 text-right">
-            <div className="flex items-center gap-2">
-              <Users className="w-5 h-5" style={{ color: themeColors.accent }} />
-              <span className="text-white font-medium">{currentRoom.participants}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Clock className="w-5 h-5" style={{ color: themeColors.accent }} />
-              <span className="text-white font-mono">
-                {currentTime.toLocaleTimeString()}
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Main Content */}
-      <div className="h-full flex items-center justify-center pt-24 pb-16">
-        <AnimatePresence mode="wait">
-          {activeActivity ? (
-            <motion.div
-              key={`active-${activeActivity.id}`}
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.9 }}
-              transition={{ duration: 0.5 }}
-              className="w-full max-w-6xl mx-auto px-6"
-            >
-              <Poll3DVisualization 
-                activity={activeActivity} 
-                roomCode={currentRoom.code}
-                themeColors={themeColors}
-              />
-            </motion.div>
-          ) : (
-            <motion.div
-              key="waiting"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              transition={{ duration: 0.5 }}
-              className="text-center max-w-4xl mx-auto px-6"
-            >
-              {/* Room Statistics */}
-              {roomStats && (
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-12">
-                  <div className="bg-slate-800/30 backdrop-blur-sm border border-slate-700 rounded-lg p-4">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Users className="w-5 h-5" style={{ color: themeColors.accent }} />
-                      <span className="text-slate-300 text-sm">Participants</span>
-                    </div>
-                    <p className="text-2xl font-bold text-white">{roomStats.participants}</p>
-                  </div>
-                  
-                  <div className="bg-slate-800/30 backdrop-blur-sm border border-slate-700 rounded-lg p-4">
-                    <div className="flex items-center gap-2 mb-2">
-                      <BarChart className="w-5 h-5" style={{ color: themeColors.accent }} />
-                      <span className="text-slate-300 text-sm">Activities</span>
-                    </div>
-                    <p className="text-2xl font-bold text-white">{roomStats.totalActivities}</p>
-                  </div>
-                  
-                  <div className="bg-slate-800/30 backdrop-blur-sm border border-slate-700 rounded-lg p-4">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Trophy className="w-5 h-5" style={{ color: themeColors.accent }} />
-                      <span className="text-slate-300 text-sm">Completed</span>
-                    </div>
-                    <p className="text-2xl font-bold text-white">{roomStats.completedActivities}</p>
-                  </div>
-                  
-                  <div className="bg-slate-800/30 backdrop-blur-sm border border-slate-700 rounded-lg p-4">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Target className="w-5 h-5" style={{ color: themeColors.accent }} />
-                      <span className="text-slate-300 text-sm">Responses</span>
-                    </div>
-                    <p className="text-2xl font-bold text-white">{roomStats.totalResponses}</p>
-                  </div>
-                </div>
-              )}
-
-              {/* Waiting Message */}
-              <div className="mb-12">
-                <div className="w-24 h-24 bg-slate-700/50 rounded-full flex items-center justify-center mx-auto mb-6">
-                  <Clock className="w-12 h-12" style={{ color: themeColors.accent }} />
-                </div>
-                <h2 className="text-3xl font-bold text-white mb-4">
-                  {allActivities.length === 0 ? "Getting Ready..." : "Activity Paused"}
-                </h2>
-                <p className="text-xl text-slate-300 max-w-2xl mx-auto">
-                  {allActivities.length === 0 
-                    ? "No activities have been created yet. The presenter will start activities soon."
-                    : "Waiting for the next activity to begin..."
-                  }
-                </p>
-              </div>
-
-              {/* Activity History/Preview */}
-              {allActivities.length > 0 && (
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 max-h-64 overflow-hidden">
-                  {allActivities.slice(0, 8).map((activity, index) => {
-                    const Icon = getActivityIcon(activity.type);
-                    const totalResponses = activity.total_responses;
-                    
-                    return (
-                      <motion.div
-                        key={activity.id}
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: index * 0.1 }}
-                        className="bg-slate-800/30 backdrop-blur-sm border border-slate-700 rounded-lg p-4"
-                      >
-                        <div className="flex items-center gap-2 mb-3">
-                          <Icon className="w-4 h-4" style={{ color: themeColors.accent }} />
-                          <span className="text-xs font-medium text-slate-300">
-                            {getActivityTypeLabel(activity.type)}
-                          </span>
-                        </div>
-                        <h4 className="font-medium text-white text-sm mb-2 line-clamp-2">
-                          {activity.title}
-                        </h4>
-                        <div className="flex items-center justify-between text-xs text-slate-400">
-                          <span>{totalResponses} responses</span>
-                          <span>{activity.options?.length || 0} options</span>
-                        </div>
-                      </motion.div>
-                    );
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={activeActivity.id}
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 0.95 }}
+          transition={{ duration: 0.3 }}
+          className="h-full"
+        >
+          {/* Header */}
+          <div className="p-6 border-b border-slate-700/50 bg-slate-800/30 backdrop-blur-sm">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-3">
+                  {React.createElement(getActivityIcon(activeActivity.type), {
+                    className: "w-8 h-8 text-blue-400"
                   })}
+                  <div>
+                    <h1 className="text-2xl font-bold text-white">{activeActivity.title}</h1>
+                    <p className="text-slate-400">{getActivityTypeLabel(activeActivity.type)} • Room {currentRoom.code}</p>
+                  </div>
                 </div>
-              )}
-
-              <div className="mt-8 text-sm opacity-50" style={{ color: themeColors.text }}>
-                Join at <span className="font-mono font-bold">{window.location.origin}/game</span> • Code: <span className="font-mono font-bold">{currentRoom.code}</span>
+                <div className="px-3 py-1 bg-green-600 text-white text-sm rounded-full animate-pulse">
+                  LIVE
+                </div>
               </div>
               
-              {/* Debug info in development */}
-              {process.env.NODE_ENV === 'development' && (
-                <div className="mt-4 text-xs text-slate-500">
-                  Last update: {lastUpdateTime.toLocaleTimeString()} • Active activity: {activeActivity?.id || 'none'}
+              <div className="flex items-center gap-6 text-slate-300">
+                <div className="flex items-center gap-2">
+                  <Users className="w-5 h-5" />
+                  <span>{currentRoom.participants} participants</span>
                 </div>
-              )}
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
+                <div className="flex items-center gap-2">
+                  <BarChart className="w-5 h-5" />
+                  <span>{activeActivity.total_responses || 0} responses</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Clock className="w-5 h-5" />
+                  <span>{formatTime(currentTime)}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Activity Content */}
+          <div className="flex-1 overflow-hidden">
+            <Poll3DVisualization activity={activeActivity} />
+          </div>
+        </motion.div>
+      </AnimatePresence>
     </div>
   );
 };
