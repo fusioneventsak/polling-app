@@ -20,25 +20,43 @@ export const DisplayPage: React.FC = () => {
   const activeActivity = React.useMemo(() => {
     if (!currentRoom) return null;
     
+    console.log('DisplayPage: Analyzing active activity...', {
+      roomCurrentActivityId: currentRoom.current_activity_id,
+      totalActivities: currentRoom.activities?.length || 0,
+      activitiesWithFlags: currentRoom.activities?.map(a => ({
+        id: a.id,
+        title: a.title,
+        isActive: a.is_active
+      })) || []
+    });
+    
     // Priority 1: Check room.current_activity_id first (most authoritative)
     if (currentRoom.current_activity_id) {
       const currentActivity = currentRoom.activities?.find(a => 
         a.id === currentRoom.current_activity_id
       ) as Activity | undefined;
       
-      // Verify the activity is actually marked as active
-      if (currentActivity && currentActivity.is_active) {
-        console.log('DisplayPage: Found active activity via current_activity_id:', currentActivity.id, currentActivity.title);
+      if (currentActivity) {
+        // Don't require is_active flag to match - trust the room's current_activity_id
+        console.log('DisplayPage: Found activity via current_activity_id:', {
+          id: currentActivity.id,
+          title: currentActivity.title,
+          isActive: currentActivity.is_active,
+          trustingRoomSetting: true
+        });
         return currentActivity;
-      } else if (currentActivity) {
-        console.log('DisplayPage: Warning - current_activity_id points to inactive activity:', currentActivity.id);
+      } else {
+        console.log('DisplayPage: Warning - current_activity_id points to non-existent activity:', currentRoom.current_activity_id);
       }
     }
     
     // Priority 2: Fallback to any activity marked as active (in case of data inconsistency)
     const flaggedActive = currentRoom.activities?.find(a => a.is_active) as Activity | undefined;
     if (flaggedActive) {
-      console.log('DisplayPage: Found active activity via is_active flag (fallback):', flaggedActive.id, flaggedActive.title);
+      console.log('DisplayPage: Found active activity via is_active flag (fallback):', {
+        id: flaggedActive.id,
+        title: flaggedActive.title
+      });
       return flaggedActive;
     }
     
@@ -111,6 +129,46 @@ export const DisplayPage: React.FC = () => {
     initializeRoom();
   }, [loadRoom]);
 
+  // Secondary subscription for immediate room changes (backup method)
+  useEffect(() => {
+    if (!pollId || !supabase) return;
+
+    console.log('DisplayPage: Setting up backup room change listener for:', pollId);
+
+    // Listen for any room changes and check if they match our room code
+    const backupChannel = supabase
+      .channel(`backup-room-${pollId}-${Date.now()}`)
+      .on('postgres_changes', 
+        { 
+          event: '*', 
+          schema: 'public', 
+          table: 'rooms'
+        },
+        async (payload) => {
+          const roomData = payload.new || payload.old;
+          if (roomData?.code === pollId) {
+            console.log('DisplayPage: Backup listener - room change detected:', {
+              eventType: payload.eventType,
+              roomCode: roomData.code,
+              newCurrentActivityId: payload.new?.current_activity_id,
+              oldCurrentActivityId: payload.old?.current_activity_id
+            });
+            
+            // Force immediate reload
+            await loadRoom(true);
+          }
+        }
+      )
+      .subscribe((status) => {
+        console.log('DisplayPage: Backup subscription status:', status);
+      });
+
+    return () => {
+      console.log('DisplayPage: Cleaning up backup subscription');
+      supabase.removeChannel(backupChannel);
+    };
+  }, [pollId, loadRoom]);
+
   // Apply room theme when room loads
   useEffect(() => {
     if (currentRoom?.settings) {
@@ -124,109 +182,139 @@ export const DisplayPage: React.FC = () => {
     };
   }, [currentRoom?.settings, applyTheme, resetTheme]);
 
-  // Enhanced real-time subscriptions with immediate updates
+  // Enhanced real-time subscriptions - setup immediately when pollId is available
   useEffect(() => {
-    if (!pollId || !currentRoom || !supabase) return;
+    if (!pollId || !supabase) return;
 
-    console.log('DisplayPage: Setting up real-time subscriptions for room:', currentRoom.id);
+    console.log('DisplayPage: Setting up real-time subscriptions for room code:', pollId);
 
     // Create a unique channel for this display session
-    const channelName = `room-display-${currentRoom.id}-${Date.now()}`;
+    const channelName = `room-display-${pollId}-${Date.now()}`;
     const channel = supabase.channel(channelName);
 
-    // Subscribe to room changes with immediate reload
+    // Subscribe to ALL room changes (we'll filter by code in the handler)
     channel.on('postgres_changes', 
       { 
         event: '*', 
         schema: 'public', 
-        table: 'rooms',
-        filter: `id=eq.${currentRoom.id}`
+        table: 'rooms'
       },
       async (payload) => {
-        console.log('DisplayPage: Room change received:', {
-          eventType: payload.eventType,
-          oldCurrentActivityId: payload.old?.current_activity_id,
-          newCurrentActivityId: payload.new?.current_activity_id,
-          oldCurrentActivityType: payload.old?.current_activity_type,
-          newCurrentActivityType: payload.new?.current_activity_type
-        });
-        
-        // Immediate reload for room changes - no delay
-        await loadRoom(true);
-      }
-    );
-
-    // Subscribe to activity changes for this room with immediate reload
-    channel.on('postgres_changes',
-      { 
-        event: '*', 
-        schema: 'public', 
-        table: 'activities',
-        filter: `room_id=eq.${currentRoom.id}`
-      },
-      async (payload) => {
-        console.log('DisplayPage: Activity change received:', {
-          eventType: payload.eventType,
-          activityId: payload.new?.id || payload.old?.id,
-          isActive: payload.new?.is_active,
-          title: payload.new?.title || payload.old?.title
-        });
-        
-        // Immediate reload for activity changes
-        await loadRoom(true);
-      }
-    );
-
-    // Subscribe to response changes for activities in this room
-    channel.on('postgres_changes',
-      {
-        event: '*',
-        schema: 'public',
-        table: 'responses'
-      },
-      async (payload) => {
-        // Check if this response belongs to an activity in our room
-        const activityId = payload.new?.activity_id || payload.old?.activity_id;
-        const roomActivity = currentRoom.activities?.find(a => a.id === activityId);
-        
-        if (roomActivity) {
-          console.log('DisplayPage: Response change for room activity:', {
+        // Only process changes for our room
+        const room = payload.new || payload.old;
+        if (room?.code === pollId) {
+          console.log('DisplayPage: Room change received for our room:', {
             eventType: payload.eventType,
-            activityId,
-            responseId: payload.new?.id || payload.old?.id
+            roomCode: room.code,
+            oldCurrentActivityId: payload.old?.current_activity_id,
+            newCurrentActivityId: payload.new?.current_activity_id,
+            oldCurrentActivityType: payload.old?.current_activity_type,
+            newCurrentActivityType: payload.new?.current_activity_type
           });
           
-          // Reload to update response counts
+          // Immediate reload for room changes - no delay
           await loadRoom(true);
         }
       }
     );
 
+    // Subscribe to ALL activity changes (we'll filter by room in the handler)
+    channel.on('postgres_changes',
+      { 
+        event: '*', 
+        schema: 'public', 
+        table: 'activities'
+      },
+      async (payload) => {
+        // Only process if we have a current room and this activity belongs to it
+        if (currentRoom && 
+            (payload.new?.room_id === currentRoom.id || payload.old?.room_id === currentRoom.id)) {
+          console.log('DisplayPage: Activity change received for our room:', {
+            eventType: payload.eventType,
+            activityId: payload.new?.id || payload.old?.id,
+            isActive: payload.new?.is_active,
+            title: payload.new?.title || payload.old?.title,
+            roomId: payload.new?.room_id || payload.old?.room_id
+          });
+          
+          // Immediate reload for activity changes
+          await loadRoom(true);
+        }
+      }
+    );
+
+    // Subscribe to response changes (we'll filter by room in the handler)
+    channel.on('postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'participant_responses'
+      },
+      async (payload) => {
+        // Check if this response belongs to an activity in our room
+        if (currentRoom) {
+          const activityId = payload.new?.activity_id || payload.old?.activity_id;
+          const roomActivity = currentRoom.activities?.find(a => a.id === activityId);
+          
+          if (roomActivity) {
+            console.log('DisplayPage: Response change for room activity:', {
+              eventType: payload.eventType,
+              activityId,
+              responseId: payload.new?.id || payload.old?.id
+            });
+            
+            // Reload to update response counts
+            await loadRoom(true);
+          }
+        }
+      }
+    );
+
     // Subscribe to the channel
-    channel.subscribe((status) => {
+    channel.subscribe((status, err) => {
       console.log('DisplayPage: Subscription status:', status);
+      if (err) {
+        console.error('DisplayPage: Subscription error:', err);
+      }
+      if (status === 'SUBSCRIBED') {
+        console.log('✅ DisplayPage: Real-time subscriptions active for room:', pollId);
+      }
     });
 
     return () => {
       console.log('DisplayPage: Cleaning up real-time subscriptions');
       supabase.removeChannel(channel);
     };
-  }, [currentRoom?.id, loadRoom]);
+  }, [pollId, loadRoom, currentRoom?.id]); // Include currentRoom.id for activity filtering
 
-  // Reduced backup periodic refresh since real-time should handle most updates
+  // More aggressive polling fallback to ensure updates
   useEffect(() => {
     if (!currentRoom) return;
     
     const interval = setInterval(async () => {
       const timeSinceLastUpdate = Date.now() - lastUpdateTime.getTime();
-      if (timeSinceLastUpdate > 30000) { // Only refresh if no updates in 30 seconds
-        console.log('DisplayPage: Backup periodic refresh (no updates for 30s)');
+      // Check every 5 seconds if no updates in last 10 seconds
+      if (timeSinceLastUpdate > 10000) {
+        console.log('DisplayPage: Aggressive polling - checking for updates (no updates for 10s)');
         await loadRoom(true);
       }
-    }, 15000); // Check every 15 seconds
+    }, 5000); // Check every 5 seconds
 
     return () => clearInterval(interval);
   }, [currentRoom?.id, lastUpdateTime, loadRoom]);
+
+  // Additional fallback - check for activity changes every 3 seconds when no activity is active
+  useEffect(() => {
+    if (!currentRoom || activeActivity) return;
+    
+    console.log('DisplayPage: Setting up frequent polling while waiting for activity');
+    const interval = setInterval(async () => {
+      console.log('DisplayPage: Frequent check for new activity');
+      await loadRoom(true);
+    }, 3000); // Check every 3 seconds when waiting
+
+    return () => clearInterval(interval);
+  }, [currentRoom?.id, activeActivity, loadRoom]);
 
   const getActivityIcon = (type: ActivityType) => {
     switch (type) {
@@ -416,6 +504,19 @@ export const DisplayPage: React.FC = () => {
             <div className="inline-flex items-center gap-3 px-6 py-3 bg-blue-900/30 border border-blue-600/50 rounded-full">
               <div className="w-3 h-3 bg-blue-500 rounded-full animate-pulse"></div>
               <span className="text-blue-200 text-lg">Waiting for activity to start...</span>
+            </div>
+            
+            {/* Debug refresh button */}
+            <div className="mt-4">
+              <button
+                onClick={() => {
+                  console.log('DisplayPage: Manual refresh triggered');
+                  loadRoom(true);
+                }}
+                className="px-4 py-2 text-sm bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg transition-colors"
+              >
+                🔄 Refresh Display
+              </button>
             </div>
           </motion.div>
         </div>
