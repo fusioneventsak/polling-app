@@ -263,8 +263,8 @@ export const AdminPage: React.FC = () => {
                     key={room.id}
                     className={`p-4 rounded-lg border cursor-pointer transition-colors ${
                       selectedRoom?.id === room.id
-                        ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800'
-                        : 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700'
+                        ? 'bg-blue-900/20 border-blue-500/30'
+                        : 'bg-slate-700/30 border-slate-600 hover:bg-slate-700/50'
                     }`}
                     onClick={() => setSelectedRoom(room)}
                   >
