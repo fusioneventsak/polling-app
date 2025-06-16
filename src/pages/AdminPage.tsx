@@ -25,106 +25,121 @@ export const AdminPage: React.FC = () => {
   } | null>(null);
   const [deletingActivities, setDeletingActivities] = useState<Set<string>>(new Set());
 
-  // Real-time subscriptions with improved logic to prevent unnecessary refreshes
+  // Consolidated real-time subscriptions with improved connection management
   useEffect(() => {
     if (!supabase) return;
 
-    console.log('Admin: Setting up optimized real-time subscriptions');
+    console.log('Admin: Setting up consolidated real-time subscriptions');
 
-    const adminChannel = supabase
-      .channel(`admin-realtime-${Date.now()}`)
-      .on('postgres_changes',
-        { event: '*', schema: 'public', table: 'rooms' },
-        (payload) => {
-          console.log('Admin: Room change received:', {
-            eventType: payload.eventType,
-            roomId: payload.new?.id || payload.old?.id,
-            oldCurrentActivityId: payload.old?.current_activity_id,
-            newCurrentActivityId: payload.new?.current_activity_id
-          });
+    // Create a single channel for admin operations
+    const adminChannel = supabase.channel('admin-console');
+
+    // Subscribe to room changes
+    adminChannel.on('postgres_changes',
+      { event: '*', schema: 'public', table: 'rooms' },
+      (payload) => {
+        console.log('Admin: Room change received:', {
+          eventType: payload.eventType,
+          roomId: payload.new?.id || payload.old?.id,
+          oldCurrentActivityId: payload.old?.current_activity_id,
+          newCurrentActivityId: payload.new?.current_activity_id
+        });
+        
+        // Skip reload for DELETE events to prevent conflicts with optimistic updates
+        if (payload.eventType === 'DELETE') {
+          console.log('Admin: Skipping reload for DELETE event');
+          return;
+        }
+        
+        // For room changes, only reload if we don't have optimistic updates pending
+        if (payload.eventType === 'UPDATE' && payload.new?.current_activity_id) {
+          const roomId = payload.new.id;
+          const currentRoomInState = rooms.find(r => r.id === roomId);
           
-          // Skip reload for DELETE events to prevent conflicts with optimistic updates
-          if (payload.eventType === 'DELETE') {
-            console.log('Admin: Skipping reload for DELETE event to prevent conflicts with optimistic updates');
-            return;
-          }
-          
-          // For room changes, only reload if we don't have optimistic updates pending
-          // This prevents the "refreshing" issue when starting activities
-          if (payload.eventType === 'UPDATE' && payload.new?.current_activity_id) {
-            // Check if this is an activity start/stop that we initiated
-            const roomId = payload.new.id;
-            const currentRoomInState = rooms.find(r => r.id === roomId);
+          if (currentRoomInState && selectedRoom?.id === roomId) {
+            // If our local state already matches this change (optimistic update), don't reload
+            const localCurrentActivityId = selectedRoom.current_activity_id;
+            const newCurrentActivityId = payload.new.current_activity_id;
             
-            if (currentRoomInState && selectedRoom?.id === roomId) {
-              // If our local state already matches this change (optimistic update), don't reload
-              const localCurrentActivityId = selectedRoom.current_activity_id;
-              const newCurrentActivityId = payload.new.current_activity_id;
-              
-              if (localCurrentActivityId === newCurrentActivityId) {
-                console.log('Admin: Skipping reload - optimistic update already applied');
-                return;
-              }
+            if (localCurrentActivityId === newCurrentActivityId) {
+              console.log('Admin: Skipping reload - optimistic update already applied');
+              return;
             }
           }
-          
-          // Reload for other room changes
-          loadRooms();
         }
-      )
-      .on('postgres_changes',
-        { event: '*', schema: 'public', table: 'activities' },
-        (payload) => {
-          console.log('Admin: Activity change received:', {
-            eventType: payload.eventType,
-            activityId: payload.new?.id || payload.old?.id,
-            isActive: payload.new?.is_active,
-            roomId: payload.new?.room_id || payload.old?.room_id
-          });
+        
+        // Reload for other changes
+        loadRooms();
+      }
+    );
+
+    // Subscribe to activity changes
+    adminChannel.on('postgres_changes',
+      { event: '*', schema: 'public', table: 'activities' },
+      (payload) => {
+        console.log('Admin: Activity change received:', {
+          eventType: payload.eventType,
+          activityId: payload.new?.id || payload.old?.id,
+          isActive: payload.new?.is_active,
+          roomId: payload.new?.room_id || payload.old?.room_id
+        });
+        
+        // Skip reload for DELETE events
+        if (payload.eventType === 'DELETE') {
+          console.log('Admin: Skipping reload for DELETE activity event');
+          return;
+        }
+        
+        // For activity changes, check if we initiated this change (optimistic update)
+        if (payload.eventType === 'UPDATE' && payload.new?.is_active !== undefined) {
+          const activityId = payload.new.id;
+          const roomId = payload.new.room_id;
           
-          // Skip reload for DELETE events to prevent conflicts with optimistic updates
-          if (payload.eventType === 'DELETE') {
-            console.log('Admin: Skipping reload for DELETE activity event to prevent conflicts');
-            return;
-          }
-          
-          // For activity changes, check if we initiated this change (optimistic update)
-          if (payload.eventType === 'UPDATE' && payload.new?.is_active !== undefined) {
-            const activityId = payload.new.id;
-            const roomId = payload.new.room_id;
-            
-            if (selectedRoom?.id === roomId) {
-              // Check if our local state already reflects this change
-              const localActivity = selectedRoom.activities?.find(a => a.id === activityId);
-              if (localActivity && localActivity.is_active === payload.new.is_active) {
-                console.log('Admin: Skipping reload - activity optimistic update already applied');
-                return;
-              }
+          if (selectedRoom?.id === roomId) {
+            // Check if our local state already reflects this change
+            const localActivity = selectedRoom.activities?.find(a => a.id === activityId);
+            if (localActivity && localActivity.is_active === payload.new.is_active) {
+              console.log('Admin: Skipping reload - activity optimistic update already applied');
+              return;
             }
           }
-          
-          // Reload for other activity changes
-          loadRooms();
         }
-      )
-      .on('postgres_changes',
-        { event: '*', schema: 'public', table: 'responses' },
-        (payload) => {
-          console.log('Admin: Response change received:', {
-            eventType: payload.eventType,
-            responseId: payload.new?.id || payload.old?.id,
-            activityId: payload.new?.activity_id || payload.old?.activity_id
-          });
-          
-          // Always refresh for response changes to update counts
-          loadRooms();
-        }
-      )
-      .subscribe();
+        
+        // Reload for other activity changes
+        loadRooms();
+      }
+    );
+
+    // Subscribe to response changes
+    adminChannel.on('postgres_changes',
+      { event: '*', schema: 'public', table: 'participant_responses' },
+      (payload) => {
+        console.log('Admin: Response change received:', {
+          eventType: payload.eventType,
+          responseId: payload.new?.id || payload.old?.id,
+          activityId: payload.new?.activity_id || payload.old?.activity_id
+        });
+        
+        // Always refresh for response changes to update counts
+        loadRooms();
+      }
+    );
+
+    // Subscribe with proper error handling
+    adminChannel.subscribe((status, err) => {
+      console.log('Admin: Subscription status:', status);
+      if (err) {
+        console.error('Admin: Subscription error:', err);
+      }
+      if (status === 'SUBSCRIBED') {
+        console.log('✅ Admin: Real-time subscriptions active');
+      }
+    });
 
     return () => {
       console.log('Admin: Cleaning up real-time subscriptions');
-      supabase.removeChannel(adminChannel);
+      // Use unsubscribe instead of removeChannel to avoid WebSocket conflicts
+      adminChannel.unsubscribe();
     };
   }, [rooms, selectedRoom]); // Include dependencies to check current state
 
