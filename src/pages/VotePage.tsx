@@ -69,15 +69,59 @@ export const VotePage: React.FC = () => {
     }
   }, [pollId, navigate]);
 
+  // Function to check if user has voted by looking at actual database responses
+  const checkVotingStatus = useCallback(async () => {
+    if (!pollId || !supabase) return;
+    
+    try {
+      // First check localStorage for quick response
+      const votedActivities = JSON.parse(localStorage.getItem('votedActivities') || '[]');
+      const localHasVoted = votedActivities.includes(pollId);
+      
+      // Also check database to ensure data consistency (in case of reset)
+      const { data: response, error } = await supabase
+        .from('participant_responses')
+        .select('id')
+        .eq('activity_id', pollId)
+        .eq('participant_id', participantId)
+        .single();
+
+      const dbHasVoted = !!response && !error;
+      
+      // If localStorage says voted but database says no, clear localStorage
+      if (localHasVoted && !dbHasVoted) {
+        console.log('VotePage: Detected reset - clearing localStorage vote status');
+        const updatedVotedActivities = votedActivities.filter((id: string) => id !== pollId);
+        localStorage.setItem('votedActivities', JSON.stringify(updatedVotedActivities));
+        setHasVoted(false);
+      } else {
+        setHasVoted(dbHasVoted);
+      }
+      
+      console.log('VotePage: Vote status check:', {
+        localStorage: localHasVoted,
+        database: dbHasVoted,
+        final: dbHasVoted
+      });
+      
+    } catch (error) {
+      console.error('VotePage: Error checking vote status:', error);
+      // Fallback to localStorage only
+      const votedActivities = JSON.parse(localStorage.getItem('votedActivities') || '[]');
+      setHasVoted(votedActivities.includes(pollId));
+    }
+  }, [pollId, participantId]);
+
   useEffect(() => {
     const initializeActivity = async () => {
       setLoading(true);
       await loadActivity(true);
+      await checkVotingStatus();
       setLoading(false);
     };
 
     initializeActivity();
-  }, [loadActivity]);
+  }, [loadActivity, checkVotingStatus]);
 
   // Apply room theme when activity loads
   useEffect(() => {
@@ -92,17 +136,9 @@ export const VotePage: React.FC = () => {
     };
   }, [activity?.room?.settings, applyTheme, resetTheme]);
 
+  // Enhanced real-time subscriptions with reset detection
   useEffect(() => {
-    // Check if user has already voted (localStorage)
-    if (pollId) {
-      const votedActivities = JSON.parse(localStorage.getItem('votedActivities') || '[]');
-      setHasVoted(votedActivities.includes(pollId));
-    }
-  }, [pollId]);
-
-  // Enhanced real-time subscriptions
-  useEffect(() => {
-    if (!pollId || !supabase) return;
+    if (!pollId || !supabase || !activity) return;
 
     console.log('VotePage: Setting up real-time subscriptions for activity:', pollId);
 
@@ -201,7 +237,7 @@ export const VotePage: React.FC = () => {
       }
     );
 
-    // Subscribe to participant responses for this activity
+    // CRITICAL: Subscribe to participant responses for this activity to detect resets
     channel.on('postgres_changes',
       { 
         event: '*', 
@@ -210,10 +246,49 @@ export const VotePage: React.FC = () => {
         filter: `activity_id=eq.${pollId}`
       },
       async (payload) => {
-        console.log('VotePage: Response change received:', payload);
+        console.log('VotePage: Participant response change received:', {
+          eventType: payload.eventType,
+          activityId: payload.new?.activity_id || payload.old?.activity_id,
+          participantId: payload.new?.participant_id || payload.old?.participant_id
+        });
+        
+        // If this is a DELETE event (could be from room reset), recheck voting status
+        if (payload.eventType === 'DELETE') {
+          console.log('VotePage: Response deleted - rechecking vote status');
+          await checkVotingStatus();
+        }
+        
         await loadActivity(true);
       }
     );
+
+    // Subscribe to ALL participant responses for the room to detect bulk deletes (room reset)
+    if (activity.room_id) {
+      channel.on('postgres_changes',
+        { 
+          event: 'DELETE', 
+          schema: 'public', 
+          table: 'participant_responses',
+          filter: `room_id=eq.${activity.room_id}`
+        },
+        async (payload) => {
+          console.log('VotePage: Bulk participant responses deleted - likely room reset');
+          
+          // Clear all localStorage votes for this room's activities
+          if (activity.room?.activities) {
+            const votedActivities = JSON.parse(localStorage.getItem('votedActivities') || '[]');
+            const roomActivityIds = activity.room.activities.map(a => a.id);
+            const filteredVotes = votedActivities.filter((id: string) => !roomActivityIds.includes(id));
+            localStorage.setItem('votedActivities', JSON.stringify(filteredVotes));
+            console.log('VotePage: Cleared localStorage votes for room activities');
+          }
+          
+          // Recheck voting status
+          await checkVotingStatus();
+          await loadActivity(true);
+        }
+      );
+    }
 
     // Subscribe to the channel
     channel.subscribe((status, err) => {
@@ -230,7 +305,7 @@ export const VotePage: React.FC = () => {
       console.log('VotePage: Cleaning up subscriptions');
       channel.unsubscribe();
     };
-  }, [pollId, navigate, roomCode, activity?.room_id, loadActivity]);
+  }, [pollId, navigate, roomCode, activity, loadActivity, checkVotingStatus]);
 
   const handleVote = async (optionId: string) => {
     if (!activity || hasVoted || voting || !supabase) return;
@@ -267,12 +342,20 @@ export const VotePage: React.FC = () => {
     }
   };
 
+  const themeColors = {
+    primary: activity?.room?.settings?.primaryColor || '#3b82f6',
+    accent: activity?.room?.settings?.accentColor || '#10b981',
+    background: activity?.room?.settings?.backgroundColor || '#1e293b'
+  };
+
+  const isVotingLocked = activity?.settings?.voting_locked || false;
+
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 flex items-center justify-center">
+      <div className="h-screen w-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 flex items-center justify-center">
         <div className="text-center">
-          <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-white text-lg">Loading activity...</p>
+          <Loader2 className="w-8 h-8 animate-spin text-blue-400 mx-auto mb-4" />
+          <p className="text-white">Loading activity...</p>
         </div>
       </div>
     );
@@ -280,35 +363,26 @@ export const VotePage: React.FC = () => {
 
   if (!activity) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-red-900 to-slate-900 flex items-center justify-center">
+      <div className="h-screen w-screen bg-gradient-to-br from-slate-900 via-red-900 to-slate-900 flex items-center justify-center">
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-white mb-2">Activity Not Found</h1>
-          <p className="text-red-300 mb-4">This activity may have ended or doesn't exist.</p>
+          <h1 className="text-2xl font-bold text-white mb-4">Activity Not Found</h1>
+          <p className="text-red-300 mb-6">This activity may have been deleted or is no longer active.</p>
           <button
             onClick={() => navigate('/game')}
-            className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+            className="px-6 py-3 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors"
           >
-            Join Another Room
+            Return to Join Page
           </button>
         </div>
       </div>
     );
   }
 
-  const themeColors = {
-    primary: activity.room?.settings?.theme?.primary_color || '#3B82F6',
-    secondary: activity.room?.settings?.theme?.secondary_color || '#1E40AF',
-    accent: activity.room?.settings?.theme?.accent_color || '#60A5FA',
-    text: activity.room?.settings?.theme?.text_color || '#FFFFFF'
-  };
-
-  const isVotingLocked = activity.settings?.voting_locked || false;
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900">
-      <div className="max-w-4xl mx-auto p-6">
+    <div className="min-h-screen w-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 overflow-x-hidden">
+      <div className="container mx-auto px-4 py-8 max-w-4xl">
         {/* Header */}
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center gap-4 mb-8">
           <button
             onClick={() => {
               if (roomCode) {
@@ -317,36 +391,31 @@ export const VotePage: React.FC = () => {
                 navigate('/game');
               }
             }}
-            className="flex items-center gap-2 text-slate-300 hover:text-white transition-colors"
+            className="p-2 rounded-lg bg-slate-800/50 hover:bg-slate-700/50 text-slate-400 hover:text-white transition-colors"
           >
-            <ArrowLeft className="w-5 h-5" />
-            Back to Room
+            <ArrowLeft className="w-6 h-6" />
           </button>
           
-          <div className="flex items-center gap-4 text-slate-300">
-            <div className="flex items-center gap-2">
+          <div className="flex items-center gap-4">
+            <span className="text-sm text-slate-400">Room {roomCode}</span>
+            <div className="flex items-center gap-2 text-sm text-slate-400">
               <Users className="w-4 h-4" />
-              <span>{activity.total_responses} responses</span>
+              <span>{activity.total_responses || 0} responses</span>
             </div>
-            {roomCode && (
-              <span className="px-3 py-1 bg-slate-700 rounded-full text-sm font-mono">
-                {roomCode}
-              </span>
-            )}
           </div>
         </div>
 
         {/* Activity Content */}
-        <div className="text-center mb-8">
+        <div className="text-center mb-12">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="mb-6"
+            className="mb-8"
           >
             <span 
-              className="inline-block px-4 py-2 rounded-full text-sm font-medium mb-4"
+              className="inline-block px-4 py-2 rounded-full text-sm font-semibold mb-6"
               style={{ 
-                backgroundColor: `${themeColors.accent}20`,
+                backgroundColor: `${themeColors.accent}20`, 
                 color: themeColors.accent 
               }}
             >
@@ -455,35 +524,35 @@ export const VotePage: React.FC = () => {
                         : isVotingLocked
                         ? 'border-slate-600 bg-slate-800/50 opacity-50 cursor-not-allowed'
                         : 'border-slate-600 bg-slate-800/50 hover:border-slate-500 hover:bg-slate-800/70 hover:scale-[1.02] cursor-pointer'
-                    } ${voting ? 'cursor-not-allowed' : ''}`}
+                    } ${voting ? 'pointer-events-none' : ''}`}
                   >
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1">
-                        <span className="text-lg font-medium text-white block">
+                    <div className="flex items-center gap-4">
+                      {option.media_url && (
+                        <img
+                          src={option.media_url}
+                          alt={`Option ${index + 1}`}
+                          className="w-16 h-16 rounded-lg object-cover"
+                        />
+                      )}
+                      
+                      <div className="flex-1 text-left">
+                        <p className="text-lg font-semibold text-white">
                           {option.text}
-                        </span>
-                        
-                        {option.media_url && (
-                          <img
-                            src={option.media_url}
-                            alt="Option media"
-                            className="mt-3 max-w-xs rounded-md"
-                          />
-                        )}
+                        </p>
                       </div>
                       
                       {voting && selectedOption === option.id && (
-                        <Loader2 className="w-6 h-6 text-blue-400 animate-spin ml-4" />
+                        <Loader2 className="w-6 h-6 animate-spin text-blue-400" />
                       )}
                     </div>
                   </motion.button>
                 ))}
               </div>
               
-              {voting && (
-                <div className="text-center mt-6">
-                  <p className="text-slate-300">Submitting your vote...</p>
-                </div>
+              {isVotingLocked && (
+                <p className="text-center text-red-400 text-sm mt-4">
+                  Voting has been locked by the presenter
+                </p>
               )}
             </motion.div>
           )}
