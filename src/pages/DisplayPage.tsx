@@ -100,7 +100,7 @@ export const DisplayPage: React.FC = () => {
       console.error('DisplayPage: Error loading room:', error);
       setCurrentRoom(null);
     }
-  }, [pollId]);
+  }, [pollId]); // Only pollId dependency
 
   // Initialize room on mount
   useEffect(() => {
@@ -126,12 +126,25 @@ export const DisplayPage: React.FC = () => {
     };
   }, [currentRoom?.settings, applyTheme, resetTheme]);
 
-  // Single consolidated real-time subscription
+  // Single real-time subscription - stable and efficient
   useEffect(() => {
     if (!pollId || !supabase) return;
 
     let mounted = true;
-    console.log('DisplayPage: Setting up single real-time subscription for room code:', pollId);
+    console.log('DisplayPage: Setting up real-time subscription for room code:', pollId);
+
+    // Create stable reference to loadRoom function
+    const reloadRoom = async () => {
+      if (!mounted) return;
+      try {
+        const room = await roomService.getRoomByCode(pollId);
+        if (room && mounted) {
+          setCurrentRoom(room);
+        }
+      } catch (error) {
+        console.error('DisplayPage: Error reloading room:', error);
+      }
+    };
 
     // Create one channel with a simple, consistent name
     const channel = supabase.channel(`display_${pollId}`);
@@ -152,38 +165,56 @@ export const DisplayPage: React.FC = () => {
               oldCurrentActivityId: payload.old?.current_activity_id
             });
             
-            await loadRoom(true);
+            // Only reload if there's an actual change we care about
+            if (payload.eventType === 'UPDATE' && 
+                payload.new?.current_activity_id !== payload.old?.current_activity_id) {
+              console.log('DisplayPage: Current activity changed, reloading...');
+              await reloadRoom();
+            }
           }
         }
       )
       .on('postgres_changes',
         { event: '*', schema: 'public', table: 'activities' },
         async (payload) => {
-          if (!mounted || !currentRoom) return;
+          if (!mounted) return;
+          
+          // Get current room state at the time of the event
+          const currentRoomState = currentRoom;
+          if (!currentRoomState) return;
           
           const roomId = payload.new?.room_id || payload.old?.room_id;
-          if (roomId === currentRoom.id) {
-            console.log('DisplayPage: Activity change detected:', {
-              eventType: payload.eventType,
-              activityId: payload.new?.id || payload.old?.id,
-              isActive: payload.new?.is_active
-            });
-            
-            await loadRoom(true);
+          if (roomId === currentRoomState.id) {
+            // Only reload for activity status changes (is_active flag)
+            if (payload.eventType === 'UPDATE' && 
+                payload.new?.is_active !== payload.old?.is_active) {
+              console.log('DisplayPage: Activity status changed:', {
+                activityId: payload.new?.id,
+                wasActive: payload.old?.is_active,
+                nowActive: payload.new?.is_active
+              });
+              await reloadRoom();
+            }
           }
         }
       )
       .on('postgres_changes',
         { event: '*', schema: 'public', table: 'participant_responses' },
         async (payload) => {
-          if (!mounted || !currentRoom) return;
+          if (!mounted) return;
+          
+          // Get current states at the time of the event
+          const currentRoomState = currentRoom;
+          const currentActiveActivity = currentRoomState?.current_activity_id;
+          
+          if (!currentRoomState || !currentActiveActivity) return;
           
           const activityId = payload.new?.activity_id || payload.old?.activity_id;
-          const isOurActivity = currentRoom.activities?.some(a => a.id === activityId);
           
-          if (isOurActivity) {
-            console.log('DisplayPage: Response change detected for our activity');
-            await loadRoom(true);
+          // Only reload if this response is for the currently active activity
+          if (activityId === currentActiveActivity) {
+            console.log('DisplayPage: Response change for active activity');
+            await reloadRoom();
           }
         }
       )
@@ -198,26 +229,9 @@ export const DisplayPage: React.FC = () => {
     return () => {
       mounted = false;
       console.log('DisplayPage: Cleaning up subscription');
-      // Just unsubscribe, don't remove the channel
       channel.unsubscribe();
     };
-  }, [pollId, loadRoom, currentRoom?.id]);
-
-  // Simple polling fallback - only when no activity is active
-  useEffect(() => {
-    if (!pollId || activeActivity) return;
-    
-    console.log('DisplayPage: Starting polling fallback (no active activity)');
-    const interval = setInterval(async () => {
-      console.log('DisplayPage: Polling for activity changes...');
-      await loadRoom(true);
-    }, 5000); // Poll every 5 seconds when waiting
-
-    return () => {
-      console.log('DisplayPage: Stopping polling fallback');
-      clearInterval(interval);
-    };
-  }, [pollId, activeActivity, loadRoom]);
+  }, [pollId]); // Only pollId dependency - no currentRoom or activeActivity to prevent re-subscriptions
 
   const getActivityIcon = (type: ActivityType) => {
     switch (type) {
