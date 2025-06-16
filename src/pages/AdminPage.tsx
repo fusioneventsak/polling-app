@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Users, Play, Square, Trash2, Edit3, MoreVertical, ExternalLink, BarChart3, Clock, Target } from 'lucide-react';
+import { Plus, Users, Play, Square, Trash2, Edit3, MoreVertical, ExternalLink, BarChart3, Clock, Target, Lock, Unlock } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card } from '../components/Card';
 import { Button } from '../components/Button';
@@ -555,6 +555,12 @@ export const AdminPage: React.FC = () => {
                                         Active
                                       </span>
                                     )}
+                                    {activity.settings?.voting_locked && (
+                                      <span className="px-2 py-1 bg-red-600/20 border border-red-600/30 text-red-400 text-xs rounded-full flex items-center gap-1">
+                                        <Lock className="w-3 h-3" />
+                                        Locked
+                                      </span>
+                                    )}
                                   </div>
                                   <p className="text-sm text-slate-400 mt-1">
                                     Type: {activity.type} • Responses: {activity.total_responses || 0}
@@ -573,6 +579,59 @@ export const AdminPage: React.FC = () => {
                                   >
                                     <Edit3 className="w-4 h-4" />
                                   </Button>
+                                  
+                                  {/* Vote Lock Toggle */}
+                                  {isActive && (
+                                    <Button
+                                      variant={activity.settings?.voting_locked ? "danger" : "ghost"}
+                                      size="sm"
+                                      onClick={async () => {
+                                        try {
+                                          const newLockState = !activity.settings?.voting_locked;
+                                          await roomService.updateActivity(activity.id, {
+                                            settings: {
+                                              ...activity.settings,
+                                              voting_locked: newLockState
+                                            }
+                                          });
+                                          
+                                          // Update local state immediately
+                                          const updatedRoom = {
+                                            ...selectedRoom,
+                                            activities: selectedRoom.activities?.map(a => 
+                                              a.id === activity.id 
+                                                ? {
+                                                    ...a,
+                                                    settings: {
+                                                      ...a.settings,
+                                                      voting_locked: newLockState
+                                                    }
+                                                  }
+                                                : a
+                                            ) || []
+                                          };
+                                          setSelectedRoom(updatedRoom);
+                                          setRooms(prev => prev.map(room => 
+                                            room.id === selectedRoom.id ? updatedRoom : room
+                                          ));
+                                          
+                                          console.log('Vote lock toggled:', newLockState ? 'LOCKED' : 'UNLOCKED');
+                                        } catch (err) {
+                                          console.error('Failed to toggle vote lock:', err);
+                                          setError('Failed to toggle vote lock');
+                                        }
+                                      }}
+                                      className="text-slate-400 hover:text-white"
+                                      title={activity.settings?.voting_locked ? 'Unlock Votes' : 'Lock Votes'}
+                                    >
+                                      {activity.settings?.voting_locked ? (
+                                        <Lock className="w-4 h-4" />
+                                      ) : (
+                                        <Unlock className="w-4 h-4" />
+                                      )}
+                                    </Button>
+                                  )}
+                                  
                                   <Button
                                     variant="ghost"
                                     size="sm"
