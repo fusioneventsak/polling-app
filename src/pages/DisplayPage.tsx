@@ -4,9 +4,109 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../lib/supabase';
 import { roomService } from '../services/roomService';
 import { useTheme } from '../components/ThemeProvider';
-import { Poll3DVisualization } from '../components/Poll3DVisualization';
 import { Users, BarChart, Clock, MessageSquare, HelpCircle, Cloud, Trophy, Target, Calendar, Activity as ActivityIcon, TrendingUp, CheckCircle } from 'lucide-react';
 import type { ActivityType, Room, Activity } from '../types';
+
+// Fixed Poll3D component without font errors
+const FixedPoll3DVisualization: React.FC<{
+  options: any[];
+  totalResponses: number;
+  themeColors: any;
+}> = ({ options, totalResponses, themeColors }) => {
+  if (!options || options.length === 0) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, scale: 0.9 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.8 }}
+        className="w-full bg-slate-900/20 rounded-xl border border-slate-700 overflow-hidden flex items-center justify-center"
+        style={{ height: '100%', minHeight: '400px' }}
+      >
+        <div className="text-center text-slate-400">
+          <div className="w-16 h-16 bg-slate-700 rounded-2xl mx-auto mb-4 flex items-center justify-center">
+            <BarChart className="w-8 h-8" />
+          </div>
+          <p className="text-lg font-medium">No poll options available</p>
+          <p className="text-sm">Poll options will appear here when created</p>
+        </div>
+      </motion.div>
+    );
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.9 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ duration: 0.8 }}
+      className="w-full bg-gradient-to-br from-slate-900/40 to-blue-900/20 rounded-xl border border-slate-700 overflow-hidden shadow-2xl relative"
+      style={{ height: '100%', minHeight: '400px' }}
+    >
+      {/* Simple 2D visualization instead of 3D to avoid font errors */}
+      <div className="h-full flex flex-col p-8">
+        <div className="text-center mb-8">
+          <h3 className="text-2xl font-bold text-white mb-2">
+            {totalResponses > 0 ? 'Live Poll Results' : 'Poll Options'}
+          </h3>
+          <p className="text-slate-400">
+            {totalResponses > 0 ? `${totalResponses} total responses` : 'Waiting for responses...'}
+          </p>
+        </div>
+        
+        <div className="flex-1 flex items-center justify-center">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 w-full max-w-4xl">
+            {options.map((option, index) => {
+              const percentage = totalResponses > 0 ? Math.round((option.responses / totalResponses) * 100) : 0;
+              const maxResponses = Math.max(...options.map(opt => opt.responses || 0), 1);
+              const heightPercentage = totalResponses > 0 ? (option.responses / maxResponses) * 100 : 20;
+              
+              return (
+                <motion.div
+                  key={option.id || index}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: index * 0.1 }}
+                  className="bg-slate-800/50 rounded-lg p-4 border border-slate-600"
+                >
+                  <div className="text-center mb-4">
+                    <h4 className="text-white font-medium text-sm mb-2">{option.text}</h4>
+                    <div className="text-2xl font-bold text-blue-400">{percentage}%</div>
+                    <div className="text-xs text-slate-400">
+                      {option.responses || 0} {(option.responses || 0) === 1 ? 'vote' : 'votes'}
+                    </div>
+                  </div>
+                  
+                  {/* Progress bar */}
+                  <div className="w-full bg-slate-700 rounded-full h-3">
+                    <motion.div
+                      initial={{ width: 0 }}
+                      animate={{ width: `${heightPercentage}%` }}
+                      transition={{ duration: 1, delay: index * 0.1 }}
+                      className="h-3 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full"
+                    />
+                  </div>
+                  
+                  {option.is_correct && (
+                    <div className="mt-2 text-center">
+                      <span className="text-green-400 text-xs font-medium">✓ CORRECT</span>
+                    </div>
+                  )}
+                </motion.div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+      
+      {/* Status indicator */}
+      <div className="absolute top-4 right-4 bg-black/40 backdrop-blur-sm rounded-lg p-2 border border-white/10">
+        <div className="flex items-center gap-2">
+          <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+          <span className="text-green-400 text-xs font-medium">LIVE</span>
+        </div>
+      </div>
+    </motion.div>
+  );
+};
 
 export const DisplayPage: React.FC = () => {
   const { pollId } = useParams<{ pollId: string }>();
@@ -142,12 +242,13 @@ export const DisplayPage: React.FC = () => {
     if (!pollId || !supabase) return;
 
     let mounted = true;
+    let lastUpdateTime = Date.now();
     console.log('DisplayPage: Setting up minimal real-time subscription for room code:', pollId);
 
     // Create one channel with a simple, consistent name
     const channel = supabase.channel(`display_${pollId}`);
 
-    // Subscribe to room changes for current_activity_id
+    // Subscribe to room changes for current_activity_id ONLY
     channel
       .on('postgres_changes', 
         { 
@@ -159,14 +260,21 @@ export const DisplayPage: React.FC = () => {
         async (payload) => {
           if (!mounted) return;
           
+          // Throttle updates - only allow one update per 2 seconds
+          const now = Date.now();
+          if (now - lastUpdateTime < 2000) {
+            console.log('DisplayPage: Throttling room update');
+            return;
+          }
+          
           // Only reload if current_activity_id actually changed
           const oldActivityId = payload.old?.current_activity_id;
           const newActivityId = payload.new?.current_activity_id;
           
           if (oldActivityId !== newActivityId) {
             console.log('DisplayPage: Activity changed from', oldActivityId, 'to', newActivityId);
+            lastUpdateTime = now;
             
-            // Simple direct update instead of full reload
             try {
               const room = await roomService.getRoomByCode(pollId);
               if (room && mounted) {
@@ -174,32 +282,6 @@ export const DisplayPage: React.FC = () => {
               }
             } catch (error) {
               console.error('DisplayPage: Error updating room:', error);
-            }
-          }
-        }
-      )
-      .on('postgres_changes',
-        { 
-          event: '*', 
-          schema: 'public', 
-          table: 'participant_responses'
-        },
-        async (payload) => {
-          if (!mounted || !currentRoom) return;
-          
-          // Check if this response is for an activity in our room
-          const activityId = payload.new?.activity_id || payload.old?.activity_id;
-          const isOurActivity = currentRoom.activities?.some(a => a.id === activityId);
-          
-          if (isOurActivity) {
-            console.log('DisplayPage: Response update for our room activity');
-            try {
-              const room = await roomService.getRoomByCode(pollId);
-              if (room && mounted) {
-                setCurrentRoom(room);
-              }
-            } catch (error) {
-              console.error('DisplayPage: Error updating room after response:', error);
             }
           }
         }
@@ -217,7 +299,57 @@ export const DisplayPage: React.FC = () => {
       console.log('DisplayPage: Cleaning up subscription');
       channel.unsubscribe();
     };
-  }, [pollId, currentRoom?.id]);
+  }, [pollId]); // Only pollId dependency to prevent re-subscriptions
+
+  // Separate effect for response updates - only when activity is active
+  useEffect(() => {
+    if (!pollId || !supabase || !activeActivity) return;
+
+    let mounted = true;
+    let lastResponseUpdate = Date.now();
+    console.log('DisplayPage: Setting up response subscription for active activity:', activeActivity.id);
+
+    const responseChannel = supabase.channel(`responses_${activeActivity.id}`);
+
+    responseChannel
+      .on('postgres_changes',
+        { 
+          event: '*', 
+          schema: 'public', 
+          table: 'participant_responses',
+          filter: `activity_id=eq.${activeActivity.id}`
+        },
+        async (payload) => {
+          if (!mounted) return;
+          
+          // Throttle response updates - only allow one update per 3 seconds
+          const now = Date.now();
+          if (now - lastResponseUpdate < 3000) {
+            console.log('DisplayPage: Throttling response update');
+            return;
+          }
+          
+          console.log('DisplayPage: Response update for active activity');
+          lastResponseUpdate = now;
+          
+          try {
+            const room = await roomService.getRoomByCode(pollId);
+            if (room && mounted) {
+              setCurrentRoom(room);
+            }
+          } catch (error) {
+            console.error('DisplayPage: Error updating room after response:', error);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      mounted = false;
+      console.log('DisplayPage: Cleaning up response subscription');
+      responseChannel.unsubscribe();
+    };
+  }, [pollId, activeActivity?.id]); // Only when active activity changes
 
   const getActivityIcon = (type: ActivityType) => {
     switch (type) {
@@ -504,7 +636,7 @@ export const DisplayPage: React.FC = () => {
 
           {/* Activity Content */}
           <div className="flex-1 overflow-hidden">
-            <Poll3DVisualization 
+            <FixedPoll3DVisualization 
               options={activeActivity.options || []} 
               totalResponses={activeActivity.total_responses || 0}
               themeColors={{
