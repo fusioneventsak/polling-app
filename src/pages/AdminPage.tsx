@@ -190,13 +190,14 @@ export const AdminPage: React.FC = () => {
     try {
       console.log('Admin: Starting activity:', activityId);
       
-      // Optimistic update: immediately update activity status without triggering refresh
+      // Optimistic update: immediately update activity status
+      // Deactivate ALL activities and activate only the new one
       if (selectedRoom) {
         const optimisticRoom = {
           ...selectedRoom,
           activities: selectedRoom.activities?.map(a => ({
             ...a,
-            is_active: a.id === activityId ? true : false
+            is_active: a.id === activityId ? true : false // Only the new activity is active
           })) || [],
           current_activity_id: activityId,
           current_activity_type: selectedRoom.activities?.find(a => a.id === activityId)?.type || null
@@ -574,18 +575,22 @@ export const AdminPage: React.FC = () => {
                                     <Trash2 className="w-4 h-4" />
                                   </Button>
                                   {isActive ? (
-                                    <Button
-                                      variant="danger"
-                                      size="sm"
-                                      onClick={() => handleEndActivity(activity.id)}
-                                    >
-                                      <Square className="w-4 h-4" />
-                                      Stop
-                                    </Button>
+                                    <div className="flex items-center gap-2">
+                                      <Button
+                                        variant="danger"
+                                        size="sm"
+                                        onClick={() => handleEndActivity(activity.id)}
+                                      >
+                                        <Square className="w-4 h-4" />
+                                        Stop
+                                      </Button>
+                                      <span className="text-xs text-green-400 font-medium">ACTIVE</span>
+                                    </div>
                                   ) : (
                                     <Button
                                       size="sm"
                                       onClick={() => handleStartActivity(selectedRoom.id, activity.id)}
+                                      className="bg-green-600 hover:bg-green-700"
                                     >
                                       <Play className="w-4 h-4" />
                                       Start
