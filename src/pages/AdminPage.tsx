@@ -47,9 +47,6 @@ export const AdminPage: React.FC = () => {
     const channelName = `admin-updates-${Date.now()}`;
     const adminChannel = supabase.channel(channelName);
     
-    // Track recent deletions to avoid refreshing immediately after our own deletions
-    let recentDeletions = new Set<string>();
-    
     // Subscribe to all room changes
     adminChannel
       .on('postgres_changes', 
@@ -57,7 +54,7 @@ export const AdminPage: React.FC = () => {
         (payload) => {
           console.log('Admin: Room change received:', payload);
           // Always refresh for room changes
-          setTimeout(loadRooms, 100);
+          setTimeout(loadRooms, 200);
         }
       )
       .on('postgres_changes',
@@ -65,36 +62,28 @@ export const AdminPage: React.FC = () => {
         (payload) => {
           console.log('Admin: Activity change received:', payload);
           
-          // If this is a DELETE event that we just performed, skip the refresh for a moment
-          if (payload.eventType === 'DELETE' && payload.old?.id) {
-            const deletedId = payload.old.id;
-            recentDeletions.add(deletedId);
-            
-            // Remove from recent deletions after 2 seconds
-            setTimeout(() => {
-              recentDeletions.delete(deletedId);
-            }, 2000);
-            
-            console.log('Skipping immediate refresh for recent deletion:', deletedId);
+          // If this is a DELETE event, don't refresh immediately to avoid conflicts
+          if (payload.eventType === 'DELETE') {
+            console.log('Ignoring DELETE event to prevent conflicts with optimistic updates');
             return;
           }
           
-          // For other activity events (INSERT, UPDATE), refresh normally
-          setTimeout(loadRooms, 100);
+          // For INSERT and UPDATE events, refresh after a delay
+          setTimeout(loadRooms, 200);
         }
       )
       .on('postgres_changes',
         { event: '*', schema: 'public', table: 'activity_options' },
         (payload) => {
           console.log('Admin: Activity options change received:', payload);
-          setTimeout(loadRooms, 100);
+          setTimeout(loadRooms, 200);
         }
       )
       .on('postgres_changes',
         { event: '*', schema: 'public', table: 'participant_responses' },
         (payload) => {
           console.log('Admin: Response change received:', payload);
-          setTimeout(loadRooms, 100);
+          setTimeout(loadRooms, 200);
         }
       )
       .subscribe((status, err) => {
@@ -213,21 +202,40 @@ export const AdminPage: React.FC = () => {
         await roomService.deleteActivity(activityId);
         console.log('Admin: Activity deleted successfully from database');
         
-        // Keep the activity in the deleting set for a bit longer to prevent race conditions
-        setTimeout(() => {
-          setDeletingActivities(prev => {
-            const newSet = new Set(prev);
-            newSet.delete(activityId);
-            return newSet;
-          });
-          console.log('Admin: Removed activity from deleting set:', activityId);
-        }, 2000);
-        
-        // Force a complete refresh after successful deletion to ensure consistency
+        // Instead of refreshing everything, just verify the deletion worked
+        // by checking if the activity still exists in the database
         setTimeout(async () => {
-          console.log('Admin: Refreshing rooms after successful deletion');
-          await loadRooms();
-        }, 500);
+          try {
+            console.log('Admin: Verifying deletion was successful');
+            const verificationRooms = await roomService.getAllRooms();
+            const verificationRoom = verificationRooms.find(r => r.id === selectedRoom.id);
+            const stillExists = verificationRoom?.activities?.some(a => a.id === activityId);
+            
+            if (stillExists) {
+              console.warn('Activity still exists in database, forcing full refresh');
+              await loadRooms();
+            } else {
+              console.log('Deletion verified, activity successfully removed');
+            }
+            
+            // Remove from deleting set after verification
+            setDeletingActivities(prev => {
+              const newSet = new Set(prev);
+              newSet.delete(activityId);
+              return newSet;
+            });
+            console.log('Admin: Removed activity from deleting set:', activityId);
+            
+          } catch (verifyError) {
+            console.error('Error verifying deletion:', verifyError);
+            // If verification fails, just remove from deleting set
+            setDeletingActivities(prev => {
+              const newSet = new Set(prev);
+              newSet.delete(activityId);
+              return newSet;
+            });
+          }
+        }, 2000);
         
       } catch (deleteError) {
         console.error('Failed to delete activity from database:', deleteError);
