@@ -1,46 +1,35 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Users, Clock, Play, Target, MessageSquare, HelpCircle, Cloud, Trophy } from 'lucide-react';
 import { Card } from '../components/Card';
 import { Button } from '../components/Button';
 import { roomService } from '../services/roomService';
 import { supabase } from '../lib/supabase';
 import { useTheme } from '../components/ThemeProvider';
+import { Users, Clock, Play, Target, MessageSquare, HelpCircle, Cloud, Trophy } from 'lucide-react';
 import type { Room, ActivityType } from '../types';
 
 export const GameJoinPage: React.FC = () => {
-  const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
   const [code, setCode] = useState('');
+  const [joinedRoom, setJoinedRoom] = useState<Room | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [joinedRoom, setJoinedRoom] = useState<Room | null>(null);
   const [currentTime, setCurrentTime] = useState(new Date());
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { applyTheme, resetTheme } = useTheme();
 
-  // Auto-join if room code is provided in URL
+  // Check if user was auto-redirected from a joined room
   useEffect(() => {
     const joinedCode = searchParams.get('joined');
-    if (joinedCode && !joinedRoom) {
-      autoRejoinRoom(joinedCode);
+    if (joinedCode) {
+      setCode(joinedCode);
+      // Auto-submit if we have a joined code
+      handleSubmitWithCode(joinedCode);
     }
-  }, [searchParams, joinedRoom]);
+  }, [searchParams]);
 
-  // Apply theme when room loads
-  useEffect(() => {
-    if (joinedRoom?.settings) {
-      applyTheme(joinedRoom.settings);
-    } else {
-      resetTheme();
-    }
-    
-    return () => {
-      resetTheme();
-    };
-  }, [joinedRoom?.settings, applyTheme, resetTheme]);
-
-  // Clock timer
+  // Clock update
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentTime(new Date());
@@ -49,34 +38,11 @@ export const GameJoinPage: React.FC = () => {
     return () => clearInterval(timer);
   }, []);
 
-  const autoRejoinRoom = async (roomCode: string) => {
-    try {
-      if (!supabase) return;
-      
-      const room = await roomService.getRoomByCode(roomCode);
-      if (room && room.is_active) {
-        setJoinedRoom(room);
-        // Clear the URL parameter
-        window.history.replaceState({}, '', '/game');
-      }
-    } catch (error) {
-      console.error('Failed to auto-rejoin room:', error);
-    }
-  };
-
-  const handleCodeChange = (value: string) => {
-    // Only allow digits and limit to 4 characters
-    const numericValue = value.replace(/\D/g, '').slice(0, 4);
-    setCode(numericValue);
-    setError('');
-  };
-
-  // Load room data when joined with enhanced error handling
-  const loadJoinedRoom = useCallback(async (forceRefresh = false) => {
-    if (!joinedRoom || !supabase) return;
+  const loadJoinedRoom = React.useCallback(async (forceRefresh = false) => {
+    if (!joinedRoom) return;
     
     try {
-      console.log('GameJoin: Loading joined room data:', joinedRoom.code, forceRefresh ? '(forced)' : '');
+      console.log('GameJoin: Loading joined room data', forceRefresh ? '(forced)' : '');
       const room = await roomService.getRoomByCode(joinedRoom.code);
       if (room) {
         setJoinedRoom(room);
@@ -230,10 +196,8 @@ export const GameJoinPage: React.FC = () => {
     }
   }, [joinedRoom?.activities?.map(a => `${a.id}:${a.is_active}`).join(','), navigate]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (code.length !== 4) {
+  const handleSubmitWithCode = async (roomCode: string) => {
+    if (roomCode.length !== 4) {
       setError('Please enter a 4-digit code');
       return;
     }
@@ -247,7 +211,7 @@ export const GameJoinPage: React.FC = () => {
         return;
       }
 
-      const result = await roomService.getRoomByCode(code);
+      const result = await roomService.getRoomByCode(roomCode);
       
       if (!result) {
         setError('Room not found');
@@ -275,6 +239,11 @@ export const GameJoinPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await handleSubmitWithCode(code);
   };
 
   const handleLeaveRoom = () => {
@@ -368,10 +337,51 @@ export const GameJoinPage: React.FC = () => {
                   const currentActivity = joinedRoom.activities?.find(a => a.id === joinedRoom.current_activity_id);
                   return currentActivity ? (
                     <div>
+                      {/* Activity Media */}
+                      {currentActivity.media_url && (
+                        <div className="mb-4">
+                          <img
+                            src={currentActivity.media_url}
+                            alt="Activity media"
+                            className="max-w-sm mx-auto rounded-lg shadow-lg"
+                          />
+                        </div>
+                      )}
+                      
                       <h2 className="text-2xl font-bold text-white mb-2">{currentActivity.title}</h2>
                       {currentActivity.description && (
                         <p className="text-slate-300 mb-4">{currentActivity.description}</p>
                       )}
+                      
+                      {/* Show options preview with media */}
+                      {currentActivity.options && currentActivity.options.length > 0 && (
+                        <div className="mb-4">
+                          <h3 className="text-sm font-medium text-slate-400 mb-3">Options Preview:</h3>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            {currentActivity.options.slice(0, 4).map((option, index) => (
+                              <div
+                                key={option.id}
+                                className="bg-slate-800/50 rounded-lg p-3 border border-slate-600"
+                              >
+                                {option.media_url && (
+                                  <img
+                                    src={option.media_url}
+                                    alt="Option media"
+                                    className="w-full max-w-24 mx-auto rounded mb-2"
+                                  />
+                                )}
+                                <div className="text-sm text-white text-center">{option.text}</div>
+                              </div>
+                            ))}
+                            {currentActivity.options.length > 4 && (
+                              <div className="text-slate-400 text-sm text-center">
+                                +{currentActivity.options.length - 4} more options
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                      
                       <div className="flex items-center gap-4 text-sm text-slate-400">
                         <span className="flex items-center gap-1">
                           <Target className="w-4 h-4" />
@@ -445,7 +455,7 @@ export const GameJoinPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* Activity List */}
+              {/* Activity List with Media Preview */}
               <div className="space-y-3">
                 {joinedRoom.activities.slice(0, 5).map((activity) => {
                   const Icon = getActivityIcon(activity.type);
@@ -462,15 +472,32 @@ export const GameJoinPage: React.FC = () => {
                           : 'bg-slate-800/50 border-slate-700'
                       }`}
                     >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <Icon className="w-5 h-5" style={{ color: themeColors.accent }} />
-                          <div>
-                            <h4 className="font-medium text-white">{activity.title}</h4>
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-start gap-3 flex-1">
+                          <Icon className="w-5 h-5 mt-1" style={{ color: themeColors.accent }} />
+                          <div className="flex-1">
+                            <h4 className="font-medium text-white mb-1">{activity.title}</h4>
+                            {activity.description && (
+                              <p className="text-sm text-slate-400 mb-2">{activity.description}</p>
+                            )}
+                            
+                            {/* Activity Media Thumbnail */}
+                            {activity.media_url && (
+                              <div className="mb-2">
+                                <img
+                                  src={activity.media_url}
+                                  alt="Activity media"
+                                  className="max-w-20 rounded"
+                                />
+                              </div>
+                            )}
+                            
                             <div className="flex items-center gap-2 text-sm text-slate-400">
                               <span>{getActivityTypeLabel(activity.type)}</span>
                               <span>•</span>
                               <span>{activity.total_responses} responses</span>
+                              <span>•</span>
+                              <span>{activity.options?.length || 0} options</span>
                             </div>
                           </div>
                         </div>
@@ -522,52 +549,35 @@ export const GameJoinPage: React.FC = () => {
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
-            <label htmlFor="code" className="block text-sm font-medium text-slate-300 mb-2">
-              Room Code
-            </label>
             <input
-              id="code"
               type="text"
               value={code}
-              onChange={(e) => handleCodeChange(e.target.value)}
-              placeholder="1234"
-              className="w-full px-4 py-3 bg-slate-800 border border-slate-600 rounded-lg text-white text-center text-2xl font-mono tracking-widest focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              onChange={(e) => {
+                const value = e.target.value.replace(/\D/g, '').slice(0, 4);
+                setCode(value);
+              }}
+              placeholder="Enter room code"
+              className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white text-center text-2xl font-mono tracking-wider placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
               maxLength={4}
-              autoComplete="off"
+              disabled={loading}
             />
           </div>
 
           {error && (
-            <motion.div
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg"
-            >
-              <p className="text-red-400 text-sm text-center">{error}</p>
-            </motion.div>
+            <div className="p-3 bg-red-900/50 border border-red-700 rounded-lg text-red-300 text-sm">
+              {error}
+            </div>
           )}
 
           <Button
             type="submit"
+            loading={loading}
             disabled={code.length !== 4 || loading}
-            className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full"
           >
-            {loading ? (
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
-                Joining...
-              </div>
-            ) : (
-              'Join Room'
-            )}
+            Join Room
           </Button>
         </form>
-
-        <div className="mt-8 text-center">
-          <p className="text-slate-400 text-sm">
-            Don't have a room code? Ask your presenter for the 4-digit code.
-          </p>
-        </div>
       </Card>
     </div>
   );
