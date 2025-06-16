@@ -162,7 +162,8 @@ export const AdminPage: React.FC = () => {
       console.log('Starting activity:', activityId, 'in room:', roomId);
       await roomService.startActivity(roomId, activityId);
       console.log('Activity started successfully');
-      // Real-time updates will handle the UI refresh
+      // Force refresh to ensure UI updates immediately
+      await loadRooms();
     } catch (err) {
       setError('Failed to start activity');
       console.error('Error starting activity:', err);
@@ -174,7 +175,8 @@ export const AdminPage: React.FC = () => {
       console.log('Ending activity:', activityId);
       await roomService.endActivity(activityId);
       console.log('Activity ended successfully');
-      // Real-time updates will handle the UI refresh
+      // Force refresh to ensure UI updates immediately
+      await loadRooms();
     } catch (err) {
       setError('Failed to end activity');
       console.error('Error ending activity:', err);

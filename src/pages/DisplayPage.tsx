@@ -34,6 +34,7 @@ export const DisplayPage: React.FC = () => {
     try {
       const room = await roomService.getRoomByCode(pollId);
       setCurrentRoom(room);
+      console.log('Loaded room data:', room);
     } catch (error) {
       console.error('Error loading room:', error);
     }
@@ -143,7 +144,7 @@ export const DisplayPage: React.FC = () => {
       console.log('Cleaning up display subscriptions');
       channel.unsubscribe();
     };
-  }, [pollId, currentRoom?.id, loadRoom]);
+  }, [pollId, currentRoom?.id]);
 
   const getActivityIcon = (type: ActivityType) => {
     switch (type) {
@@ -207,7 +208,6 @@ export const DisplayPage: React.FC = () => {
     );
   }
 
-  const maxVotes = activeActivity ? Math.max(...(activeActivity.options?.map(opt => opt.responses) || [0]), 1) : 1;
   const getPercentage = (votes: number, total: number) => {
     return total > 0 ? Math.round((votes / total) * 100) : 0;
   };
@@ -362,6 +362,17 @@ export const DisplayPage: React.FC = () => {
                   <p className="text-lg mb-2 opacity-75" style={{ color: themeStyles.color || '#ffffff' }}>
                     {activeActivity.description}
                   </p>
+                )}
+
+                {/* Activity Media */}
+                {activeActivity.media_url && (
+                  <div className="mb-4">
+                    <img
+                      src={activeActivity.media_url}
+                      alt="Activity media"
+                      className="max-w-md max-h-32 object-contain mx-auto rounded-lg border border-slate-600"
+                    />
+                  </div>
                 )}
 
                 <div className="flex items-center justify-center gap-6 text-sm opacity-75" style={{ color: themeStyles.color || '#ffffff' }}>
