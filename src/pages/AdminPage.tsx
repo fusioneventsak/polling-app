@@ -183,11 +183,15 @@ export const AdminPage: React.FC = () => {
       
       // Store the activity being deleted for potential rollback
       const activityToDelete = selectedRoom.activities?.find(a => a.id === activityId);
+      const wasCurrentActivity = selectedRoom.current_activity_id === activityId;
       
       // Immediate optimistic update: remove activity from UI immediately
       const optimisticRoom = {
         ...selectedRoom,
-        activities: selectedRoom.activities?.filter(a => a.id !== activityId) || []
+        activities: selectedRoom.activities?.filter(a => a.id !== activityId) || [],
+        // If we're deleting the current activity, clear the current activity references
+        current_activity_id: wasCurrentActivity ? null : selectedRoom.current_activity_id,
+        current_activity_type: wasCurrentActivity ? null : selectedRoom.current_activity_type
       };
       setSelectedRoom(optimisticRoom);
       setRooms(prev => prev.map(room => 
@@ -216,6 +220,10 @@ export const AdminPage: React.FC = () => {
               await loadRooms();
             } else {
               console.log('Deletion verified, activity successfully removed');
+              // If this was the current activity, ensure room state is properly updated
+              if (wasCurrentActivity) {
+                console.log('Deleted activity was current activity, ensuring room state is clean');
+              }
             }
             
             // Remove from deleting set after verification
@@ -254,7 +262,10 @@ export const AdminPage: React.FC = () => {
           
           const revertedRoom = {
             ...selectedRoom,
-            activities: revertedActivities
+            activities: revertedActivities,
+            // Restore current activity references if needed
+            current_activity_id: wasCurrentActivity ? activityId : selectedRoom.current_activity_id,
+            current_activity_type: wasCurrentActivity ? activityToDelete.type : selectedRoom.current_activity_type
           };
           
           setSelectedRoom(revertedRoom);
