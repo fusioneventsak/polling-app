@@ -227,6 +227,48 @@ export const AdminPage: React.FC = () => {
     }
   };
 
+  const handleToggleVoteLock = async (activity: Activity) => {
+    try {
+      const newLockState = !activity.settings?.voting_locked;
+      
+      // Optimistic update
+      if (selectedRoom) {
+        const optimisticRoom = {
+          ...selectedRoom,
+          activities: selectedRoom.activities?.map(a => 
+            a.id === activity.id 
+              ? {
+                  ...a,
+                  settings: {
+                    ...a.settings,
+                    voting_locked: newLockState
+                  }
+                }
+              : a
+          ) || []
+        };
+        setSelectedRoom(optimisticRoom);
+        setRooms(prev => prev.map(room => 
+          room.id === selectedRoom.id ? optimisticRoom : room
+        ));
+      }
+      
+      await roomService.updateActivity(activity.id, {
+        settings: {
+          ...activity.settings,
+          voting_locked: newLockState
+        }
+      });
+      
+      console.log('Vote lock toggled:', newLockState ? 'LOCKED' : 'UNLOCKED');
+    } catch (err) {
+      console.error('Failed to toggle vote lock:', err);
+      setError('Failed to toggle vote lock');
+      // Revert optimistic update on error
+      await loadRooms();
+    }
+  };
+
   const handleStartActivity = async (roomId: string, activityId: string) => {
     try {
       console.log('Admin: Starting activity:', activityId);
@@ -594,6 +636,8 @@ export const AdminPage: React.FC = () => {
                         ?.filter(activity => !deletingActivities.has(activity.id))
                         .map((activity) => {
                           const isActive = activity.is_active;
+                          const isLocked = activity.settings?.voting_locked || false;
+                          
                           return (
                             <motion.div
                               key={activity.id}
@@ -613,6 +657,12 @@ export const AdminPage: React.FC = () => {
                                     {isActive && (
                                       <span className="px-2 py-1 bg-green-600 text-green-100 text-xs rounded-full font-medium">
                                         Active
+                                      </span>
+                                    )}
+                                    {isLocked && (
+                                      <span className="px-2 py-1 bg-red-600/20 border border-red-600/30 text-red-400 text-xs rounded-full flex items-center gap-1">
+                                        <Lock className="w-3 h-3" />
+                                        Locked
                                       </span>
                                     )}
                                   </div>
@@ -635,6 +685,23 @@ export const AdminPage: React.FC = () => {
                                   </div>
                                 </div>
                                 <div className="flex items-center gap-2 ml-4">
+                                  {/* Vote Lock/Unlock Button - Only show for active activities */}
+                                  {isActive && (
+                                    <Button
+                                      variant={isLocked ? "danger" : "ghost"}
+                                      size="sm"
+                                      onClick={() => handleToggleVoteLock(activity)}
+                                      className="text-slate-400 hover:text-white"
+                                      title={isLocked ? 'Unlock Votes' : 'Lock Votes'}
+                                    >
+                                      {isLocked ? (
+                                        <Unlock className="w-4 h-4" />
+                                      ) : (
+                                        <Lock className="w-4 h-4" />
+                                      )}
+                                    </Button>
+                                  )}
+                                  
                                   {isActive ? (
                                     <Button
                                       onClick={() => handleEndActivity(activity.id)}
