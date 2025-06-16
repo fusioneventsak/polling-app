@@ -743,3 +743,5 @@ export const roomService = {
     }
   }
 };
+
+export { roomService }
