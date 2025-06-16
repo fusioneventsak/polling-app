@@ -26,7 +26,7 @@ interface RoomSettingsProps {
 export const RoomSettings: React.FC<RoomSettingsProps> = ({ room, onSave, onCancel }) => {
   const [name, setName] = useState(room?.name || '');
   const [description, setDescription] = useState(room?.description || '');
-  const [settings, setSettings] = useState<RoomSettings>(room.settings || {
+  const [settings, setSettings] = useState<RoomSettings>(room?.settings || {
     theme: {
       primary_color: '#2563eb',
       secondary_color: '#0891b2',
@@ -214,7 +214,6 @@ export const RoomSettings: React.FC<RoomSettingsProps> = ({ room, onSave, onCanc
               </p>
             </div>
             
-            <Button variant="ghost" onClick={onClose}>
             <Button variant="ghost" onClick={onCancel}>
               <X className="w-5 h-5" />
             </Button>

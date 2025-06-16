@@ -11,20 +11,6 @@ import { ActivityEditor } from '../components/ActivityEditor';
 import { RoomSettings } from '../components/RoomSettings';
 import { DraggableActivity } from '../components/DraggableActivity';
 import { roomService } from '../services/roomService';
-import type { Room, Activity, CreateRoomData } from '../types';
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { DragDropContext, Droppable, Draggable, DropResult } from 'react-beautiful-dnd';
-import { Plus, Settings, Play, Square, Trash2, Edit, Users, BarChart3, ArrowLeft } from 'lucide-react';
-import { Layout } from '../components/Layout';
-import { Button } from '../components/Button';
-import { Card } from '../components/Card';
-import { LoadingSpinner } from '../components/LoadingSpinner';
-import { ConfirmationModal } from '../components/ConfirmationModal';
-import { ActivityEditor } from '../components/ActivityEditor';
-import { RoomSettings } from '../components/RoomSettings';
-import { DraggableActivity } from '../components/DraggableActivity';
-import { roomService } from '../services/roomService';
 import { supabase } from '../lib/supabase';
 import type { Room, Activity, CreateRoomData } from '../types';
 
@@ -103,6 +89,7 @@ export const AdminPage: React.FC = () => {
       adminChannel.unsubscribe();
     };
   }, []);
+
   const loadRooms = async () => {
     try {
       setLoading(true);
@@ -156,7 +143,7 @@ export const AdminPage: React.FC = () => {
       if (selectedRoom) {
         const updatedRoom = {
           ...selectedRoom,
-          activities: selectedRoom.activities.filter(activity => activity.id !== activityId)
+          activities: selectedRoom.activities?.filter(activity => activity.id !== activityId) || []
         };
         setSelectedRoom(updatedRoom);
         setRooms(prev => prev.map(room => 
@@ -170,12 +157,10 @@ export const AdminPage: React.FC = () => {
     }
   };
 
-  const handleStartActivity = async (activityId: string) => {
-    if (!selectedRoom) return;
-    
+  const handleStartActivity = async (roomId: string, activityId: string) => {
     try {
-      console.log('Starting activity:', activityId, 'in room:', selectedRoom.id);
-      await roomService.startActivity(selectedRoom.id, activityId);
+      console.log('Starting activity:', activityId, 'in room:', roomId);
+      await roomService.startActivity(roomId, activityId);
       console.log('Activity started successfully');
       // Real-time updates will handle the UI refresh
     } catch (err) {
@@ -185,8 +170,6 @@ export const AdminPage: React.FC = () => {
   };
 
   const handleEndActivity = async (activityId: string) => {
-    if (!selectedRoom) return;
-    
     try {
       console.log('Ending activity:', activityId);
       await roomService.endActivity(activityId);
@@ -202,8 +185,8 @@ export const AdminPage: React.FC = () => {
     if (!selectedRoom) return;
 
     const updatedActivities = editingActivity
-      ? selectedRoom.activities.map(a => a.id === activity.id ? activity : a)
-      : [...selectedRoom.activities, activity];
+      ? selectedRoom.activities?.map(a => a.id === activity.id ? activity : a) || []
+      : [...(selectedRoom.activities || []), activity];
 
     const updatedRoom = {
       ...selectedRoom,
@@ -219,7 +202,7 @@ export const AdminPage: React.FC = () => {
   };
 
   const handleDragEnd = (result: DropResult) => {
-    if (!result.destination || !selectedRoom) return;
+    if (!result.destination || !selectedRoom?.activities) return;
 
     const items = Array.from(selectedRoom.activities);
     const [reorderedItem] = items.splice(result.source.index, 1);
@@ -241,7 +224,7 @@ export const AdminPage: React.FC = () => {
     try {
       await roomService.reorderActivities(selectedRoom.id, activityIds);
       const reorderedActivities = activityIds.map((id, index) => {
-        const activity = selectedRoom.activities.find(a => a.id === id);
+        const activity = selectedRoom.activities?.find(a => a.id === id);
         return activity ? { ...activity, activity_order: index + 1 } : null;
       }).filter(Boolean) as Activity[];
 
@@ -284,7 +267,7 @@ export const AdminPage: React.FC = () => {
               <ArrowLeft className="w-4 h-4" />
               Back to Home
             </Button>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+            <h1 className="text-3xl font-bold text-white">
               Admin Dashboard
             </h1>
           </div>
@@ -298,8 +281,8 @@ export const AdminPage: React.FC = () => {
         </div>
 
         {error && (
-          <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
-            <p className="text-red-600 dark:text-red-400">{error}</p>
+          <div className="mb-6 p-4 bg-red-500/20 border border-red-500/30 rounded-lg">
+            <p className="text-red-400">{error}</p>
             <Button
               variant="ghost"
               size="sm"
@@ -315,7 +298,7 @@ export const AdminPage: React.FC = () => {
           {/* Rooms List */}
           <div className="lg:col-span-1">
             <Card className="p-6">
-              <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">
+              <h2 className="text-xl font-semibold mb-4 text-white">
                 Rooms ({rooms.length})
               </h2>
               <div className="space-y-3">
@@ -324,20 +307,20 @@ export const AdminPage: React.FC = () => {
                     key={room.id}
                     className={`p-4 rounded-lg border cursor-pointer transition-colors ${
                       selectedRoom?.id === room.id
-                        ? 'bg-blue-900/20 border-blue-500/30'
+                        ? 'bg-blue-500/20 border-blue-500/30'
                         : 'bg-slate-700/30 border-slate-600 hover:bg-slate-700/50'
                     }`}
                     onClick={() => setSelectedRoom(room)}
                   >
                     <div className="flex items-center justify-between">
                       <div>
-                        <h3 className="font-medium text-gray-900 dark:text-white">
+                        <h3 className="font-medium text-white">
                           {room.name}
                         </h3>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                        <p className="text-sm text-slate-400">
                           Code: {room.code}
                         </p>
-                        <div className="flex items-center gap-4 mt-2 text-xs text-gray-500 dark:text-gray-400">
+                        <div className="flex items-center gap-4 mt-2 text-xs text-slate-400">
                           <span className="flex items-center gap-1">
                             <Users className="w-3 h-3" />
                             {room.participants}
@@ -353,7 +336,7 @@ export const AdminPage: React.FC = () => {
                           className={`w-2 h-2 rounded-full ${
                             room.is_active
                               ? 'bg-green-500'
-                              : 'bg-gray-300 dark:bg-gray-600'
+                              : 'bg-slate-600'
                           }`}
                         />
                         <Button
@@ -367,7 +350,7 @@ export const AdminPage: React.FC = () => {
                               name: room.name
                             });
                           }}
-                          className="text-red-600 hover:text-red-700 dark:text-red-400"
+                          className="text-red-400 hover:text-red-300"
                         >
                           <Trash2 className="w-4 h-4" />
                         </Button>
@@ -376,7 +359,7 @@ export const AdminPage: React.FC = () => {
                   </div>
                 ))}
                 {rooms.length === 0 && (
-                  <p className="text-gray-500 dark:text-gray-400 text-center py-8">
+                  <p className="text-slate-400 text-center py-8">
                     No rooms created yet
                   </p>
                 )}
@@ -390,16 +373,16 @@ export const AdminPage: React.FC = () => {
               <Card className="p-6">
                 <div className="flex items-center justify-between mb-6">
                   <div>
-                    <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+                    <h2 className="text-2xl font-bold text-white">
                       {selectedRoom.name}
                     </h2>
-                    <p className="text-gray-500 dark:text-gray-400">
+                    <p className="text-slate-400">
                       Room Code: <span className="font-mono font-bold">{selectedRoom.code}</span>
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
                     <Button
-                      variant="outline"
+                      variant="secondary"
                       size="sm"
                       onClick={() => setShowRoomSettings(true)}
                       className="flex items-center gap-2"
@@ -418,7 +401,7 @@ export const AdminPage: React.FC = () => {
                 </div>
 
                 <div className="space-y-4">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  <h3 className="text-lg font-semibold text-white">
                     Activities ({selectedRoom.activities?.length || 0})
                   </h3>
                   
@@ -473,9 +456,9 @@ export const AdminPage: React.FC = () => {
                       </Droppable>
                     </DragDropContext>
                   ) : (
-                    <div className="text-center py-12 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                      <BarChart3 className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                      <p className="text-gray-500 dark:text-gray-400 mb-4">
+                    <div className="text-center py-12 bg-slate-800/30 rounded-lg">
+                      <BarChart3 className="w-12 h-12 text-slate-400 mx-auto mb-4" />
+                      <p className="text-slate-400 mb-4">
                         No activities created yet
                       </p>
                       <Button
@@ -491,11 +474,11 @@ export const AdminPage: React.FC = () => {
               </Card>
             ) : (
               <Card className="p-12 text-center">
-                <Settings className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+                <Settings className="w-16 h-16 text-slate-400 mx-auto mb-4" />
+                <h3 className="text-xl font-semibold text-white mb-2">
                   Select a Room
                 </h3>
-                <p className="text-gray-500 dark:text-gray-400">
+                <p className="text-slate-400">
                   Choose a room from the list to manage its activities and settings
                 </p>
               </Card>
@@ -548,7 +531,7 @@ export const AdminPage: React.FC = () => {
             title={`Delete ${deleteConfirmation.type}`}
             message={`Are you sure you want to delete "${deleteConfirmation.name}"? This action cannot be undone.`}
             confirmText="Delete"
-            confirmVariant="danger"
+            variant="danger"
             onConfirm={() => {
               if (deleteConfirmation.type === 'room') {
                 handleDeleteRoom(deleteConfirmation.id);
