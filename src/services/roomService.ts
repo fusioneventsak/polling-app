@@ -4,8 +4,7 @@ import type { Room, Activity, CreateRoomData, CreateActivityData } from '../type
 export const roomService = {
   async getAllRooms(): Promise<Room[]> {
     if (!supabase) {
-      console.warn('Supabase not available - returning empty rooms array');
-      return [];
+      throw new Error('Supabase not available - cannot get rooms');
     }
     
     try {
@@ -13,9 +12,9 @@ export const roomService = {
         .from('rooms')
         .select(`
           *,
-          activities!activities_room_id_fkey (
+          activities (
             *,
-            activity_options!activity_options_activity_id_fkey (*)
+            activity_options (*)
           )
         `)
         .order('created_at', { ascending: false });
@@ -27,12 +26,10 @@ export const roomService = {
 
       return rooms?.map(room => ({
         ...room,
-        activities: room.activities?.sort((a, b) => a.activity_order - b.activity_order).map(activity => ({
+        activities: room.activities?.map((activity: any) => ({
           ...activity,
-          options: activity.activity_options?.sort((a, b) => a.option_order - b.option_order).filter((option, index, self) => 
-            index === self.findIndex(o => o.id === option.id)
-          ) || []
-        })) || []
+          options: activity.activity_options?.sort((a: any, b: any) => a.option_order - b.option_order) || []
+        })).sort((a: Activity, b: Activity) => a.activity_order - b.activity_order) || []
       })) || [];
     } catch (error) {
       console.error('Error in getAllRooms:', error);
@@ -42,8 +39,7 @@ export const roomService = {
 
   async getRoomByCode(code: string): Promise<Room | null> {
     if (!supabase) {
-      console.warn('Supabase not available - cannot get room by code');
-      return null;
+      throw new Error('Supabase not available - cannot get room');
     }
     
     try {
@@ -51,9 +47,9 @@ export const roomService = {
         .from('rooms')
         .select(`
           *,
-          activities!activities_room_id_fkey (
+          activities (
             *,
-            activity_options!activity_options_activity_id_fkey (*)
+            activity_options (*)
           )
         `)
         .eq('code', code)
@@ -63,18 +59,16 @@ export const roomService = {
         if (error.code === 'PGRST116') {
           return null; // Room not found
         }
-        console.error('Error fetching room by code:', error);
+        console.error('Error fetching room:', error);
         throw error;
       }
 
       return {
         ...room,
-        activities: room.activities?.sort((a, b) => a.activity_order - b.activity_order).map(activity => ({
+        activities: room.activities?.map((activity: any) => ({
           ...activity,
-          options: activity.activity_options?.sort((a, b) => a.option_order - b.option_order).filter((option, index, self) => 
-            index === self.findIndex(o => o.id === option.id)
-          ) || []
-        })) || []
+          options: activity.activity_options?.sort((a: any, b: any) => a.option_order - b.option_order) || []
+        })).sort((a: Activity, b: Activity) => a.activity_order - b.activity_order) || []
       };
     } catch (error) {
       console.error('Error in getRoomByCode:', error);
@@ -88,23 +82,10 @@ export const roomService = {
     }
     
     try {
-      const code = Math.floor(1000 + Math.random() * 9000).toString();
-      
       const { data: room, error } = await supabase
         .from('rooms')
-        .insert([{
-          ...roomData,
-          code,
-          is_active: true,
-          participants: 0
-        }])
-        .select(`
-          *,
-          activities!activities_room_id_fkey (
-            *,
-            activity_options (*)
-          )
-        `)
+        .insert([roomData])
+        .select()
         .single();
 
       if (error) {
@@ -112,9 +93,6 @@ export const roomService = {
         throw error;
       }
 
-      // Note: Storage bucket is now shared (room-uploads) and created via migration
-      // Files are organized by room code within the bucket
-      
       return {
         ...room,
         activities: []
@@ -135,13 +113,7 @@ export const roomService = {
         .from('rooms')
         .update(updates)
         .eq('id', id)
-        .select(`
-          *,
-          activities!activities_room_id_fkey (
-            *,
-            activity_options (*)
-          )
-        `)
+        .select()
         .single();
 
       if (error) {
@@ -149,13 +121,9 @@ export const roomService = {
         throw error;
       }
 
-      return {
-        ...room,
-        activities: room.activities?.sort((a, b) => a.activity_order - b.activity_order).map(activity => ({
-          ...activity,
-          options: activity.activity_options?.sort((a, b) => a.option_order - b.option_order) || []
-        })) || []
-      };
+      // Fetch the complete room with activities
+      const completeRoom = await this.getRoomByCode(room.code);
+      return completeRoom!;
     } catch (error) {
       console.error('Error in updateRoom:', error);
       throw error;
@@ -247,7 +215,7 @@ export const roomService = {
         .from('activities')
         .select(`
           *,
-          activity_options (*)
+          activity_options!activity_options_activity_id_fkey (*)
         `)
         .eq('id', activity.id)
         .single();
@@ -275,13 +243,7 @@ export const roomService = {
     try {
       // If options are being updated, handle them separately
       if (updates.options) {
-        // First, get existing options to avoid orphaned data
-        const { data: existingOptions } = await supabase
-          .from('activity_options')
-          .select('id')
-          .eq('activity_id', id);
-        
-        // Delete all existing options for this activity
+        // First, delete all existing options for this activity
         const { error: deleteError } = await supabase
           .from('activity_options')
           .delete()
@@ -419,17 +381,22 @@ export const roomService = {
     
     try {
       // Update activity orders in batch
-      const updatePromises = activityIds.map(async (activityId, index) => {
-        const { error } = await supabase
+      const updatePromises = activityIds.map((activityId, index) => 
+        supabase
           .from('activities')
           .update({ activity_order: index + 1 })
           .eq('id', activityId)
-          .eq('room_id', roomId);
+      );
 
-        if (error) throw error;
-      });
-
-      await Promise.all(updatePromises);
+      const results = await Promise.all(updatePromises);
+      
+      // Check for any errors
+      for (const result of results) {
+        if (result.error) {
+          console.error('Error updating activity order:', result.error);
+          throw result.error;
+        }
+      }
     } catch (error) {
       console.error('Error in reorderActivities:', error);
       throw error;
@@ -442,33 +409,53 @@ export const roomService = {
     }
     
     try {
-      // End any currently active activities in the room
-      await supabase
-        .from('activities')
-        .update({ is_active: false })
-        .eq('room_id', roomId)
-        .eq('is_active', true);
-
-      // Start the specified activity
-      await supabase
-        .from('activities')
-        .update({ is_active: true })
-        .eq('id', activityId);
-
-      // Update room's current activity
-      const { data: activity } = await supabase
+      // Get the activity to check its type
+      const { data: activity, error: activityError } = await supabase
         .from('activities')
         .select('type')
         .eq('id', activityId)
         .single();
 
-      await supabase
+      if (activityError) {
+        console.error('Error fetching activity:', activityError);
+        throw activityError;
+      }
+
+      // First, deactivate all other activities in the room
+      const { error: deactivateError } = await supabase
+        .from('activities')
+        .update({ is_active: false })
+        .eq('room_id', roomId);
+
+      if (deactivateError) {
+        console.error('Error deactivating activities:', deactivateError);
+        throw deactivateError;
+      }
+
+      // Activate the selected activity
+      const { error: activateError } = await supabase
+        .from('activities')
+        .update({ is_active: true })
+        .eq('id', activityId);
+
+      if (activateError) {
+        console.error('Error activating activity:', activateError);
+        throw activateError;
+      }
+
+      // Update the room's current activity
+      const { error: roomError } = await supabase
         .from('rooms')
         .update({
           current_activity_id: activityId,
-          current_activity_type: activity?.type
+          current_activity_type: activity.type
         })
         .eq('id', roomId);
+
+      if (roomError) {
+        console.error('Error updating room:', roomError);
+        throw roomError;
+      }
     } catch (error) {
       console.error('Error in startActivity:', error);
       throw error;
@@ -481,25 +468,41 @@ export const roomService = {
     }
     
     try {
-      const { data: activity } = await supabase
+      // Get the activity's room
+      const { data: activity, error: activityError } = await supabase
         .from('activities')
         .select('room_id')
         .eq('id', activityId)
         .single();
 
-      await supabase
+      if (activityError) {
+        console.error('Error fetching activity:', activityError);
+        throw activityError;
+      }
+
+      // Deactivate the activity
+      const { error: deactivateError } = await supabase
         .from('activities')
         .update({ is_active: false })
         .eq('id', activityId);
 
-      if (activity) {
-        await supabase
-          .from('rooms')
-          .update({
-            current_activity_id: null,
-            current_activity_type: null
-          })
-          .eq('id', activity.room_id);
+      if (deactivateError) {
+        console.error('Error deactivating activity:', deactivateError);
+        throw deactivateError;
+      }
+
+      // Clear the room's current activity
+      const { error: roomError } = await supabase
+        .from('rooms')
+        .update({
+          current_activity_id: null,
+          current_activity_type: null
+        })
+        .eq('id', activity.room_id);
+
+      if (roomError) {
+        console.error('Error updating room:', roomError);
+        throw roomError;
       }
     } catch (error) {
       console.error('Error in endActivity:', error);
@@ -507,36 +510,32 @@ export const roomService = {
     }
   },
 
-  async submitResponse(roomId: string, activityId: string, optionId: string, participantId: string, responseTime?: number): Promise<void> {
+  async submitResponse(
+    roomId: string,
+    activityId: string,
+    optionId: string,
+    participantId: string,
+    responseTime?: number
+  ): Promise<void> {
     if (!supabase) {
       throw new Error('Supabase not available - cannot submit response');
     }
     
     try {
-      // Check if participant already responded (if multiple responses not allowed)
-      const { data: activity } = await supabase
-        .from('activities')
-        .select('settings')
-        .eq('id', activityId)
-        .single();
+      // Check if participant has already responded to this activity
+      const { data: existingResponse } = await supabase
+        .from('participant_responses')
+        .select('id')
+        .eq('activity_id', activityId)
+        .eq('participant_id', participantId)
+        .maybeSingle();
 
-      const allowMultiple = activity?.settings?.allow_multiple_responses || false;
-
-      if (!allowMultiple) {
-        const { data: existingResponse } = await supabase
-          .from('participant_responses')
-          .select('id')
-          .eq('activity_id', activityId)
-          .eq('participant_id', participantId)
-          .single();
-
-        if (existingResponse) {
-          throw new Error('Participant has already responded to this activity');
-        }
+      if (existingResponse) {
+        throw new Error('You have already responded to this activity');
       }
 
-      // Submit the response
-      await supabase
+      // Insert the response
+      const { error: responseError } = await supabase
         .from('participant_responses')
         .insert({
           room_id: roomId,
@@ -546,32 +545,31 @@ export const roomService = {
           response_time: responseTime
         });
 
-      // Update option response count
-      const { data: option } = await supabase
-        .from('activity_options')
-        .select('responses')
-        .eq('id', optionId)
-        .single();
-
-      if (option) {
-        await supabase
-          .from('activity_options')
-          .update({ responses: option.responses + 1 })
-          .eq('id', optionId);
+      if (responseError) {
+        console.error('Error submitting response:', responseError);
+        throw responseError;
       }
 
-      // Update activity total responses
-      const { data: activityData } = await supabase
-        .from('activities')
-        .select('total_responses')
-        .eq('id', activityId)
-        .single();
+      // Update the option's response count
+      const { error: optionError } = await supabase
+        .from('activity_options')
+        .update({ responses: supabase.sql`responses + 1` })
+        .eq('id', optionId);
 
-      if (activityData) {
-        await supabase
-          .from('activities')
-          .update({ total_responses: activityData.total_responses + 1 })
-          .eq('id', activityId);
+      if (optionError) {
+        console.error('Error updating option count:', optionError);
+        throw optionError;
+      }
+
+      // Update the activity's total response count
+      const { error: activityError } = await supabase
+        .from('activities')
+        .update({ total_responses: supabase.sql`total_responses + 1` })
+        .eq('id', activityId);
+
+      if (activityError) {
+        console.error('Error updating activity count:', activityError);
+        throw activityError;
       }
     } catch (error) {
       console.error('Error in submitResponse:', error);
