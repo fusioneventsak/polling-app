@@ -4,7 +4,8 @@ import type { Room, Activity, CreateRoomData, CreateActivityData } from '../type
 export const roomService = {
   async getAllRooms(): Promise<Room[]> {
     if (!supabase) {
-      throw new Error('Supabase not available - cannot get rooms');
+      console.warn('Supabase not available - returning empty rooms array');
+      return [];
     }
     
     try {
@@ -14,7 +15,7 @@ export const roomService = {
           *,
           activities!activities_room_id_fkey (
             *,
-            activity_options (*)
+            activity_options!activity_options_activity_id_fkey (*)
           )
         `)
         .order('created_at', { ascending: false });
@@ -26,10 +27,12 @@ export const roomService = {
 
       return rooms?.map(room => ({
         ...room,
-        activities: room.activities?.map((activity: any) => ({
+        activities: room.activities?.sort((a, b) => a.activity_order - b.activity_order).map(activity => ({
           ...activity,
-          options: activity.activity_options?.sort((a: any, b: any) => a.option_order - b.option_order) || []
-        })).sort((a: Activity, b: Activity) => a.activity_order - b.activity_order) || []
+          options: activity.activity_options?.sort((a, b) => a.option_order - b.option_order).filter((option, index, self) => 
+            index === self.findIndex(o => o.id === option.id)
+          ) || []
+        })) || []
       })) || [];
     } catch (error) {
       console.error('Error in getAllRooms:', error);
@@ -39,7 +42,8 @@ export const roomService = {
 
   async getRoomByCode(code: string): Promise<Room | null> {
     if (!supabase) {
-      throw new Error('Supabase not available - cannot get room');
+      console.warn('Supabase not available - cannot get room by code');
+      return null;
     }
     
     try {
@@ -49,7 +53,7 @@ export const roomService = {
           *,
           activities!activities_room_id_fkey (
             *,
-            activity_options (*)
+            activity_options!activity_options_activity_id_fkey (*)
           )
         `)
         .eq('code', code)
@@ -59,16 +63,18 @@ export const roomService = {
         if (error.code === 'PGRST116') {
           return null; // Room not found
         }
-        console.error('Error fetching room:', error);
+        console.error('Error fetching room by code:', error);
         throw error;
       }
 
       return {
         ...room,
-        activities: room.activities?.map((activity: any) => ({
+        activities: room.activities?.sort((a, b) => a.activity_order - b.activity_order).map(activity => ({
           ...activity,
-          options: activity.activity_options?.sort((a: any, b: any) => a.option_order - b.option_order) || []
-        })).sort((a: Activity, b: Activity) => a.activity_order - b.activity_order) || []
+          options: activity.activity_options?.sort((a, b) => a.option_order - b.option_order).filter((option, index, self) => 
+            index === self.findIndex(o => o.id === option.id)
+          ) || []
+        })) || []
       };
     } catch (error) {
       console.error('Error in getRoomByCode:', error);
