@@ -1,85 +1,88 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Layout } from '../components/Layout';
-import { Button } from '../components/Button';
-import { Card } from '../components/Card';
-import { useTheme } from '../components/ThemeProvider';
+import { Check, Clock, Users, ArrowLeft, Loader2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { roomService } from '../services/roomService';
-import { Check, Users, BarChart, MessageSquare, HelpCircle, Target, Cloud, Image as ImageIcon } from 'lucide-react';
-import type { Activity, ActivityType } from '../types';
+import { useTheme } from '../components/ThemeProvider';
+import type { Activity } from '../types';
 
 export const VotePage: React.FC = () => {
   const { pollId } = useParams<{ pollId: string }>();
   const navigate = useNavigate();
   const [activity, setActivity] = useState<Activity | null>(null);
+  const [roomCode, setRoomCode] = useState<string | null>(null);
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
   const [hasVoted, setHasVoted] = useState(false);
   const [voting, setVoting] = useState(false);
   const [loading, setLoading] = useState(true);
   const [participantId] = useState(() => 
-    `participant_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+    localStorage.getItem('participantId') || 
+    (() => {
+      const id = `participant_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      localStorage.setItem('participantId', id);
+      return id;
+    })()
   );
-  const [roomCode, setRoomCode] = useState<string | null>(null);
   const { applyTheme, resetTheme } = useTheme();
 
-  // Load activity data
-  const loadActivity = async () => {
+  // Load activity data with enhanced error handling
+  const loadActivity = useCallback(async (forceRefresh = false) => {
     if (!pollId || !supabase) return;
-    
-    try {
-      // Get activity with room information
-      const { data: activityData, error } = await supabase
-        .from('activities')
-        .select(`
-          *,
-          activity_options (*),
-          rooms!activities_room_id_fkey (
-            id,
-            code,
-            name,
-            participants,
-            is_active,
-            settings
-          )
-        `)
-        .eq('id', pollId)
-        .single();
 
-      if (error) {
-        console.error('Error loading activity:', error);
+    try {
+      console.log('VotePage: Loading activity data for ID:', pollId, forceRefresh ? '(forced)' : '');
+      const activityData = await roomService.getActivityById(pollId);
+      
+      if (!activityData) {
+        console.log('VotePage: Activity not found:', pollId);
         setActivity(null);
         return;
       }
 
-      if (activityData) {
-        const formattedActivity = {
-          ...activityData,
-          options: activityData.activity_options?.sort((a, b) => a.option_order - b.option_order) || [],
-          room: activityData.rooms
-        };
-        setActivity(formattedActivity);
-        setRoomCode(activityData.rooms?.code || null);
-        console.log('Vote page loaded activity:', formattedActivity);
-      } else {
-        setActivity(null);
+      // Check if activity is still active
+      if (!activityData.is_active) {
+        console.log('VotePage: Activity is no longer active:', pollId);
+        if (activityData.room?.code) {
+          navigate(`/game?joined=${activityData.room.code}`);
+        } else {
+          navigate('/game');
+        }
+        return;
       }
+
+      const formattedActivity = {
+        ...activityData,
+        options: activityData.options?.sort((a, b) => a.option_order - b.option_order) || [],
+        room: activityData.room
+      };
+      
+      setActivity(formattedActivity);
+      setRoomCode(activityData.room?.code || null);
+      
+      console.log('VotePage: Activity loaded successfully:', {
+        id: formattedActivity.id,
+        title: formattedActivity.title,
+        type: formattedActivity.type,
+        optionsCount: formattedActivity.options.length,
+        totalResponses: formattedActivity.total_responses,
+        isActive: formattedActivity.is_active
+      });
     } catch (error) {
-      console.error('Error loading activity:', error);
+      console.error('VotePage: Error loading activity:', error);
       setActivity(null);
     }
-  };
+  }, [pollId, navigate]);
 
   useEffect(() => {
     const initializeActivity = async () => {
       setLoading(true);
-      await loadActivity();
+      await loadActivity(true);
       setLoading(false);
     };
 
     initializeActivity();
-  }, [pollId]);
+  }, [loadActivity]);
 
   // Apply room theme when activity loads
   useEffect(() => {
@@ -102,11 +105,11 @@ export const VotePage: React.FC = () => {
     }
   }, [pollId]);
 
-  // Set up real-time subscriptions
+  // Enhanced real-time subscriptions
   useEffect(() => {
     if (!pollId || !supabase) return;
 
-    console.log('Setting up real-time subscriptions for activity:', pollId);
+    console.log('VotePage: Setting up real-time subscriptions for activity:', pollId);
 
     // Create a unique channel for this vote session
     const channelName = `activity-vote-${pollId}-${Date.now()}`;
@@ -120,7 +123,12 @@ export const VotePage: React.FC = () => {
         table: 'rooms'
       },
       async (payload) => {
-        console.log('Room change received:', payload);
+        console.log('VotePage: Room change received:', {
+          eventType: payload.eventType,
+          roomId: payload.new?.id || payload.old?.id,
+          oldCurrentActivityId: payload.old?.current_activity_id,
+          newCurrentActivityId: payload.new?.current_activity_id
+        });
         
         // Only handle changes for our room
         if (activity?.room_id && payload.new?.id === activity.room_id) {
@@ -128,7 +136,7 @@ export const VotePage: React.FC = () => {
           if (payload.eventType === 'UPDATE' && 
               payload.new?.current_activity_id && 
               payload.new.current_activity_id !== pollId) {
-            console.log('New activity started, redirecting to:', payload.new.current_activity_id);
+            console.log('VotePage: New activity started, redirecting to:', payload.new.current_activity_id);
             navigate(`/vote/${payload.new.current_activity_id}`);
             return;
           }
@@ -137,7 +145,7 @@ export const VotePage: React.FC = () => {
           if (payload.eventType === 'UPDATE' && 
               payload.old?.current_activity_id === pollId && 
               !payload.new?.current_activity_id) {
-            console.log('Activity ended, redirecting to room waiting area');
+            console.log('VotePage: Activity ended, redirecting to room waiting area');
             if (roomCode) {
               navigate(`/game?joined=${roomCode}`);
             } else {
@@ -147,7 +155,7 @@ export const VotePage: React.FC = () => {
           }
         }
         
-        await loadActivity();
+        await loadActivity(true);
       }
     );
 
@@ -160,11 +168,16 @@ export const VotePage: React.FC = () => {
         filter: `id=eq.${pollId}`
       },
       async (payload) => {
-        console.log('Activity change received:', payload);
+        console.log('VotePage: Activity change received:', {
+          eventType: payload.eventType,
+          activityId: payload.new?.id || payload.old?.id,
+          oldIsActive: payload.old?.is_active,
+          newIsActive: payload.new?.is_active
+        });
         
         // If activity was stopped, redirect back to room waiting area
         if (payload.eventType === 'UPDATE' && payload.new?.is_active === false && payload.old?.is_active === true) {
-          console.log('Activity stopped, redirecting to room waiting area');
+          console.log('VotePage: Activity stopped, redirecting to room waiting area');
           if (roomCode) {
             navigate(`/game?joined=${roomCode}`);
           } else {
@@ -173,7 +186,7 @@ export const VotePage: React.FC = () => {
           return;
         }
         
-        await loadActivity();
+        await loadActivity(true);
       }
     );
 
@@ -186,8 +199,8 @@ export const VotePage: React.FC = () => {
         filter: `activity_id=eq.${pollId}`
       },
       async (payload) => {
-        console.log('Activity options change received:', payload);
-        await loadActivity();
+        console.log('VotePage: Activity options change received:', payload);
+        await loadActivity(true);
       }
     );
 
@@ -200,27 +213,27 @@ export const VotePage: React.FC = () => {
         filter: `activity_id=eq.${pollId}`
       },
       async (payload) => {
-        console.log('Response change received:', payload);
-        await loadActivity();
+        console.log('VotePage: Response change received:', payload);
+        await loadActivity(true);
       }
     );
 
     // Subscribe to the channel
     channel.subscribe((status, err) => {
-      console.log('Vote subscription status:', status);
+      console.log('VotePage: Subscription status:', status);
       if (err) {
-        console.error('Vote subscription error:', err);
+        console.error('VotePage: Subscription error:', err);
       }
       if (status === 'SUBSCRIBED') {
-        console.log('✅ Vote real-time subscriptions active');
+        console.log('✅ VotePage: Real-time subscriptions active');
       }
     });
 
     return () => {
-      console.log('Cleaning up vote subscriptions');
+      console.log('VotePage: Cleaning up subscriptions');
       channel.unsubscribe();
     };
-  }, [pollId, navigate, roomCode, activity?.room_id]);
+  }, [pollId, navigate, roomCode, activity?.room_id, loadActivity]);
 
   const handleVote = async (optionId: string) => {
     if (!activity || hasVoted || voting || !supabase) return;
@@ -237,334 +250,268 @@ export const VotePage: React.FC = () => {
       votedActivities.push(activity.id);
       localStorage.setItem('votedActivities', JSON.stringify(votedActivities));
       
-      // Reload activity to get updated results
-      await loadActivity();
-    } catch (err) {
-      console.error('Failed to cast vote:', err);
+      // Reload activity to get updated response counts
+      setTimeout(() => loadActivity(true), 1000);
+      
+    } catch (error) {
+      console.error('VotePage: Error submitting vote:', error);
       setSelectedOption(null);
+      
+      // Show error to user
+      alert('Failed to submit vote. Please try again.');
     } finally {
       setVoting(false);
     }
   };
 
-  const getActivityIcon = (type: ActivityType) => {
-    switch (type) {
-      case 'poll': return MessageSquare;
-      case 'trivia': return HelpCircle;
-      case 'quiz': return Target;
-      case 'word_cloud': return Cloud;
-      default: return MessageSquare;
-    }
-  };
-
-  const getActivityTypeLabel = (type: ActivityType) => {
-    switch (type) {
-      case 'poll': return 'Poll';
-      case 'trivia': return 'Trivia';
-      case 'quiz': return 'Quiz';
-      case 'word_cloud': return 'Word Cloud';
-      default: return 'Activity';
+  const handleGoBack = () => {
+    if (roomCode) {
+      navigate(`/game?joined=${roomCode}`);
+    } else {
+      navigate('/game');
     }
   };
 
   if (loading) {
     return (
-      <Layout>
-        <div className="container mx-auto px-4 py-16 flex items-center justify-center min-h-screen">
-          <Card className="text-center">
-            <div className="w-16 h-16 bg-slate-700 rounded-2xl mx-auto mb-4 flex items-center justify-center">
-              <BarChart className="w-8 h-8 text-slate-400 animate-pulse" />
-            </div>
-            <h2 className="text-xl font-semibold text-white mb-2">Loading...</h2>
-            <p className="text-slate-400">Connecting to activity...</p>
-          </Card>
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-white text-lg">Loading activity...</p>
         </div>
-      </Layout>
-    );
-  }
-
-  if (!supabase) {
-    return (
-      <Layout>
-        <div className="container mx-auto px-4 py-16 flex items-center justify-center min-h-screen">
-          <Card className="text-center">
-            <div className="w-16 h-16 bg-slate-700 rounded-2xl mx-auto mb-4 flex items-center justify-center">
-              <BarChart className="w-8 h-8 text-slate-400" />
-            </div>
-            <h2 className="text-xl font-semibold text-white mb-2">Service Unavailable</h2>
-            <p className="text-slate-400">Real-time features are not configured. Please contact the administrator.</p>
-          </Card>
-        </div>
-      </Layout>
+      </div>
     );
   }
 
   if (!activity) {
     return (
-      <Layout>
-        <div className="container mx-auto px-4 py-16 flex items-center justify-center min-h-screen">
-          <Card className="text-center">
-            <div className="w-16 h-16 bg-slate-700 rounded-2xl mx-auto mb-4 flex items-center justify-center">
-              <BarChart className="w-8 h-8 text-slate-400" />
-            </div>
-            <h2 className="text-xl font-semibold text-white mb-2">Activity not found</h2>
-            <p className="text-slate-400">The activity you're looking for doesn't exist or has ended.</p>
-          </Card>
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-red-900 to-slate-900 flex items-center justify-center">
+        <div className="text-center max-w-md mx-auto p-6">
+          <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Clock className="w-8 h-8 text-red-400" />
+          </div>
+          <h2 className="text-2xl font-bold text-white mb-2">Activity Not Available</h2>
+          <p className="text-red-400 mb-6">
+            This activity is no longer active or doesn't exist.
+          </p>
+          <button
+            onClick={handleGoBack}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg flex items-center gap-2 mx-auto transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Back to Room
+          </button>
         </div>
-      </Layout>
+      </div>
     );
   }
 
-  if (!activity?.is_active) {
-    return (
-      <Layout>
-        <div className="container mx-auto px-4 py-16 flex items-center justify-center min-h-screen">
-          <Card className="text-center">
-            <div className="w-16 h-16 bg-slate-700 rounded-2xl mx-auto mb-4 flex items-center justify-center">
-              {React.createElement(getActivityIcon(activity.type), {
-                className: "w-8 h-8 text-slate-400"
-              })}
-            </div>
-            <h2 className="text-xl font-semibold text-white mb-2">Activity Inactive</h2>
-            <p className="text-slate-400">This {getActivityTypeLabel(activity.type).toLowerCase()} is currently not accepting responses.</p>
-          </Card>
-        </div>
-      </Layout>
-    );
-  }
-
-  const getPercentage = (votes: number) => {
-    return activity.total_responses > 0 ? Math.round((votes / activity.total_responses) * 100) : 0;
+  const themeColors = {
+    primary: activity.room?.settings?.theme?.primary_color || '#3B82F6',
+    secondary: activity.room?.settings?.theme?.secondary_color || '#1E40AF',
+    accent: activity.room?.settings?.theme?.accent_color || '#60A5FA',
+    text: activity.room?.settings?.theme?.text_color || '#FFFFFF'
   };
-
-  const Icon = getActivityIcon(activity.type);
-
-  // Get theme-aware styles
-  const getThemeStyles = () => {
-    const settings = activity?.room?.settings;
-    if (!settings?.theme) return {};
-    
-    return {
-      primaryColor: settings.theme.primary_color || '#2563eb',
-      secondaryColor: settings.theme.secondary_color || '#0891b2',
-      accentColor: settings.theme.accent_color || '#06b6d4',
-      textColor: settings.theme.text_color || '#ffffff'
-    };
-  };
-
-  const themeStyles = getThemeStyles();
 
   return (
-    <Layout 
-      showBackground={!activity?.room?.settings?.theme?.background_gradient}
-      className={activity?.room?.settings?.theme?.background_gradient ? `bg-gradient-to-br ${activity.room.settings.theme.background_gradient}` : ''}
-    >
-      <div className="container mx-auto px-4 py-8 max-w-2xl">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8 }}
-        >
-          <Card className="mb-6">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-3">
-                <span 
-                  className="px-3 py-1 text-white text-sm font-mono rounded-full"
-                  style={{ backgroundColor: themeStyles.primaryColor }}
-                >
-                  {activity.room?.code}
-                </span>
-                <div className="flex items-center gap-2">
-                  <Icon className="w-5 h-5" style={{ color: themeStyles.accentColor }} />
-                  <span className="text-sm text-slate-400">
-                    {getActivityTypeLabel(activity.type)}
-                  </span>
-                  <div className="px-2 py-1 bg-green-500/20 text-green-400 border border-green-500/30 rounded text-xs font-semibold">
-                    ● LIVE
-                  </div>
-                </div>
-              </div>
-              <div className="flex items-center gap-4 text-sm text-slate-400">
-                <div className="flex items-center gap-1">
-                  <Users className="w-4 h-4" />
-                  {activity.room?.participants || 0}
-                </div>
-                <div className="flex items-center gap-1">
-                  <BarChart className="w-4 h-4" />
-                  {activity.total_responses}
-                </div>
-              </div>
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900">
+      <div className="max-w-4xl mx-auto p-6">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-8">
+          <button
+            onClick={handleGoBack}
+            className="flex items-center gap-2 text-slate-300 hover:text-white transition-colors"
+          >
+            <ArrowLeft className="w-5 h-5" />
+            Back to Room
+          </button>
+          
+          <div className="flex items-center gap-4 text-slate-300">
+            <div className="flex items-center gap-2">
+              <Users className="w-4 h-4" />
+              <span>{activity.total_responses} responses</span>
             </div>
-            
-            {activity.room?.settings?.branding?.logo_url && (
-              <div className="flex justify-center mb-4">
-                <img
-                  src={activity.room.settings.branding.logo_url}
-                  alt="Organization logo"
-                  className="h-12 object-contain"
-                />
-              </div>
+            {roomCode && (
+              <span className="px-3 py-1 bg-slate-700 rounded-full text-sm font-mono">
+                {roomCode}
+              </span>
             )}
+          </div>
+        </div>
 
-            {/* Activity Media */}
-            {activity.media_url && (
-              <div className="mb-4">
-                <img
-                  src={activity.media_url}
-                  alt="Activity media"
-                  className="w-full max-h-48 object-contain rounded-lg border border-slate-600"
-                />
-              </div>
-            )}
+        {/* Activity Content */}
+        <div className="text-center mb-8">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-6"
+          >
+            <span 
+              className="inline-block px-4 py-2 rounded-full text-sm font-medium mb-4"
+              style={{ 
+                backgroundColor: `${themeColors.accent}20`,
+                color: themeColors.accent 
+              }}
+            >
+              {activity.type.charAt(0).toUpperCase() + activity.type.slice(1)}
+            </span>
             
-            <h1 className="text-2xl font-bold text-white mb-2">
+            <h1 className="text-4xl font-bold text-white mb-4">
               {activity.title}
             </h1>
             
             {activity.description && (
-              <p className="text-slate-300 text-sm mb-2">{activity.description}</p>
-            )}
-            
-            {activity.room?.settings?.branding?.organization_name && (
-              <p className="text-slate-400 text-xs mb-2">
-                {activity.room.settings.branding.organization_name}
+              <p className="text-xl text-slate-300">
+                {activity.description}
               </p>
             )}
-            
-            {hasVoted ? (
-              <p className="text-green-400 text-sm">✓ Thank you for your response!</p>
-            ) : (
-              <p className="text-slate-300 text-sm">Tap an option to respond</p>
-            )}
-          </Card>
+          </motion.div>
 
-          <div className="space-y-4">
-            <AnimatePresence>
-              {activity.options?.map((option, index) => {
-                const percentage = getPercentage(option.responses);
-                const isSelected = selectedOption === option.id;
-                const showResults = hasVoted;
-
-                return (
-                  <motion.div
-                    key={option.id}
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: index * 0.1 }}
-                    layout
-                  >
-                    <motion.button
-                      className={`w-full p-6 rounded-xl border-2 transition-all duration-300 relative overflow-hidden ${
-                        hasVoted
-                          ? 'cursor-default bg-slate-800/50 border-slate-700'
-                          : isSelected
-                          ? 'border-2'
-                          : 'bg-slate-800/50 border-slate-700 hover:border-slate-600 hover:bg-slate-800/70'
-                      }`}
-                      style={!hasVoted && isSelected ? {
-                        backgroundColor: `${themeStyles.primaryColor}20`,
-                        borderColor: themeStyles.primaryColor
-                      } : {}}
-                      onClick={() => !hasVoted && handleVote(option.id)}
-                      disabled={hasVoted || voting}
-                      whileHover={!hasVoted ? { scale: 1.02 } : {}}
-                      whileTap={!hasVoted ? { scale: 0.98 } : {}}
-                    >
-                      {showResults && (
-                        <motion.div
-                          className="absolute inset-0"
-                          style={{
-                            background: option.is_correct 
-                              ? 'linear-gradient(to right, rgba(5, 150, 105, 0.2), rgba(16, 185, 129, 0.2))'
-                              : `linear-gradient(to right, ${themeStyles.primaryColor}33, ${themeStyles.secondaryColor}33)`
-                          }}
-                          initial={{ width: 0 }}
-                          animate={{ width: `${percentage}%` }}
-                          transition={{ duration: 1, ease: "easeOut" }}
-                        />
-                      )}
-
-                      <div className="relative z-10">
-                        {/* Option Image */}
-                        {option.media_url && (
-                          <div className="mb-4">
-                            <img
-                              src={option.media_url}
-                              alt={`Option: ${option.text}`}
-                              className="w-full max-h-32 object-contain rounded-lg border border-slate-600"
-                            />
-                          </div>
-                        )}
-
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            {hasVoted && isSelected && (
-                              <motion.div
-                                initial={{ scale: 0 }}
-                                animate={{ scale: 1 }}
-                                className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center flex-shrink-0"
-                              >
-                                <Check className="w-4 h-4 text-white" />
-                              </motion.div>
-                            )}
-                            <div className="text-left">
-                              <span className="text-lg font-semibold text-white block">
-                                {option.text}
-                              </span>
-                              {(activity.type === 'trivia' || activity.type === 'quiz') && option.is_correct && showResults && (
-                                <span className="text-green-400 text-sm">✓ Correct Answer</span>
-                              )}
-                            </div>
-                          </div>
-
-                          {showResults && (
-                            <motion.div
-                              initial={{ opacity: 0, scale: 0.5 }}
-                              animate={{ opacity: 1, scale: 1 }}
-                              transition={{ delay: 0.5 }}
-                              className="text-right flex-shrink-0"
-                            >
-                              <div className="text-xl font-bold" style={{ color: themeStyles.accentColor }}>
-                                {percentage}%
-                              </div>
-                              <div className="text-sm text-slate-400">
-                                {option.responses} responses
-                              </div>
-                            </motion.div>
-                          )}
-                        </div>
-                      </div>
-                    </motion.button>
-                  </motion.div>
-                );
-              }) || []}
-            </AnimatePresence>
-          </div>
-
-          {hasVoted && (
+          {activity.media_url && (
             <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.8 }}
-              className="mt-8 text-center"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="mb-8"
             >
-              <Card>
-                <h3 className="text-lg font-semibold text-white mb-2">
-                  Thanks for participating! 🎉
-                </h3>
-                <p className="text-slate-300 text-sm">
-                  Watch the results update in real-time as more people respond.
-                </p>
-                {activity.room?.settings?.branding?.show_powered_by !== false && (
-                  <p className="text-slate-500 text-xs mt-2">
-                    Powered by PollStream
-                  </p>
-                )}
-              </Card>
+              <img
+                src={activity.media_url}
+                alt="Activity media"
+                className="max-w-md mx-auto rounded-lg shadow-lg"
+              />
             </motion.div>
           )}
-        </motion.div>
+        </div>
+
+        {/* Voting Options */}
+        <AnimatePresence mode="wait">
+          {hasVoted ? (
+            <motion.div
+              key="voted"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="text-center"
+            >
+              <div 
+                className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6"
+                style={{ backgroundColor: `${themeColors.accent}20` }}
+              >
+                <Check className="w-10 h-10" style={{ color: themeColors.accent }} />
+              </div>
+              
+              <h2 className="text-2xl font-bold text-white mb-4">
+                Thank you for voting!
+              </h2>
+              
+              <p className="text-slate-300 mb-8">
+                Your response has been recorded. Results will be shown when the presenter ends this activity.
+              </p>
+              
+              <div className="grid gap-3 max-w-2xl mx-auto">
+                {activity.options?.map((option) => {
+                  const percentage = activity.total_responses > 0 
+                    ? (option.responses / activity.total_responses) * 100 
+                    : 0;
+                  const isSelected = selectedOption === option.id;
+                  
+                  return (
+                    <motion.div
+                      key={option.id}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      className={`p-4 rounded-lg border-2 relative overflow-hidden ${
+                        isSelected 
+                          ? 'border-green-500 bg-green-500/10' 
+                          : 'border-slate-600 bg-slate-800/50'
+                      }`}
+                    >
+                      <div 
+                        className="absolute inset-0 transition-all duration-500"
+                        style={{
+                          background: `linear-gradient(90deg, ${themeColors.accent}15 ${percentage}%, transparent ${percentage}%)`,
+                        }}
+                      />
+                      
+                      <div className="relative flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          {isSelected && (
+                            <Check className="w-5 h-5 text-green-400" />
+                          )}
+                          <span className="text-white font-medium">
+                            {option.text}
+                          </span>
+                        </div>
+                        
+                        <div className="flex items-center gap-3 text-sm">
+                          <span className="text-slate-300">
+                            {option.responses} votes
+                          </span>
+                          <span 
+                            className="font-bold min-w-[3rem] text-right"
+                            style={{ color: themeColors.accent }}
+                          >
+                            {percentage.toFixed(1)}%
+                          </span>
+                        </div>
+                      </div>
+                    </motion.div>
+                  );
+                })}
+              </div>
+            </motion.div>
+          ) : (
+            <motion.div
+              key="voting"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="max-w-2xl mx-auto"
+            >
+              <div className="grid gap-4">
+                {activity.options?.map((option, index) => (
+                  <motion.button
+                    key={option.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: index * 0.1 }}
+                    onClick={() => handleVote(option.id)}
+                    disabled={voting}
+                    className={`p-6 rounded-lg border-2 text-left transition-all duration-200 ${
+                      voting && selectedOption === option.id
+                        ? 'border-blue-500 bg-blue-500/10 scale-[0.98]'
+                        : 'border-slate-600 bg-slate-800/50 hover:border-slate-500 hover:bg-slate-800/70 hover:scale-[1.02]'
+                    } ${voting ? 'cursor-not-allowed' : 'cursor-pointer'}`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <span className="text-lg font-medium text-white block">
+                          {option.text}
+                        </span>
+                        
+                        {option.media_url && (
+                          <img
+                            src={option.media_url}
+                            alt="Option media"
+                            className="mt-3 max-w-xs rounded-md"
+                          />
+                        )}
+                      </div>
+                      
+                      {voting && selectedOption === option.id && (
+                        <Loader2 className="w-6 h-6 text-blue-400 animate-spin ml-4" />
+                      )}
+                    </div>
+                  </motion.button>
+                ))}
+              </div>
+              
+              {voting && (
+                <div className="text-center mt-6">
+                  <p className="text-slate-300">Submitting your vote...</p>
+                </div>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
-    </Layout>
+    </div>
   );
 };
