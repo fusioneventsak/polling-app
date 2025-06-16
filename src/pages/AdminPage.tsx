@@ -126,28 +126,33 @@ export const AdminPage: React.FC = () => {
 
   const handleDeleteRoom = async (roomId: string) => {
     try {
+      // Show loading state
+      setDeleteConfirmation(prev => prev ? { ...prev, loading: true } : null);
+      
       // Optimistic update: immediately remove room from UI
       setRooms(prev => prev.filter(room => room.id !== roomId));
       if (selectedRoom?.id === roomId) {
         setSelectedRoom(null);
       }
-      setDeleteConfirmation(null);
       
       await roomService.deleteRoom(roomId);
       
-      // Refresh to ensure consistency
-      await loadRooms();
+      // Clear confirmation modal
+      setDeleteConfirmation(null);
+      
+      console.log('Room deleted successfully');
     } catch (err) {
       // Revert optimistic update on error
       console.error('Failed to delete room, reverting optimistic update');
       await loadRooms();
       setError('Failed to delete room');
+      setDeleteConfirmation(null);
       console.error('Error deleting room:', err);
     }
   };
 
   const handleDeleteActivity = async (activityId: string) => {
-    if (!deleteConfirmation) return;
+    if (!deleteConfirmation || !selectedRoom) return;
     
     try {
       console.log('Admin: Starting activity deletion:', activityId);
@@ -156,25 +161,20 @@ export const AdminPage: React.FC = () => {
       setDeleteConfirmation(prev => prev ? { ...prev, loading: true } : null);
       
       // Optimistic update: immediately remove the activity from UI
-      if (selectedRoom) {
-        const optimisticRoom = {
-          ...selectedRoom,
-          activities: selectedRoom.activities?.filter(a => a.id !== activityId) || []
-        };
-        setSelectedRoom(optimisticRoom);
-        setRooms(prev => prev.map(room => 
-          room.id === selectedRoom.id ? optimisticRoom : room
-        ));
-      }
+      const optimisticRoom = {
+        ...selectedRoom,
+        activities: selectedRoom.activities?.filter(a => a.id !== activityId) || []
+      };
+      setSelectedRoom(optimisticRoom);
+      setRooms(prev => prev.map(room => 
+        room.id === selectedRoom.id ? optimisticRoom : room
+      ));
       
-      // Clear confirmation modal immediately after optimistic update
-      setDeleteConfirmation(null);
-      
+      // Call the delete API
       await roomService.deleteActivity(activityId);
-      console.log('Admin: Activity deleted, refreshing rooms');
       
-      // Refresh rooms data to get updated state
-      await loadRooms();
+      // Clear confirmation modal
+      setDeleteConfirmation(null);
       
       console.log('Admin: Activity deletion completed');
     } catch (err) {
@@ -182,6 +182,7 @@ export const AdminPage: React.FC = () => {
       console.error('Failed to delete activity, reverting optimistic update');
       await loadRooms(); // Reload to get correct state
       setError(`Failed to delete activity: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      setDeleteConfirmation(null);
     }
   };
 
@@ -207,8 +208,6 @@ export const AdminPage: React.FC = () => {
       
       await roomService.startActivity(roomId, activityId);
       console.log('Activity started successfully');
-      // Force refresh to ensure UI updates immediately
-      await loadRooms();
     } catch (err) {
       // Revert optimistic update on error
       console.error('Failed to start activity, reverting optimistic update');
@@ -240,8 +239,6 @@ export const AdminPage: React.FC = () => {
       
       await roomService.endActivity(activityId);
       console.log('Activity ended successfully');
-      // Force refresh to ensure UI updates immediately
-      await loadRooms();
     } catch (err) {
       // Revert optimistic update on error
       console.error('Failed to end activity, reverting optimistic update');
@@ -312,11 +309,8 @@ export const AdminPage: React.FC = () => {
       setRooms(prev => prev.map(room => 
         room.id === selectedRoom.id ? updatedRoom : room
       ));
-      
+
       await roomService.reorderActivities(selectedRoom.id, activityIds);
-      
-      // Refresh to ensure consistency
-      await loadRooms();
     } catch (err) {
       // Revert optimistic update on error
       console.error('Failed to reorder activities, reverting optimistic update');
@@ -329,8 +323,8 @@ export const AdminPage: React.FC = () => {
   if (loading) {
     return (
       <Layout>
-        <div className="flex items-center justify-center min-h-[400px]">
-          <LoadingSpinner size="lg" />
+        <div className="flex items-center justify-center min-h-[50vh]">
+          <LoadingSpinner />
         </div>
       </Layout>
     );
@@ -338,21 +332,22 @@ export const AdminPage: React.FC = () => {
 
   return (
     <Layout>
-      <div className="max-w-7xl mx-auto px-4 py-8">
-        <div className="flex items-center justify-between mb-8">
+      <div className="max-w-7xl mx-auto space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Button
               variant="ghost"
-              size="sm"
               onClick={() => navigate('/')}
               className="flex items-center gap-2"
             >
               <ArrowLeft className="w-4 h-4" />
               Back to Home
             </Button>
-            <h1 className="text-3xl font-bold text-white">
-              Admin Dashboard
-            </h1>
+            <div>
+              <h1 className="text-3xl font-bold text-white">Admin Dashboard</h1>
+              <p className="text-slate-400">Manage your rooms and activities</p>
+            </div>
           </div>
           <Button
             onClick={() => setShowCreateRoom(true)}
@@ -364,93 +359,67 @@ export const AdminPage: React.FC = () => {
         </div>
 
         {error && (
-          <div className="mb-6 p-4 bg-red-500/20 border border-red-500/30 rounded-lg">
+          <Card className="p-4 bg-red-500/10 border-red-500/20">
             <p className="text-red-400">{error}</p>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setError(null)}
-              className="mt-2"
-            >
-              Dismiss
-            </Button>
-          </div>
+          </Card>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Rooms List */}
           <div className="lg:col-span-1">
             <Card className="p-6">
-              <h2 className="text-xl font-semibold mb-4 text-white">
+              <h2 className="text-xl font-semibold text-white mb-4">
                 Rooms ({rooms.length})
               </h2>
-              <div className="space-y-3">
+              <div className="space-y-3 max-h-[60vh] overflow-y-auto">
                 {rooms.map((room) => (
                   <div
                     key={room.id}
-                    className={`p-4 rounded-lg border cursor-pointer transition-colors ${
+                    className={`p-4 rounded-lg border cursor-pointer transition-all ${
                       selectedRoom?.id === room.id
-                        ? 'bg-blue-500/20 border-blue-500/30'
+                        ? 'bg-blue-500/20 border-blue-500/50'
                         : 'bg-slate-700/30 border-slate-600 hover:bg-slate-700/50'
                     }`}
                     onClick={() => setSelectedRoom(room)}
                   >
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h3 className="font-medium text-white">
-                          {room.name}
-                        </h3>
-                        <p className="text-sm text-slate-400">
-                          Code: {room.code}
-                        </p>
-                        <div className="flex items-center gap-4 mt-2 text-xs text-slate-400">
-                          <span className="flex items-center gap-1">
-                            <Users className="w-3 h-3" />
-                            {room.participants}
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <BarChart3 className="w-3 h-3" />
-                            {room.activities?.length || 0}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <div
-                          className={`w-2 h-2 rounded-full ${
-                            room.is_active
-                              ? 'bg-green-500'
-                              : 'bg-slate-600'
-                          }`}
-                        />
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setDeleteConfirmation({
-                              type: 'room',
-                              id: room.id,
-                              name: room.name
-                            });
-                          }}
-                          className="text-red-400 hover:text-red-300"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="font-semibold text-white">{room.name}</h3>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDeleteConfirmation({
+                            type: 'room',
+                            id: room.id,
+                            name: room.name
+                          });
+                        }}
+                        className="text-red-400 hover:text-red-300"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                    <p className="text-sm text-slate-400 mb-2">
+                      Code: <span className="font-mono">{room.code}</span>
+                    </p>
+                    <div className="flex items-center gap-4 text-sm text-slate-400">
+                      <span className="flex items-center gap-1">
+                        <Users className="w-4 h-4" />
+                        {room.participants}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <BarChart3 className="w-4 h-4" />
+                        {room.activities?.length || 0}
+                      </span>
                     </div>
                   </div>
                 ))}
-                {rooms.length === 0 && (
-                  <p className="text-slate-400 text-center py-8">
-                    No rooms created yet
-                  </p>
-                )}
               </div>
             </Card>
           </div>
 
-          {/* Room Details */}
+          {/* Room Details & Activities */}
           <div className="lg:col-span-2">
             {selectedRoom ? (
               <Card className="p-6">
