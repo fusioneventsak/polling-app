@@ -6,7 +6,7 @@ import { roomService } from '../services/roomService';
 import { useTheme } from '../components/ThemeProvider';
 import { Poll3DVisualization } from '../components/Poll3DVisualization';
 import { Users, BarChart, Clock, MessageSquare, HelpCircle, Cloud, Trophy, Target, Calendar, Activity } from 'lucide-react';
-import type { ActivityType, Room, Activity as ActivityType } from '../types';
+import type { ActivityType, Room, Activity } from '../types';
 
 export const DisplayPage: React.FC = () => {
   const { pollId } = useParams<{ pollId: string }>();
@@ -24,7 +24,7 @@ export const DisplayPage: React.FC = () => {
     if (currentRoom.current_activity_id) {
       const currentActivity = currentRoom.activities?.find(a => 
         a.id === currentRoom.current_activity_id && a.is_active
-      );
+      ) as Activity | undefined;
       if (currentActivity) {
         console.log('DisplayPage: Found active activity via current_activity_id:', currentActivity.id);
         return currentActivity;
@@ -32,7 +32,7 @@ export const DisplayPage: React.FC = () => {
     }
     
     // Fallback: Find any activity marked as active
-    const flaggedActive = currentRoom.activities?.find(a => a.is_active);
+    const flaggedActive = currentRoom.activities?.find(a => a.is_active) as Activity | undefined;
     if (flaggedActive) {
       console.log('DisplayPage: Found active activity via is_active flag:', flaggedActive.id);
       return flaggedActive;
