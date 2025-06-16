@@ -163,31 +163,29 @@ const AnimatedBar: React.FC<BarProps> = ({
         />
       )}
       
-      {/* Percentage text */}
+      {/* Percentage text - NO FONT REFERENCE */}
       <Text
         position={[position[0], animatedHeight + (imageUrl ? 2.2 : 1.5), position[2]]}
         fontSize={0.35}
         color="#ffffff"
         anchorX="center"
         anchorY="middle"
-        font="/fonts/inter-bold.woff"
       >
         {percentage}%
       </Text>
       
-      {/* Response count */}
+      {/* Response count - NO FONT REFERENCE */}
       <Text
         position={[position[0], animatedHeight + (imageUrl ? 1.9 : 1.2), position[2]]}
         fontSize={0.15}
         color="#94a3b8"
         anchorX="center"
         anchorY="middle"
-        font="/fonts/inter-regular.woff"
       >
         {responses} {responses === 1 ? 'vote' : 'votes'}
       </Text>
       
-      {/* Option label */}
+      {/* Option label - NO FONT REFERENCE */}
       <Text
         position={[position[0], animatedHeight + (imageUrl ? 1.6 : 0.9), position[2]]}
         fontSize={0.18}
@@ -195,12 +193,11 @@ const AnimatedBar: React.FC<BarProps> = ({
         anchorX="center"
         anchorY="middle"
         maxWidth={2.5}
-        font="/fonts/inter-medium.woff"
       >
         {label.length > 25 ? `${label.substring(0, 25)}...` : label}
       </Text>
       
-      {/* Correct indicator */}
+      {/* Correct indicator - NO FONT REFERENCE */}
       {isCorrect && (
         <Text
           position={[position[0], animatedHeight + (imageUrl ? 1.3 : 0.6), position[2]]}
@@ -208,13 +205,12 @@ const AnimatedBar: React.FC<BarProps> = ({
           color="#10b981"
           anchorX="center"
           anchorY="middle"
-          font="/fonts/inter-bold.woff"
         >
           ✓ CORRECT
         </Text>
       )}
       
-      {/* Base label */}
+      {/* Base label - NO FONT REFERENCE */}
       <Text
         position={[position[0], -0.2, position[2] + 0.8]}
         fontSize={0.12}
@@ -222,7 +218,6 @@ const AnimatedBar: React.FC<BarProps> = ({
         anchorX="center"
         anchorY="middle"
         maxWidth={1.5}
-        font="/fonts/inter-medium.woff"
       >
         Option {Math.floor((position[0] + 10) / 2.5) + 1}
       </Text>
@@ -335,26 +330,24 @@ const Scene: React.FC<{ options: ActivityOption[]; totalResponses: number; theme
         );
       })}
       
-      {/* Floating title */}
+      {/* Floating title - NO FONT REFERENCE */}
       <Text
         position={[0, 7, -3]}
         fontSize={0.4}
         color="#ffffff"
         anchorX="center"
         anchorY="middle"
-        font="/fonts/inter-bold.woff"
       >
         {totalResponses > 0 ? 'Live Poll Results' : 'Poll Options'}
       </Text>
       
-      {/* Total responses indicator */}
+      {/* Total responses indicator - NO FONT REFERENCE */}
       <Text
         position={[0, 6.4, -3]}
         fontSize={0.2}
         color="#94a3b8"
         anchorX="center"
         anchorY="middle"
-        font="/fonts/inter-regular.woff"
       >
         {totalResponses > 0 ? `${totalResponses} total responses` : 'Waiting for responses...'}
       </Text>
