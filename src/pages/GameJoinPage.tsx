@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card } from '../components/Card';
@@ -18,6 +18,11 @@ export const GameJoinPage: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { applyTheme, resetTheme } = useTheme();
+  
+  // Add participant ID for tracking user responses
+  const [participantId] = useState(() => 
+    `participant_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+  );
 
   // Check if user was auto-redirected from a joined room
   useEffect(() => {
@@ -38,7 +43,70 @@ export const GameJoinPage: React.FC = () => {
     return () => clearInterval(timer);
   }, []);
 
-  const loadJoinedRoom = React.useCallback(async (forceRefresh = false) => {
+  // Function to check and clean localStorage voting status after room reset
+  const checkAndCleanVotingStatus = useCallback(async () => {
+    if (!joinedRoom || !supabase) return;
+    
+    try {
+      console.log('GameJoin: Checking voting status consistency');
+      
+      // Get current localStorage voted activities
+      const votedActivities = JSON.parse(localStorage.getItem('votedActivities') || '[]');
+      
+      if (votedActivities.length === 0) {
+        return; // Nothing to check
+      }
+      
+      // Get all activity IDs for this room
+      const roomActivityIds = joinedRoom.activities?.map(activity => activity.id) || [];
+      
+      // Check which voted activities belong to this room
+      const roomVotedActivities = votedActivities.filter((activityId: string) => 
+        roomActivityIds.includes(activityId)
+      );
+      
+      if (roomVotedActivities.length === 0) {
+        return; // No votes for this room in localStorage
+      }
+      
+      // Check database for actual responses for these activities
+      const { data: responses, error } = await supabase
+        .from('participant_responses')
+        .select('activity_id')
+        .in('activity_id', roomVotedActivities)
+        .eq('participant_id', participantId);
+      
+      if (error) {
+        console.error('GameJoin: Error checking responses:', error);
+        return;
+      }
+      
+      const dbVotedActivityIds = responses?.map(r => r.activity_id) || [];
+      
+      // Find localStorage votes that don't exist in database (indicating reset)
+      const invalidVotes = roomVotedActivities.filter((activityId: string) => 
+        !dbVotedActivityIds.includes(activityId)
+      );
+      
+      if (invalidVotes.length > 0) {
+        console.log('GameJoin: Detected room reset - clearing invalid localStorage votes:', invalidVotes);
+        
+        // Remove invalid votes from localStorage
+        const cleanedVotedActivities = votedActivities.filter((activityId: string) => 
+          !invalidVotes.includes(activityId)
+        );
+        
+        localStorage.setItem('votedActivities', JSON.stringify(cleanedVotedActivities));
+        
+        console.log('GameJoin: Cleaned localStorage votes');
+      }
+      
+    } catch (error) {
+      console.error('GameJoin: Error checking voting status:', error);
+    }
+  }, [joinedRoom, participantId]);
+
+  const loadJoinedRoom = useCallback(async (forceRefresh = false) => {
     if (!joinedRoom) return;
     
     try {
@@ -46,6 +114,10 @@ export const GameJoinPage: React.FC = () => {
       const room = await roomService.getRoomByCode(joinedRoom.code);
       if (room) {
         setJoinedRoom(room);
+        
+        // Check and clean voting status after loading room data
+        await checkAndCleanVotingStatus();
+        
         console.log('GameJoin: Room data updated:', {
           name: room.name,
           participants: room.participants,
@@ -56,7 +128,7 @@ export const GameJoinPage: React.FC = () => {
     } catch (error) {
       console.error('GameJoin: Error loading joined room:', error);
     }
-  }, [joinedRoom]);
+  }, [joinedRoom, checkAndCleanVotingStatus]);
 
   // Enhanced real-time subscriptions for joined room
   useEffect(() => {
@@ -143,7 +215,7 @@ export const GameJoinPage: React.FC = () => {
       }
     );
 
-    // Subscribe to participant responses
+    // Enhanced participant responses subscription with reset detection
     channel.on('postgres_changes',
       { 
         event: '*', 
@@ -152,7 +224,18 @@ export const GameJoinPage: React.FC = () => {
         filter: `room_id=eq.${joinedRoom.id}`
       },
       async (payload) => {
-        console.log('GameJoin: Response change received:', payload);
+        console.log('GameJoin: Participant response change received:', {
+          eventType: payload.eventType,
+          activityId: payload.new?.activity_id || payload.old?.activity_id,
+          participantId: payload.new?.participant_id || payload.old?.participant_id
+        });
+        
+        // If this is a DELETE event (could be from room reset), check localStorage consistency
+        if (payload.eventType === 'DELETE') {
+          console.log('GameJoin: Response deleted - checking for room reset');
+          await checkAndCleanVotingStatus();
+        }
+        
         await loadJoinedRoom(true);
       }
     );
@@ -172,7 +255,7 @@ export const GameJoinPage: React.FC = () => {
       console.log('GameJoin: Cleaning up subscriptions');
       channel.unsubscribe();
     };
-  }, [joinedRoom?.id, navigate, loadJoinedRoom]);
+  }, [joinedRoom?.id, navigate, loadJoinedRoom, checkAndCleanVotingStatus]);
 
   // Auto-navigate to active activity when room is first loaded
   useEffect(() => {
@@ -246,339 +329,276 @@ export const GameJoinPage: React.FC = () => {
     await handleSubmitWithCode(code);
   };
 
-  const handleLeaveRoom = () => {
-    if (joinedRoom) {
-      // Decrement participant count
-      roomService.updateRoom(joinedRoom.id, { 
-        participants: Math.max(0, joinedRoom.participants - 1) 
-      }).catch(console.error);
-    }
-    
-    setJoinedRoom(null);
-    setCode('');
-    resetTheme();
-  };
-
   const getActivityIcon = (type: ActivityType) => {
     switch (type) {
-      case 'poll': return MessageSquare;
-      case 'trivia': return HelpCircle;
-      case 'quiz': return Target;
-      case 'word_cloud': return Cloud;
-      default: return MessageSquare;
+      case 'poll':
+        return Target;
+      case 'trivia':
+        return HelpCircle;
+      case 'quiz':
+        return MessageSquare;
+      default:
+        return Target;
     }
   };
 
   const getActivityTypeLabel = (type: ActivityType) => {
     switch (type) {
-      case 'poll': return 'Poll';
-      case 'trivia': return 'Trivia';
-      case 'quiz': return 'Quiz';
-      case 'word_cloud': return 'Word Cloud';
-      default: return 'Activity';
+      case 'poll':
+        return 'Poll';
+      case 'trivia':
+        return 'Trivia';
+      case 'quiz':
+        return 'Quiz';
+      default:
+        return 'Activity';
     }
   };
 
-  if (joinedRoom) {
-    const themeColors = {
-      primary: joinedRoom.settings?.theme?.primary_color || '#3B82F6',
-      secondary: joinedRoom.settings?.theme?.secondary_color || '#1E40AF',
-      accent: joinedRoom.settings?.theme?.accent_color || '#60A5FA',
-      text: joinedRoom.settings?.theme?.text_color || '#FFFFFF'
-    };
+  // Check if any activity has user responses (for display purposes)
+  const getActivityVotingStatus = (activityId: string) => {
+    const votedActivities = JSON.parse(localStorage.getItem('votedActivities') || '[]');
+    return votedActivities.includes(activityId);
+  };
 
+  if (joinedRoom) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900">
-        <div className="max-w-4xl mx-auto p-6">
-          {/* Header */}
-          <div className="flex items-center justify-between mb-8">
-            <div>
-              <h1 className="text-3xl font-bold text-white">{joinedRoom.name}</h1>
-              {joinedRoom.description && (
-                <p className="text-slate-300 mt-2">{joinedRoom.description}</p>
-              )}
-            </div>
-            
-            <div className="flex items-center gap-6">
-              <div className="flex items-center gap-2 text-slate-300">
-                <Users className="w-5 h-5" style={{ color: themeColors.accent }} />
-                <span>{joinedRoom.participants} participants</span>
-              </div>
-              <div className="flex items-center gap-2 text-slate-300">
-                <Clock className="w-5 h-5" style={{ color: themeColors.accent }} />
-                <span className="font-mono">{currentTime.toLocaleTimeString()}</span>
-              </div>
-              <Button
-                onClick={handleLeaveRoom}
-                variant="secondary"
-                className="bg-red-600/20 hover:bg-red-600/30 text-red-400"
-              >
-                Leave Room
-              </Button>
-            </div>
-          </div>
-
-          {/* Current Activity Status */}
-          <AnimatePresence mode="wait">
-            {joinedRoom.current_activity_id ? (
+        <div className="container mx-auto px-4 py-8">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="max-w-4xl mx-auto"
+          >
+            {/* Room Header */}
+            <Card className="p-8 mb-8 text-center">
               <motion.div
-                key="active-activity"
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                className="mb-8 p-6 bg-green-500/10 border border-green-500/20 rounded-lg"
+                initial={{ scale: 0.9 }}
+                animate={{ scale: 1 }}
+                className="mb-6"
               >
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-4 h-4 bg-green-400 rounded-full animate-pulse"></div>
-                  <span className="text-green-400 font-medium text-lg">Activity in Progress</span>
+                <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full mb-4">
+                  <Users className="w-10 h-10 text-white" />
                 </div>
-                
-                {(() => {
-                  const currentActivity = joinedRoom.activities?.find(a => a.id === joinedRoom.current_activity_id);
-                  return currentActivity ? (
-                    <div>
-                      {/* Activity Media */}
-                      {currentActivity.media_url && (
-                        <div className="mb-4">
-                          <img
-                            src={currentActivity.media_url}
-                            alt="Activity media"
-                            className="max-w-sm mx-auto rounded-lg shadow-lg"
-                          />
-                        </div>
-                      )}
-                      
-                      <h2 className="text-2xl font-bold text-white mb-2">{currentActivity.title}</h2>
-                      {currentActivity.description && (
-                        <p className="text-slate-300 mb-4">{currentActivity.description}</p>
-                      )}
-                      
-                      {/* Show options preview with media */}
-                      {currentActivity.options && currentActivity.options.length > 0 && (
-                        <div className="mb-4">
-                          <h3 className="text-sm font-medium text-slate-400 mb-3">Options Preview:</h3>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            {currentActivity.options.slice(0, 4).map((option, index) => (
-                              <div
-                                key={option.id}
-                                className="bg-slate-800/50 rounded-lg p-3 border border-slate-600"
-                              >
-                                {option.media_url && (
-                                  <img
-                                    src={option.media_url}
-                                    alt="Option media"
-                                    className="w-full max-w-24 mx-auto rounded mb-2"
-                                  />
-                                )}
-                                <div className="text-sm text-white text-center">{option.text}</div>
-                              </div>
-                            ))}
-                            {currentActivity.options.length > 4 && (
-                              <div className="text-slate-400 text-sm text-center">
-                                +{currentActivity.options.length - 4} more options
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      )}
-                      
-                      <div className="flex items-center gap-4 text-sm text-slate-400">
-                        <span className="flex items-center gap-1">
-                          <Target className="w-4 h-4" />
-                          {getActivityTypeLabel(currentActivity.type)}
-                        </span>
-                        <span>{currentActivity.total_responses} responses</span>
-                        <span>{currentActivity.options?.length || 0} options</span>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="text-white">
-                      <p className="text-lg">Loading activity details...</p>
-                    </div>
-                  );
-                })()}
+                <h1 className="text-4xl font-bold text-white mb-2">{joinedRoom.name}</h1>
+                <p className="text-xl text-slate-400">Room Code: {joinedRoom.code}</p>
               </motion.div>
-            ) : (
-              <motion.div
-                key="waiting"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
-                className="text-center mb-8 p-8"
-              >
-                <div 
-                  className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6"
-                  style={{ backgroundColor: `${themeColors.primary}20` }}
-                >
-                  <Play className="w-10 h-10" style={{ color: themeColors.primary }} />
-                </div>
-                
-                <h2 className="text-2xl font-bold text-white mb-4">
-                  Waiting for the next activity
-                </h2>
-                
-                <p className="text-slate-300 text-lg">
-                  The presenter will start an activity soon. You'll be automatically redirected when it begins.
-                </p>
-              </motion.div>
-            )}
-          </AnimatePresence>
 
-          {/* Room Statistics */}
-          {joinedRoom.activities && joinedRoom.activities.length > 0 && (
-            <Card className="mb-8">
-              <h3 className="text-xl font-semibold text-white mb-6 flex items-center gap-2">
-                <Trophy className="w-5 h-5" style={{ color: themeColors.accent }} />
-                Room Activity Summary
-              </h3>
-              
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-                <div className="text-center">
-                  <div className="text-3xl font-bold mb-2" style={{ color: themeColors.accent }}>
-                    {joinedRoom.activities.length}
-                  </div>
-                  <div className="text-slate-400">Total Activities</div>
+              <div className="flex items-center justify-center gap-8 text-slate-300">
+                <div className="flex items-center gap-2">
+                  <Users className="w-5 h-5" />
+                  <span>{joinedRoom.participants} participants</span>
                 </div>
-                
-                <div className="text-center">
-                  <div className="text-3xl font-bold mb-2" style={{ color: themeColors.accent }}>
-                    {joinedRoom.activities.filter(a => a.total_responses > 0).length}
-                  </div>
-                  <div className="text-slate-400">Completed</div>
+                <div className="flex items-center gap-2">
+                  <Target className="w-5 h-5" />
+                  <span>{joinedRoom.activities?.length || 0} activities</span>
                 </div>
-                
-                <div className="text-center">
-                  <div className="text-3xl font-bold mb-2" style={{ color: themeColors.accent }}>
-                    {joinedRoom.activities.reduce((sum, a) => sum + a.total_responses, 0)}
-                  </div>
-                  <div className="text-slate-400">Total Responses</div>
+                <div className="flex items-center gap-2">
+                  <Clock className="w-5 h-5" />
+                  <span>{currentTime.toLocaleTimeString()}</span>
                 </div>
-              </div>
-
-              {/* Activity List with Media Preview */}
-              <div className="space-y-3">
-                {joinedRoom.activities.slice(0, 5).map((activity) => {
-                  const Icon = getActivityIcon(activity.type);
-                  const isCompleted = activity.total_responses > 0 && !activity.is_active;
-                  
-                  return (
-                    <div
-                      key={activity.id}
-                      className={`p-4 rounded-lg border ${
-                        activity.is_active
-                          ? 'bg-green-500/10 border-green-500/30'
-                          : isCompleted
-                          ? 'bg-blue-500/10 border-blue-500/30'
-                          : 'bg-slate-800/50 border-slate-700'
-                      }`}
-                    >
-                      <div className="flex items-start justify-between">
-                        <div className="flex items-start gap-3 flex-1">
-                          <Icon className="w-5 h-5 mt-1" style={{ color: themeColors.accent }} />
-                          <div className="flex-1">
-                            <h4 className="font-medium text-white mb-1">{activity.title}</h4>
-                            {activity.description && (
-                              <p className="text-sm text-slate-400 mb-2">{activity.description}</p>
-                            )}
-                            
-                            {/* Activity Media Thumbnail */}
-                            {activity.media_url && (
-                              <div className="mb-2">
-                                <img
-                                  src={activity.media_url}
-                                  alt="Activity media"
-                                  className="max-w-20 rounded"
-                                />
-                              </div>
-                            )}
-                            
-                            <div className="flex items-center gap-2 text-sm text-slate-400">
-                              <span>{getActivityTypeLabel(activity.type)}</span>
-                              <span>•</span>
-                              <span>{activity.total_responses} responses</span>
-                              <span>•</span>
-                              <span>{activity.options?.length || 0} options</span>
-                            </div>
-                          </div>
-                        </div>
-                        
-                        {activity.is_active && (
-                          <span className="text-xs px-2 py-1 bg-green-500/20 text-green-400 rounded flex items-center gap-1">
-                            <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-                            LIVE
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-                
-                {joinedRoom.activities.length > 5 && (
-                  <div className="text-center text-slate-400 text-sm">
-                    ... and {joinedRoom.activities.length - 5} more activities
-                  </div>
-                )}
               </div>
             </Card>
-          )}
 
-          {/* Room Code Display */}
-          <div className="text-center">
-            <div className="inline-flex items-center gap-3 px-6 py-3 bg-slate-800/50 rounded-lg border border-slate-700">
-              <span className="text-slate-400">Room Code:</span>
-              <span className="text-2xl font-mono font-bold" style={{ color: themeColors.accent }}>
-                {joinedRoom.code}
-              </span>
-            </div>
-          </div>
+            {/* Activities List */}
+            <Card className="p-6">
+              <h2 className="text-2xl font-bold text-white mb-6">Activities</h2>
+              
+              {joinedRoom.activities && joinedRoom.activities.length > 0 ? (
+                <div className="space-y-4">
+                  {joinedRoom.activities
+                    .sort((a, b) => a.activity_order - b.activity_order)
+                    .map((activity, index) => {
+                      const IconComponent = getActivityIcon(activity.type);
+                      const hasVoted = getActivityVotingStatus(activity.id);
+                      const isActive = activity.is_active;
+                      
+                      return (
+                        <motion.div
+                          key={activity.id}
+                          initial={{ opacity: 0, x: -20 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: index * 0.1 }}
+                          className={`p-6 rounded-lg border transition-all ${
+                            isActive
+                              ? 'bg-green-900/30 border-green-600 shadow-lg shadow-green-900/20'
+                              : hasVoted
+                              ? 'bg-blue-900/30 border-blue-600'
+                              : 'bg-slate-800/50 border-slate-700 hover:border-slate-600'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-4">
+                              <div className={`p-3 rounded-lg ${
+                                isActive
+                                  ? 'bg-green-600/20 text-green-400'
+                                  : hasVoted
+                                  ? 'bg-blue-600/20 text-blue-400'
+                                  : 'bg-slate-700/50 text-slate-400'
+                              }`}>
+                                <IconComponent className="w-6 h-6" />
+                              </div>
+                              
+                              <div className="flex-1">
+                                <div className="flex items-center gap-3 mb-2">
+                                  <h3 className="text-xl font-semibold text-white">
+                                    {activity.title}
+                                  </h3>
+                                  
+                                  {isActive && (
+                                    <span className="px-3 py-1 bg-green-600 text-green-100 text-sm rounded-full font-medium animate-pulse">
+                                      Live
+                                    </span>
+                                  )}
+                                  
+                                  {hasVoted && !isActive && (
+                                    <span className="px-3 py-1 bg-blue-600/20 text-blue-400 text-sm rounded-full font-medium">
+                                      Completed
+                                    </span>
+                                  )}
+                                </div>
+                                
+                                {activity.description && (
+                                  <p className="text-slate-400 mb-3">{activity.description}</p>
+                                )}
+                                
+                                <div className="flex items-center gap-6 text-sm text-slate-500">
+                                  <span className="flex items-center gap-1">
+                                    <Target className="w-4 h-4" />
+                                    {getActivityTypeLabel(activity.type)}
+                                  </span>
+                                  <span className="flex items-center gap-1">
+                                    <MessageSquare className="w-4 h-4" />
+                                    {activity.options?.length || 0} options
+                                  </span>
+                                  <span className="flex items-center gap-1">
+                                    <Trophy className="w-4 h-4" />
+                                    {activity.total_responses || 0} responses
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                            
+                            <div className="flex items-center gap-3">
+                              {isActive && (
+                                <Button
+                                  onClick={() => navigate(`/vote/${activity.id}`)}
+                                  className="bg-green-600 hover:bg-green-700"
+                                >
+                                  <Play className="w-4 h-4" />
+                                  Join Now
+                                </Button>
+                              )}
+                              
+                              {hasVoted && !isActive && (
+                                <div className="flex items-center gap-2 text-blue-400">
+                                  <Trophy className="w-4 h-4" />
+                                  <span className="text-sm font-medium">Voted</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </motion.div>
+                      );
+                    })}
+                </div>
+              ) : (
+                <div className="text-center py-12 text-slate-400">
+                  <Target className="w-16 h-16 mx-auto mb-4 opacity-50" />
+                  <h3 className="text-xl font-semibold mb-2">No Activities Yet</h3>
+                  <p>The host hasn't created any activities for this room yet.</p>
+                  <p className="text-sm mt-2">Check back soon or ask the host to add some activities!</p>
+                </div>
+              )}
+            </Card>
+
+            {/* Waiting for Activity */}
+            {(!joinedRoom.current_activity_id && joinedRoom.activities && joinedRoom.activities.length > 0) && (
+              <Card className="p-6 mt-6 bg-slate-800/30">
+                <div className="text-center">
+                  <div className="flex items-center justify-center mb-4">
+                    <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                  </div>
+                  <h3 className="text-lg font-semibold text-white mb-2">Waiting for Host</h3>
+                  <p className="text-slate-400">The host will start an activity soon. Stay tuned!</p>
+                </div>
+              </Card>
+            )}
+          </motion.div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 flex items-center justify-center">
-      <Card className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-blue-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-            <Users className="w-8 h-8 text-blue-400" />
-          </div>
-          <h1 className="text-2xl font-bold text-white mb-2">Join Room</h1>
-          <p className="text-slate-400">Enter the 4-digit room code to join</p>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div>
-            <input
-              type="text"
-              value={code}
-              onChange={(e) => {
-                const value = e.target.value.replace(/\D/g, '').slice(0, 4);
-                setCode(value);
-              }}
-              placeholder="Enter room code"
-              className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white text-center text-2xl font-mono tracking-wider placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              maxLength={4}
-              disabled={loading}
-            />
-          </div>
-
-          {error && (
-            <div className="p-3 bg-red-900/50 border border-red-700 rounded-lg text-red-300 text-sm">
-              {error}
-            </div>
-          )}
-
-          <Button
-            type="submit"
-            loading={loading}
-            disabled={code.length !== 4 || loading}
-            className="w-full"
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 flex items-center justify-center p-4">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="w-full max-w-md"
+      >
+        <Card className="p-8 text-center">
+          <motion.div
+            initial={{ scale: 0.8 }}
+            animate={{ scale: 1 }}
+            className="mb-8"
           >
-            Join Room
-          </Button>
-        </form>
-      </Card>
+            <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full mb-6">
+              <Users className="w-10 h-10 text-white" />
+            </div>
+            <h1 className="text-3xl font-bold text-white mb-2">Join Room</h1>
+            <p className="text-slate-400">Enter the 4-digit room code to participate</p>
+          </motion.div>
+
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div>
+              <input
+                type="text"
+                value={code}
+                onChange={(e) => {
+                  const value = e.target.value.replace(/\D/g, '').slice(0, 4);
+                  setCode(value);
+                }}
+                placeholder="Enter room code"
+                className="w-full px-4 py-4 text-center text-2xl font-bold bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all tracking-widest"
+                maxLength={4}
+                autoComplete="off"
+              />
+            </div>
+
+            {error && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="p-3 bg-red-900/50 border border-red-700 rounded-lg text-red-300 text-sm"
+              >
+                {error}
+              </motion.div>
+            )}
+
+            <Button
+              type="submit"
+              disabled={loading || code.length !== 4}
+              className="w-full py-4 text-lg font-semibold bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loading ? (
+                <div className="flex items-center gap-2">
+                  <div className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
+                  Joining...
+                </div>
+              ) : (
+                'Join Room'
+              )}
+            </Button>
+          </form>
+
+          <div className="mt-8 pt-6 border-t border-slate-700">
+            <p className="text-slate-500 text-sm">
+              Don't have a room code? Ask the host to share it with you.
+            </p>
+          </div>
+        </Card>
+      </motion.div>
     </div>
   );
 };
