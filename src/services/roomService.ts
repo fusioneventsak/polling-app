@@ -1,10 +1,10 @@
 import { supabase } from '../lib/supabase';
-import type { Room, Activity, CreateRoomData, CreateActivityData } from '../types';
+import type { Room, Activity, CreateRoomData, CreateActivityData, ParticipantResponse } from '../types';
 
 export const roomService = {
   async getAllRooms(): Promise<Room[]> {
     if (!supabase) {
-      throw new Error('Supabase not available - cannot get rooms');
+      throw new Error('Supabase not available - cannot fetch rooms');
     }
     
     try {
@@ -12,9 +12,9 @@ export const roomService = {
         .from('rooms')
         .select(`
           *,
-          activities!activities_room_id_fkey (
+          activities:activities!activities_room_id_fkey (
             *,
-            activity_options (*)
+            activity_options!activity_options_activity_id_fkey (*)
           )
         `)
         .order('created_at', { ascending: false });
@@ -26,10 +26,10 @@ export const roomService = {
 
       return rooms?.map(room => ({
         ...room,
-        activities: room.activities?.map((activity: any) => ({
+        activities: room.activities?.map(activity => ({
           ...activity,
-          options: activity.activity_options?.sort((a: any, b: any) => a.option_order - b.option_order) || []
-        })).sort((a: Activity, b: Activity) => a.activity_order - b.activity_order) || []
+          options: activity.activity_options?.sort((a, b) => a.option_order - b.option_order) || []
+        })).sort((a, b) => a.activity_order - b.activity_order) || []
       })) || [];
     } catch (error) {
       console.error('Error in getAllRooms:', error);
@@ -39,7 +39,7 @@ export const roomService = {
 
   async getRoomByCode(code: string): Promise<Room | null> {
     if (!supabase) {
-      throw new Error('Supabase not available - cannot get room');
+      throw new Error('Supabase not available - cannot fetch room');
     }
     
     try {
@@ -47,9 +47,9 @@ export const roomService = {
         .from('rooms')
         .select(`
           *,
-          activities!activities_room_id_fkey (
+          activities:activities!activities_room_id_fkey (
             *,
-            activity_options (*)
+            activity_options!activity_options_activity_id_fkey (*)
           )
         `)
         .eq('code', code)
@@ -59,16 +59,18 @@ export const roomService = {
         if (error.code === 'PGRST116') {
           return null; // Room not found
         }
-        console.error('Error fetching room:', error);
+        console.error('Error fetching room by code:', error);
         throw error;
       }
 
+      if (!room) return null;
+
       return {
         ...room,
-        activities: room.activities?.map((activity: any) => ({
+        activities: room.activities?.map(activity => ({
           ...activity,
-          options: activity.activity_options?.sort((a: any, b: any) => a.option_order - b.option_order) || []
-        })).sort((a: Activity, b: Activity) => a.activity_order - b.activity_order) || []
+          options: activity.activity_options?.sort((a, b) => a.option_order - b.option_order) || []
+        })).sort((a, b) => a.activity_order - b.activity_order) || []
       };
     } catch (error) {
       console.error('Error in getRoomByCode:', error);
@@ -82,9 +84,33 @@ export const roomService = {
     }
     
     try {
+      // Generate a unique 4-digit code
+      let code: string;
+      let isUnique = false;
+      let attempts = 0;
+      const maxAttempts = 100;
+
+      do {
+        code = Math.floor(1000 + Math.random() * 9000).toString();
+        const existing = await this.getRoomByCode(code);
+        isUnique = !existing;
+        attempts++;
+      } while (!isUnique && attempts < maxAttempts);
+
+      if (!isUnique) {
+        throw new Error('Unable to generate unique room code');
+      }
+
       const { data: room, error } = await supabase
         .from('rooms')
-        .insert([roomData])
+        .insert({
+          code,
+          name: roomData.name,
+          description: roomData.description,
+          is_active: true,
+          participants: 0,
+          settings: roomData.settings || {}
+        })
         .select()
         .single();
 
@@ -113,7 +139,13 @@ export const roomService = {
         .from('rooms')
         .update(updates)
         .eq('id', id)
-        .select()
+        .select(`
+          *,
+          activities:activities!activities_room_id_fkey (
+            *,
+            activity_options!activity_options_activity_id_fkey (*)
+          )
+        `)
         .single();
 
       if (error) {
@@ -121,9 +153,13 @@ export const roomService = {
         throw error;
       }
 
-      // Fetch the complete room with activities
-      const completeRoom = await this.getRoomByCode(room.code);
-      return completeRoom!;
+      return {
+        ...room,
+        activities: room.activities?.map(activity => ({
+          ...activity,
+          options: activity.activity_options?.sort((a, b) => a.option_order - b.option_order) || []
+        })).sort((a, b) => a.activity_order - b.activity_order) || []
+      };
     } catch (error) {
       console.error('Error in updateRoom:', error);
       throw error;
@@ -158,30 +194,34 @@ export const roomService = {
     
     try {
       // Get the next activity order for this room
-      const { data: lastActivity } = await supabase
+      const { data: existingActivities, error: countError } = await supabase
         .from('activities')
         .select('activity_order')
         .eq('room_id', activityData.room_id)
         .order('activity_order', { ascending: false })
-        .limit(1)
-        .maybeSingle();
+        .limit(1);
 
-      const nextOrder = (lastActivity?.activity_order || 0) + 1;
+      if (countError) {
+        console.error('Error counting activities:', countError);
+        throw countError;
+      }
+
+      const nextOrder = (existingActivities?.[0]?.activity_order || 0) + 1;
 
       // Create the activity
       const { data: activity, error: activityError } = await supabase
         .from('activities')
-        .insert([{
+        .insert({
           room_id: activityData.room_id,
           type: activityData.type,
           title: activityData.title,
           description: activityData.description,
           media_url: activityData.media_url,
           settings: activityData.settings || {},
-          activity_order: nextOrder,
           is_active: false,
-          total_responses: 0
-        }])
+          total_responses: 0,
+          activity_order: nextOrder
+        })
         .select()
         .single();
 
@@ -190,44 +230,36 @@ export const roomService = {
         throw activityError;
       }
 
-      // Create activity options
+      // Create activity options if provided
       if (activityData.options && activityData.options.length > 0) {
-        const optionPromises = activityData.options.map(async (option, index) => {
-          const { error } = await supabase
-            .from('activity_options')
-            .insert({
-              activity_id: activity.id,
-              text: option.text,
-              media_url: option.media_url,
-              is_correct: option.is_correct || false,
-              responses: 0,
-              option_order: index
-            });
+        const optionsToInsert = activityData.options.map((option, index) => ({
+          activity_id: activity.id,
+          text: option.text,
+          media_url: option.media_url,
+          is_correct: option.is_correct || false,
+          responses: 0,
+          option_order: index + 1
+        }));
 
-          if (error) throw error;
-        });
+        const { data: options, error: optionsError } = await supabase
+          .from('activity_options')
+          .insert(optionsToInsert)
+          .select();
 
-        await Promise.all(optionPromises);
-      }
+        if (optionsError) {
+          console.error('Error creating activity options:', optionsError);
+          throw optionsError;
+        }
 
-      // Fetch the complete activity with options
-      const { data: completeActivity, error: fetchError } = await supabase
-        .from('activities')
-        .select(`
-          *,
-          activity_options!activity_options_activity_id_fkey (*)
-        `)
-        .eq('id', activity.id)
-        .single();
-
-      if (fetchError) {
-        console.error('Error fetching complete activity:', fetchError);
-        throw fetchError;
+        return {
+          ...activity,
+          options: options?.sort((a, b) => a.option_order - b.option_order) || []
+        };
       }
 
       return {
-        ...completeActivity,
-        options: completeActivity.activity_options?.sort((a, b) => a.option_order - b.option_order) || []
+        ...activity,
+        options: []
       };
     } catch (error) {
       console.error('Error in createActivity:', error);
@@ -235,139 +267,60 @@ export const roomService = {
     }
   },
 
-  async updateActivity(id: string, updates: Partial<Activity>): Promise<Activity> {
+  async updateActivity(id: string, updates: any): Promise<Activity> {
     if (!supabase) {
       throw new Error('Supabase not available - cannot update activity');
     }
     
     try {
-      // If options are being updated, handle them with a proper transaction approach
-      if (updates.options) {
-        // First, create a backup of current options in case we need to rollback
-        const { data: currentOptions } = await supabase
+      // Separate options from other updates
+      const { options, ...activityUpdates } = updates;
+      
+      if (options) {
+        // Update options separately
+        
+        // First, get existing options
+        const { data: existingOptions, error: fetchError } = await supabase
           .from('activity_options')
           .select('*')
-          .eq('activity_id', id)
-          .order('option_order');
+          .eq('activity_id', id);
 
-        try {
-          // Use a more aggressive approach: delete and wait longer for commit
-          const { error: deleteError } = await supabase
-            .from('activity_options')
-            .delete()
-            .eq('activity_id', id);
-          
-          if (deleteError) {
-            console.error('Error deleting existing options:', deleteError);
-            throw deleteError;
-          }
-          
-          // Wait longer for the delete to be fully committed
-          await new Promise(resolve => setTimeout(resolve, 500));
-          
-          // Verify the delete was successful before proceeding
-          const { data: remainingOptions, error: checkError } = await supabase
-            .from('activity_options')
-            .select('id')
-            .eq('activity_id', id);
-            
-          if (checkError) {
-            throw checkError;
-          }
-          
-          if (remainingOptions && remainingOptions.length > 0) {
-            console.warn('Options still exist after delete, waiting longer...');
-            await new Promise(resolve => setTimeout(resolve, 1000));
-          }
-          
-          // Create new options with explicit ordering and better error handling
-          if (updates.options.length > 0) {
-            for (let index = 0; index < updates.options.length; index++) {
-              const option = updates.options[index];
-              
-              // Add retry logic for each insert
-              let retryCount = 0;
-              const maxRetries = 3;
-              
-              while (retryCount < maxRetries) {
-                try {
-                  const { error } = await supabase
-                    .from('activity_options')
-                    .insert({
-                      activity_id: id,
-                      text: option.text,
-                      media_url: option.media_url,
-                      is_correct: option.is_correct || false,
-                      responses: 0,
-                      option_order: index
-                    });
-                  
-                  if (error) {
-                    if (error.code === '23505' && retryCount < maxRetries - 1) {
-                      // Constraint violation, wait and retry
-                      console.warn(`Constraint violation on option ${index}, retrying... (${retryCount + 1}/${maxRetries})`);
-                      await new Promise(resolve => setTimeout(resolve, 200 * (retryCount + 1)));
-                      retryCount++;
-                      continue;
-                    }
-                    throw error;
-                  }
-                  
-                  // Success, break retry loop
-                  break;
-                  
-                } catch (insertError) {
-                  if (retryCount === maxRetries - 1) {
-                    console.error('Max retries reached for option insert:', insertError);
-                    throw insertError;
-                  }
-                  retryCount++;
-                  await new Promise(resolve => setTimeout(resolve, 200 * retryCount));
-                }
-              }
-            }
-          }
-          
-        } catch (optionError) {
-          console.error('Error handling options, attempting to restore backup:', optionError);
-          
-          // Attempt to restore the backup if we have it
-          if (currentOptions && currentOptions.length > 0) {
-            try {
-              // Clear any partial inserts first
-              await supabase
-                .from('activity_options')
-                .delete()
-                .eq('activity_id', id);
-                
-              // Restore original options
-              const restorePromises = currentOptions.map(option => 
-                supabase
-                  .from('activity_options')
-                  .insert({
-                    id: option.id,
-                    activity_id: option.activity_id,
-                    text: option.text,
-                    media_url: option.media_url,
-                    is_correct: option.is_correct,
-                    responses: option.responses,
-                    option_order: option.option_order,
-                    created_at: option.created_at
-                  })
-              );
-              
-              await Promise.all(restorePromises);
-              console.log('Successfully restored backup options');
-            } catch (restoreError) {
-              console.error('Failed to restore backup options:', restoreError);
-            }
-          }
-          
-          throw optionError;
+        if (fetchError) {
+          console.error('Error fetching existing options:', fetchError);
+          throw fetchError;
         }
-        
-        // Remove options from updates object since we handled them separately
-        const { options, ...activityUpdates } = updates;
+
+        // Delete existing options
+        const { error: deleteError } = await supabase
+          .from('activity_options')
+          .delete()
+          .eq('activity_id', id);
+
+        if (deleteError) {
+          console.error('Error deleting existing options:', deleteError);
+          throw deleteError;
+        }
+
+        // Insert new options
+        if (options.length > 0) {
+          const optionsToInsert = options.map((option: any, index: number) => ({
+            activity_id: id,
+            text: option.text,
+            media_url: option.media_url,
+            is_correct: option.is_correct || false,
+            responses: option.responses || 0,
+            option_order: index + 1
+          }));
+
+          const { error: insertError } = await supabase
+            .from('activity_options')
+            .insert(optionsToInsert);
+
+          if (insertError) {
+            console.error('Error inserting new options:', insertError);
+            throw insertError;
+          }
+        }
         
         // Update the activity itself (without options)
         if (Object.keys(activityUpdates).length > 0) {
@@ -427,7 +380,7 @@ export const roomService = {
     try {
       console.log('Deleting activity:', activityId);
       
-      // First, verify the activity exists
+      // First, verify the activity exists and get room info
       const { data: activityCheck, error: checkError } = await supabase
         .from('activities')
         .select('id, room_id, is_active, title')
@@ -437,17 +390,17 @@ export const roomService = {
       if (checkError) {
         if (checkError.code === 'PGRST116') {
           console.log('Activity not found, may already be deleted:', activityId);
-          return; // Activity doesn't exist, consider it successfully deleted
+          return; // Already deleted
         }
         console.error('Error checking activity existence:', checkError);
         throw checkError;
       }
       
-      console.log('Found activity to delete:', activityCheck.title);
+      console.log('Found activity to delete:', activityCheck);
       
-      // If the activity is currently active, clear it from the room
+      // If this is the current activity in the room, clear it
       if (activityCheck.is_active) {
-        console.log('Activity is active, clearing from room first');
+        console.log('Activity is currently active, clearing room current activity');
         const { error: roomUpdateError } = await supabase
           .from('rooms')
           .update({
@@ -455,47 +408,38 @@ export const roomService = {
             current_activity_type: null
           })
           .eq('id', activityCheck.room_id);
-          
+        
         if (roomUpdateError) {
-          console.error('Error clearing active activity from room:', roomUpdateError);
-          // Don't throw here, continue with deletion
+          console.error('Error clearing room current activity:', roomUpdateError);
+          throw roomUpdateError;
         }
       }
       
-      // Delete the activity - foreign key constraints will handle cascading deletes
-      console.log('Attempting to delete activity from database...');
-      const { error, data } = await supabase
+      // Delete the activity (cascade will handle options and responses)
+      const { error: deleteError } = await supabase
         .from('activities')
         .delete()
-        .eq('id', activityId)
-        .select(); // Request data to see what was deleted
-
-      if (error) {
-        console.error('Error deleting activity:', error);
-        console.error('Error details:', {
-          code: error.code,
-          message: error.message,
-          details: error.details,
-          hint: error.hint
-        });
-        throw new Error(`Failed to delete activity: ${error.message} (Code: ${error.code})`);
+        .eq('id', activityId);
+      
+      if (deleteError) {
+        console.error('Error deleting activity:', deleteError);
+        throw deleteError;
       }
       
-      console.log('Delete operation result:', data);
-      
-      // Verify the deletion worked
-      const { data: verifyData, error: verifyError } = await supabase
+      // Verify deletion
+      const { data: verifyDelete, error: verifyError } = await supabase
         .from('activities')
         .select('id')
         .eq('id', activityId)
-        .maybeSingle();
-        
+        .single();
+      
       if (verifyError && verifyError.code !== 'PGRST116') {
-        console.error('Error verifying deletion:', verifyError);
+        console.error('Error verifying activity deletion:', verifyError);
+        throw verifyError;
       }
       
-      if (verifyData) {
-        console.error('Activity still exists after deletion attempt!');
+      if (verifyDelete) {
+        console.error('Activity deletion failed - activity still exists in database');
         throw new Error('Activity deletion failed - activity still exists in database');
       }
       
@@ -546,7 +490,7 @@ export const roomService = {
       // Get the activity to check its type
       const { data: activity, error: activityError } = await supabase
         .from('activities')
-        .select('type')
+        .select('type, room_id')
         .eq('id', activityId)
         .single();
 
@@ -555,6 +499,14 @@ export const roomService = {
         throw activityError;
       }
 
+      // Verify the activity belongs to the specified room
+      if (activity.room_id !== roomId) {
+        throw new Error('Activity does not belong to the specified room');
+      }
+
+      // Start a transaction-like operation
+      console.log('Step 1: Deactivating all other activities in room:', roomId);
+      
       // First, deactivate all other activities in the room
       const { error: deactivateError } = await supabase
         .from('activities')
@@ -566,6 +518,8 @@ export const roomService = {
         throw deactivateError;
       }
 
+      console.log('Step 2: Activating target activity:', activityId);
+      
       // Activate the selected activity
       const { error: activateError } = await supabase
         .from('activities')
@@ -577,6 +531,8 @@ export const roomService = {
         throw activateError;
       }
 
+      console.log('Step 3: Updating room current activity to:', activityId);
+      
       // Update the room's current activity
       const { error: roomError } = await supabase
         .from('rooms')
@@ -591,9 +547,9 @@ export const roomService = {
         throw roomError;
       }
       
-      console.log('Activity started successfully:', activityId);
+      console.log('✅ Activity started successfully:', activityId);
     } catch (error) {
-      console.error('Error in startActivity:', error);
+      console.error('❌ Error in startActivity:', error);
       throw error;
     }
   },
@@ -604,10 +560,12 @@ export const roomService = {
     }
     
     try {
+      console.log('Ending activity:', activityId);
+      
       // Get the activity's room
       const { data: activity, error: activityError } = await supabase
         .from('activities')
-        .select('room_id')
+        .select('room_id, is_active')
         .eq('id', activityId)
         .single();
 
@@ -616,6 +574,13 @@ export const roomService = {
         throw activityError;
       }
 
+      if (!activity.is_active) {
+        console.log('Activity is already inactive:', activityId);
+        return; // Already inactive
+      }
+
+      console.log('Step 1: Deactivating activity:', activityId);
+      
       // Deactivate the activity
       const { error: deactivateError } = await supabase
         .from('activities')
@@ -627,6 +592,8 @@ export const roomService = {
         throw deactivateError;
       }
 
+      console.log('Step 2: Clearing room current activity');
+      
       // Clear the room's current activity
       const { error: roomError } = await supabase
         .from('rooms')
@@ -640,8 +607,10 @@ export const roomService = {
         console.error('Error updating room:', roomError);
         throw roomError;
       }
+      
+      console.log('✅ Activity ended successfully:', activityId);
     } catch (error) {
-      console.error('Error in endActivity:', error);
+      console.error('❌ Error in endActivity:', error);
       throw error;
     }
   },
@@ -652,26 +621,32 @@ export const roomService = {
     optionId: string,
     participantId: string,
     responseTime?: number
-  ): Promise<void> {
+  ): Promise<ParticipantResponse> {
     if (!supabase) {
       throw new Error('Supabase not available - cannot submit response');
     }
     
     try {
-      // Check if participant has already responded to this activity
-      const { data: existingResponse } = await supabase
+      // Check if participant already responded to this activity
+      const { data: existingResponse, error: checkError } = await supabase
         .from('participant_responses')
         .select('id')
+        .eq('room_id', roomId)
         .eq('activity_id', activityId)
         .eq('participant_id', participantId)
-        .maybeSingle();
+        .single();
 
-      if (existingResponse) {
-        throw new Error('You have already responded to this activity');
+      if (checkError && checkError.code !== 'PGRST116') {
+        console.error('Error checking existing response:', checkError);
+        throw checkError;
       }
 
-      // Insert the response
-      const { error: responseError } = await supabase
+      if (existingResponse) {
+        throw new Error('Participant has already responded to this activity');
+      }
+
+      // Submit the response
+      const { data: response, error: responseError } = await supabase
         .from('participant_responses')
         .insert({
           room_id: roomId,
@@ -679,36 +654,55 @@ export const roomService = {
           option_id: optionId,
           participant_id: participantId,
           response_time: responseTime
-        });
+        })
+        .select()
+        .single();
 
       if (responseError) {
         console.error('Error submitting response:', responseError);
         throw responseError;
       }
 
-      // Update the option's response count
-      const { error: optionError } = await supabase
-        .from('activity_options')
-        .update({ responses: supabase.sql`responses + 1` })
-        .eq('id', optionId);
-
-      if (optionError) {
-        console.error('Error updating option count:', optionError);
-        throw optionError;
-      }
-
-      // Update the activity's total response count
-      const { error: activityError } = await supabase
-        .from('activities')
-        .update({ total_responses: supabase.sql`total_responses + 1` })
-        .eq('id', activityId);
-
-      if (activityError) {
-        console.error('Error updating activity count:', activityError);
-        throw activityError;
-      }
+      return response;
     } catch (error) {
       console.error('Error in submitResponse:', error);
+      throw error;
+    }
+  },
+
+  async getActivityById(id: string): Promise<Activity | null> {
+    if (!supabase) {
+      throw new Error('Supabase not available - cannot fetch activity');
+    }
+    
+    try {
+      const { data: activity, error } = await supabase
+        .from('activities')
+        .select(`
+          *,
+          activity_options!activity_options_activity_id_fkey (*),
+          rooms!activities_room_id_fkey (*)
+        `)
+        .eq('id', id)
+        .single();
+
+      if (error) {
+        if (error.code === 'PGRST116') {
+          return null; // Activity not found
+        }
+        console.error('Error fetching activity by id:', error);
+        throw error;
+      }
+
+      if (!activity) return null;
+
+      return {
+        ...activity,
+        options: activity.activity_options?.sort((a, b) => a.option_order - b.option_order) || [],
+        room: activity.rooms
+      };
+    } catch (error) {
+      console.error('Error in getActivityById:', error);
       throw error;
     }
   }
