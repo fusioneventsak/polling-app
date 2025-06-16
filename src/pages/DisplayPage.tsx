@@ -25,7 +25,9 @@ export const DisplayPage: React.FC = () => {
       activitiesWithFlags: currentRoom.activities?.map(a => ({
         id: a.id,
         title: a.title,
-        isActive: a.is_active
+        isActive: a.is_active,
+        optionsCount: a.options?.length || 0,
+        totalResponses: a.total_responses || 0
       })) || []
     });
     
@@ -41,6 +43,13 @@ export const DisplayPage: React.FC = () => {
           id: currentActivity.id,
           title: currentActivity.title,
           isActive: currentActivity.is_active,
+          optionsCount: currentActivity.options?.length || 0,
+          totalResponses: currentActivity.total_responses || 0,
+          options: currentActivity.options?.map(opt => ({
+            id: opt.id,
+            text: opt.text,
+            responses: opt.responses || 0
+          })) || [],
           trustingRoomSetting: true
         });
         return currentActivity;
@@ -54,7 +63,9 @@ export const DisplayPage: React.FC = () => {
     if (flaggedActive) {
       console.log('DisplayPage: Found active activity via is_active flag (fallback):', {
         id: flaggedActive.id,
-        title: flaggedActive.title
+        title: flaggedActive.title,
+        optionsCount: flaggedActive.options?.length || 0,
+        totalResponses: flaggedActive.total_responses || 0
       });
       return flaggedActive;
     }
@@ -126,95 +137,70 @@ export const DisplayPage: React.FC = () => {
     };
   }, [currentRoom?.settings, applyTheme, resetTheme]);
 
-  // Single real-time subscription - stable and efficient
+  // Minimal real-time subscription - only for critical changes
   useEffect(() => {
     if (!pollId || !supabase) return;
 
     let mounted = true;
-    console.log('DisplayPage: Setting up real-time subscription for room code:', pollId);
-
-    // Create stable reference to loadRoom function
-    const reloadRoom = async () => {
-      if (!mounted) return;
-      try {
-        const room = await roomService.getRoomByCode(pollId);
-        if (room && mounted) {
-          setCurrentRoom(room);
-        }
-      } catch (error) {
-        console.error('DisplayPage: Error reloading room:', error);
-      }
-    };
+    console.log('DisplayPage: Setting up minimal real-time subscription for room code:', pollId);
 
     // Create one channel with a simple, consistent name
     const channel = supabase.channel(`display_${pollId}`);
 
-    // Single subscription for all changes
+    // Subscribe to room changes for current_activity_id
     channel
       .on('postgres_changes', 
-        { event: '*', schema: 'public', table: 'rooms' },
+        { 
+          event: 'UPDATE', 
+          schema: 'public', 
+          table: 'rooms',
+          filter: `code=eq.${pollId}`
+        },
         async (payload) => {
           if (!mounted) return;
           
-          const room = payload.new || payload.old;
-          if (room?.code === pollId) {
-            console.log('DisplayPage: Room change detected:', {
-              eventType: payload.eventType,
-              roomCode: room.code,
-              newCurrentActivityId: payload.new?.current_activity_id,
-              oldCurrentActivityId: payload.old?.current_activity_id
-            });
+          // Only reload if current_activity_id actually changed
+          const oldActivityId = payload.old?.current_activity_id;
+          const newActivityId = payload.new?.current_activity_id;
+          
+          if (oldActivityId !== newActivityId) {
+            console.log('DisplayPage: Activity changed from', oldActivityId, 'to', newActivityId);
             
-            // Only reload if there's an actual change we care about
-            if (payload.eventType === 'UPDATE' && 
-                payload.new?.current_activity_id !== payload.old?.current_activity_id) {
-              console.log('DisplayPage: Current activity changed, reloading...');
-              await reloadRoom();
+            // Simple direct update instead of full reload
+            try {
+              const room = await roomService.getRoomByCode(pollId);
+              if (room && mounted) {
+                setCurrentRoom(room);
+              }
+            } catch (error) {
+              console.error('DisplayPage: Error updating room:', error);
             }
           }
         }
       )
       .on('postgres_changes',
-        { event: '*', schema: 'public', table: 'activities' },
+        { 
+          event: '*', 
+          schema: 'public', 
+          table: 'participant_responses'
+        },
         async (payload) => {
-          if (!mounted) return;
+          if (!mounted || !currentRoom) return;
           
-          // Get current room state at the time of the event
-          const currentRoomState = currentRoom;
-          if (!currentRoomState) return;
-          
-          const roomId = payload.new?.room_id || payload.old?.room_id;
-          if (roomId === currentRoomState.id) {
-            // Only reload for activity status changes (is_active flag)
-            if (payload.eventType === 'UPDATE' && 
-                payload.new?.is_active !== payload.old?.is_active) {
-              console.log('DisplayPage: Activity status changed:', {
-                activityId: payload.new?.id,
-                wasActive: payload.old?.is_active,
-                nowActive: payload.new?.is_active
-              });
-              await reloadRoom();
-            }
-          }
-        }
-      )
-      .on('postgres_changes',
-        { event: '*', schema: 'public', table: 'participant_responses' },
-        async (payload) => {
-          if (!mounted) return;
-          
-          // Get current states at the time of the event
-          const currentRoomState = currentRoom;
-          const currentActiveActivity = currentRoomState?.current_activity_id;
-          
-          if (!currentRoomState || !currentActiveActivity) return;
-          
+          // Check if this response is for an activity in our room
           const activityId = payload.new?.activity_id || payload.old?.activity_id;
+          const isOurActivity = currentRoom.activities?.some(a => a.id === activityId);
           
-          // Only reload if this response is for the currently active activity
-          if (activityId === currentActiveActivity) {
-            console.log('DisplayPage: Response change for active activity');
-            await reloadRoom();
+          if (isOurActivity) {
+            console.log('DisplayPage: Response update for our room activity');
+            try {
+              const room = await roomService.getRoomByCode(pollId);
+              if (room && mounted) {
+                setCurrentRoom(room);
+              }
+            } catch (error) {
+              console.error('DisplayPage: Error updating room after response:', error);
+            }
           }
         }
       )
@@ -224,6 +210,14 @@ export const DisplayPage: React.FC = () => {
         } else {
           console.log('DisplayPage: Subscription status:', status);
         }
+      });
+
+    return () => {
+      mounted = false;
+      console.log('DisplayPage: Cleaning up subscription');
+      channel.unsubscribe();
+    };
+  }, [pollId, currentRoom?.id]); // Include currentRoom.id so we can check activities
       });
 
     return () => {
@@ -518,7 +512,15 @@ export const DisplayPage: React.FC = () => {
 
           {/* Activity Content */}
           <div className="flex-1 overflow-hidden">
-            <Poll3DVisualization activity={activeActivity} />
+            <Poll3DVisualization 
+              options={activeActivity.options || []} 
+              totalResponses={activeActivity.total_responses || 0}
+              themeColors={{
+                primaryColor: '#3b82f6',
+                secondaryColor: '#8b5cf6', 
+                accentColor: '#06b6d4'
+              }}
+            />
           </div>
         </motion.div>
       </AnimatePresence>
