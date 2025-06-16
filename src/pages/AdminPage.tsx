@@ -278,7 +278,18 @@ export const AdminPage: React.FC = () => {
     try {
       if (!selectedRoom) return;
       
-      const updatedActivity = await roomService.updateActivity(activityData.id, activityData);
+      // Only pass the fields that exist in the activities table
+      const updateData = {
+        title: activityData.title,
+        description: activityData.description,
+        media_url: activityData.media_url,
+        type: activityData.type,
+        settings: activityData.settings,
+        // Include options if they exist (the updateActivity function will handle them separately)
+        ...(activityData.options && { options: activityData.options })
+      };
+      
+      const updatedActivity = await roomService.updateActivity(activityData.id, updateData);
       
       // Update the selected room with the updated activity
       const updatedRoom = {
