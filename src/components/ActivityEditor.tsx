@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from './Button';
 import { Card } from './Card';
@@ -35,6 +35,7 @@ export const ActivityEditor: React.FC<ActivityEditorProps> = ({
     ]
   );
   const [saving, setSaving] = useState(false);
+  const saveInProgress = useRef(false);
 
   const addOption = () => {
     if (options.length < 6) {
@@ -63,14 +64,25 @@ export const ActivityEditor: React.FC<ActivityEditorProps> = ({
   };
 
   const handleSave = async () => {
+    // Prevent multiple simultaneous save attempts
+    if (saving || saveInProgress.current) {
+      console.log('Save already in progress, ignoring duplicate request');
+      return;
+    }
+
     if (!title.trim() || !options.every(opt => opt.text.trim())) {
       return;
     }
 
+    saveInProgress.current = true;
     setSaving(true);
+    
     try {
+      console.log('Starting activity save process...');
+      
       if (activity) {
         // Update existing activity
+        console.log('Updating existing activity:', activity.id);
         const updatedActivity = await roomService.updateActivity(activity.id, {
           title,
           description,
@@ -81,9 +93,11 @@ export const ActivityEditor: React.FC<ActivityEditorProps> = ({
             media_url: opt.mediaUrl || undefined
           }))
         });
+        console.log('Activity updated successfully');
         onSave(updatedActivity);
       } else {
         // Create new activity
+        console.log('Creating new activity');
         const activityData: CreateActivityData = {
           room_id: roomId,
           type,
@@ -98,12 +112,16 @@ export const ActivityEditor: React.FC<ActivityEditorProps> = ({
         };
         
         const newActivity = await roomService.createActivity(activityData);
+        console.log('Activity created successfully');
         onSave(newActivity);
       }
     } catch (error) {
       console.error('Failed to save activity:', error);
+      // Show user-friendly error message
+      alert('Failed to save activity. Please try again.');
     } finally {
       setSaving(false);
+      saveInProgress.current = false;
     }
   };
 
@@ -129,6 +147,7 @@ export const ActivityEditor: React.FC<ActivityEditorProps> = ({
                 value={type}
                 onChange={(e) => setType(e.target.value as ActivityType)}
                 className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                disabled={saving}
               >
                 <option value="poll">Poll</option>
                 <option value="trivia">Trivia</option>
@@ -148,6 +167,7 @@ export const ActivityEditor: React.FC<ActivityEditorProps> = ({
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Enter activity title"
               className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              disabled={saving}
             />
           </div>
 
@@ -161,6 +181,7 @@ export const ActivityEditor: React.FC<ActivityEditorProps> = ({
               placeholder="Enter activity description"
               rows={3}
               className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              disabled={saving}
             />
           </div>
 
@@ -173,9 +194,9 @@ export const ActivityEditor: React.FC<ActivityEditorProps> = ({
               currentImageUrl={mediaUrl}
               onImageUploaded={setMediaUrl}
               onImageRemoved={() => setMediaUrl('')}
-              label=""
-              description="Upload an image for this activity"
-              maxSizeMB={10}
+              label="Upload an image for this activity"
+              description="Add visual content to make your activity more engaging"
+              maxSizeMB={5}
             />
           </div>
 
@@ -183,34 +204,37 @@ export const ActivityEditor: React.FC<ActivityEditorProps> = ({
             <label className="block text-sm font-medium text-slate-300 mb-2">
               Options
             </label>
-            <div className="space-y-3">
+            <div className="space-y-4">
               {options.map((option, index) => (
-                <div key={index} className="space-y-3 p-4 bg-slate-800/30 rounded-lg border border-slate-700">
-                  <div className="flex gap-2">
+                <div key={index} className="border border-slate-600 rounded-lg p-4">
+                  <div className="flex items-center gap-3 mb-3">
                     <input
                       type="text"
                       value={option.text}
                       onChange={(e) => updateOption(index, e.target.value)}
                       placeholder={`Option ${index + 1}`}
-                      className="flex-1 px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="flex-1 px-3 py-2 bg-slate-800 border border-slate-600 rounded text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      disabled={saving}
                     />
                     
-                    {(type === 'trivia' || type === 'quiz') && (
+                    {type === 'trivia' || type === 'quiz' ? (
                       <Button
                         variant={option.isCorrect ? 'primary' : 'ghost'}
                         size="sm"
                         onClick={() => toggleCorrectAnswer(index)}
                         className="px-3"
+                        disabled={saving}
                       >
                         ✓
                       </Button>
-                    )}
+                    ) : null}
                     
                     {options.length > 2 && (
                       <Button
                         variant="danger"
                         size="sm"
                         onClick={() => removeOption(index)}
+                        disabled={saving}
                       >
                         <Trash2 className="w-4 h-4" />
                       </Button>
@@ -239,6 +263,7 @@ export const ActivityEditor: React.FC<ActivityEditorProps> = ({
                 size="sm"
                 onClick={addOption}
                 className="mt-3"
+                disabled={saving}
               >
                 <Plus className="w-4 h-4" />
                 Add Option
@@ -251,7 +276,7 @@ export const ActivityEditor: React.FC<ActivityEditorProps> = ({
           <Button
             onClick={handleSave}
             loading={saving}
-            disabled={!title.trim() || !options.every(opt => opt.text.trim())}
+            disabled={!title.trim() || !options.every(opt => opt.text.trim()) || saving}
             className="flex-1"
           >
             <Check className="w-4 h-4" />
@@ -260,6 +285,7 @@ export const ActivityEditor: React.FC<ActivityEditorProps> = ({
           <Button
             variant="ghost"
             onClick={onCancel}
+            disabled={saving}
           >
             <X className="w-4 h-4" />
             Cancel
