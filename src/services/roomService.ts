@@ -376,21 +376,7 @@ export const roomService = {
     try {
       console.log('Deleting activity:', activityId);
       
-      // First, verify the activity exists
-      const { data: existingActivity, error: checkError } = await supabase
-        .from('activities')
-        .select('id, room_id')
-        .eq('id', activityId)
-        .single();
-      
-      if (checkError) {
-        console.error('Activity not found:', checkError);
-        throw new Error('Activity not found');
-      }
-      
-      console.log('Activity found, proceeding with deletion:', existingActivity);
-      
-      // Delete the activity - this should cascade to delete options and responses
+      // Delete the activity - foreign key constraints will handle cascading deletes
       const { error } = await supabase
         .from('activities')
         .delete()
@@ -398,24 +384,10 @@ export const roomService = {
 
       if (error) {
         console.error('Error deleting activity:', error);
-        throw error;
+        throw new Error(`Failed to delete activity: ${error.message}`);
       }
       
       console.log('Activity deleted successfully:', activityId);
-      
-      // Verify deletion was successful
-      const { data: verifyDeleted } = await supabase
-        .from('activities')
-        .select('id')
-        .eq('id', activityId)
-        .single();
-      
-      if (verifyDeleted) {
-        console.error('Activity still exists after deletion attempt');
-        throw new Error('Activity deletion failed - record still exists');
-      }
-      
-      console.log('Activity deletion verified successfully');
     } catch (error) {
       console.error('Error in deleteActivity:', error);
       throw error;

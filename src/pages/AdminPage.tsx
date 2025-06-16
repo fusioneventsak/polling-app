@@ -139,6 +139,8 @@ export const AdminPage: React.FC = () => {
   };
 
   const handleDeleteActivity = async (activityId: string) => {
+    if (!deleteConfirmation) return;
+    
     try {
       console.log('Admin: Starting activity deletion:', activityId);
       
@@ -148,29 +150,14 @@ export const AdminPage: React.FC = () => {
       await roomService.deleteActivity(activityId);
       console.log('Admin: Activity deleted, refreshing rooms');
       
-      // Update local state immediately for better UX
-      if (selectedRoom) {
-        const updatedActivities = selectedRoom.activities?.filter(a => a.id !== activityId) || [];
-        const updatedRoom = {
-          ...selectedRoom,
-          activities: updatedActivities
-        };
-        setSelectedRoom(updatedRoom);
-        setRooms(prev => prev.map(room => 
-          room.id === selectedRoom.id ? updatedRoom : room
-        ));
-      }
-      
       setDeleteConfirmation(null);
       console.log('Admin: Activity deletion completed');
       
-      // Force a background refresh to ensure consistency
-      setTimeout(() => {
-        loadRooms();
-      }, 100);
+      // Refresh rooms data to get updated state
+      await loadRooms();
     } catch (err) {
       setDeleteConfirmation(prev => prev ? { ...prev, loading: false } : null);
-      setError('Failed to delete activity');
+      setError(`Failed to delete activity: ${err instanceof Error ? err.message : 'Unknown error'}`);
       console.error('Error deleting activity:', err);
     }
   };
