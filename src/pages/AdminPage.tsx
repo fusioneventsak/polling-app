@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Users, Play, Square, Trash2, Edit3, MoreVertical, ExternalLink, BarChart3, Clock, Target, Lock, Unlock } from 'lucide-react';
+import { Plus, Users, Play, Square, Trash2, Edit3, MoreVertical, ExternalLink, BarChart3, Clock, Target, Lock, Unlock, RotateCcw } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card } from '../components/Card';
 import { Button } from '../components/Button';
@@ -21,6 +21,11 @@ export const AdminPage: React.FC = () => {
     type: 'room' | 'activity';
     id: string;
     name: string;
+    loading?: boolean;
+  } | null>(null);
+  const [resetConfirmation, setResetConfirmation] = useState<{
+    roomId: string;
+    roomName: string;
     loading?: boolean;
   } | null>(null);
   const [deletingActivities, setDeletingActivities] = useState<Set<string>>(new Set());
@@ -98,8 +103,9 @@ export const AdminPage: React.FC = () => {
           if (selectedRoom?.id === roomId) {
             // Check if our local state already reflects this change
             const localActivity = selectedRoom.activities?.find(a => a.id === activityId);
+            
             if (localActivity && localActivity.is_active === payload.new.is_active) {
-              console.log('Admin: Skipping reload - activity optimistic update already applied');
+              console.log('Admin: Skipping activity reload - optimistic update already applied');
               return;
             }
           }
@@ -110,22 +116,25 @@ export const AdminPage: React.FC = () => {
       }
     );
 
-    // Subscribe to response changes
+    // Subscribe to activity options changes
     adminChannel.on('postgres_changes',
-      { event: '*', schema: 'public', table: 'participant_responses' },
+      { event: '*', schema: 'public', table: 'activity_options' },
       (payload) => {
-        console.log('Admin: Response change received:', {
-          eventType: payload.eventType,
-          responseId: payload.new?.id || payload.old?.id,
-          activityId: payload.new?.activity_id || payload.old?.activity_id
-        });
-        
-        // Always refresh for response changes to update counts
+        console.log('Admin: Activity options change received:', payload.eventType);
         loadRooms();
       }
     );
 
-    // Subscribe with proper error handling
+    // Subscribe to participant responses for real-time vote count updates
+    adminChannel.on('postgres_changes',
+      { event: '*', schema: 'public', table: 'participant_responses' },
+      (payload) => {
+        console.log('Admin: Participant response change received:', payload.eventType);
+        loadRooms();
+      }
+    );
+
+    // Subscribe to the channel
     adminChannel.subscribe((status, err) => {
       console.log('Admin: Subscription status:', status);
       if (err) {
@@ -137,16 +146,16 @@ export const AdminPage: React.FC = () => {
     });
 
     return () => {
-      console.log('Admin: Cleaning up real-time subscriptions');
-      // Use unsubscribe instead of removeChannel to avoid WebSocket conflicts
+      console.log('Admin: Cleaning up subscriptions');
       adminChannel.unsubscribe();
     };
-  }, [rooms, selectedRoom]); // Include dependencies to check current state
+  }, [rooms, selectedRoom]);
 
   const loadRooms = async () => {
+    setLoading(true);
+    setError(null);
+    
     try {
-      setLoading(true);
-      setError(null);
       const roomsData = await roomService.getAllRooms();
       console.log('Admin: Loaded rooms:', roomsData.length);
       setRooms(roomsData);
@@ -183,6 +192,38 @@ export const AdminPage: React.FC = () => {
     } catch (err) {
       setError('Failed to create room');
       console.error('Error creating room:', err);
+    }
+  };
+
+  const handleResetRoom = async (roomId: string) => {
+    if (!resetConfirmation) return;
+    
+    try {
+      console.log('Admin: Starting room reset:', roomId);
+      
+      // Show loading state
+      setResetConfirmation(prev => prev ? { ...prev, loading: true } : null);
+      
+      // Reset the room
+      const resetRoom = await roomService.resetRoom(roomId);
+      
+      // Update the room in state
+      setRooms(prev => prev.map(room => 
+        room.id === roomId ? resetRoom : room
+      ));
+      
+      if (selectedRoom?.id === roomId) {
+        setSelectedRoom(resetRoom);
+      }
+      
+      // Clear confirmation modal
+      setResetConfirmation(null);
+      
+      console.log('Room reset successfully');
+    } catch (err) {
+      setError('Failed to reset room');
+      setResetConfirmation(null);
+      console.error('Error resetting room:', err);
     }
   };
 
@@ -516,6 +557,25 @@ export const AdminPage: React.FC = () => {
                       {selectedRoom.participants} participants
                     </div>
                     <Button
+                      onClick={() => openDisplayPage(selectedRoom.code)}
+                      variant="outline"
+                      className="border-slate-600 text-slate-300 hover:border-slate-500 hover:text-white"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                      Launch Display
+                    </Button>
+                    <Button
+                      onClick={() => setResetConfirmation({ 
+                        roomId: selectedRoom.id, 
+                        roomName: selectedRoom.name 
+                      })}
+                      variant="outline"
+                      className="border-orange-600 text-orange-400 hover:border-orange-500 hover:text-orange-300"
+                    >
+                      <RotateCcw className="w-4 h-4" />
+                      Reset Room
+                    </Button>
+                    <Button
                       onClick={() => setShowCreateActivity(true)}
                       className="bg-green-600 hover:bg-green-700"
                     >
@@ -548,29 +608,52 @@ export const AdminPage: React.FC = () => {
                             >
                               <div className="flex items-center justify-between">
                                 <div className="flex-1">
-                                  <div className="flex items-center gap-3">
+                                  <div className="flex items-center gap-3 mb-2">
                                     <h4 className="font-semibold text-white">{activity.title}</h4>
                                     {isActive && (
-                                      <span className="px-2 py-1 bg-green-600 text-white text-xs rounded-full">
+                                      <span className="px-2 py-1 bg-green-600 text-green-100 text-xs rounded-full font-medium">
                                         Active
                                       </span>
                                     )}
-                                    {activity.settings?.voting_locked && (
-                                      <span className="px-2 py-1 bg-red-600/20 border border-red-600/30 text-red-400 text-xs rounded-full flex items-center gap-1">
-                                        <Lock className="w-3 h-3" />
-                                        Locked
-                                      </span>
-                                    )}
                                   </div>
-                                  <p className="text-sm text-slate-400 mt-1">
-                                    Type: {activity.type} • Responses: {activity.total_responses || 0}
-                                  </p>
                                   {activity.description && (
-                                    <p className="text-sm text-slate-500 mt-2">{activity.description}</p>
+                                    <p className="text-sm text-slate-400 mb-3">{activity.description}</p>
                                   )}
+                                  <div className="flex items-center gap-4 text-xs text-slate-500">
+                                    <span className="flex items-center gap-1">
+                                      <Target className="w-3 h-3" />
+                                      {activity.type}
+                                    </span>
+                                    <span className="flex items-center gap-1">
+                                      <BarChart3 className="w-3 h-3" />
+                                      {activity.total_responses || 0} responses
+                                    </span>
+                                    <span className="flex items-center gap-1">
+                                      <Clock className="w-3 h-3" />
+                                      {activity.options?.length || 0} options
+                                    </span>
+                                  </div>
                                 </div>
-                                
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-2 ml-4">
+                                  {isActive ? (
+                                    <Button
+                                      onClick={() => handleEndActivity(activity.id)}
+                                      size="sm"
+                                      className="bg-red-600 hover:bg-red-700"
+                                    >
+                                      <Square className="w-4 h-4" />
+                                      End
+                                    </Button>
+                                  ) : (
+                                    <Button
+                                      onClick={() => handleStartActivity(selectedRoom.id, activity.id)}
+                                      size="sm"
+                                      className="bg-green-600 hover:bg-green-700"
+                                    >
+                                      <Play className="w-4 h-4" />
+                                      Start
+                                    </Button>
+                                  )}
                                   <Button
                                     variant="ghost"
                                     size="sm"
@@ -579,59 +662,6 @@ export const AdminPage: React.FC = () => {
                                   >
                                     <Edit3 className="w-4 h-4" />
                                   </Button>
-                                  
-                                  {/* Vote Lock Toggle */}
-                                  {isActive && (
-                                    <Button
-                                      variant={activity.settings?.voting_locked ? "danger" : "ghost"}
-                                      size="sm"
-                                      onClick={async () => {
-                                        try {
-                                          const newLockState = !activity.settings?.voting_locked;
-                                          await roomService.updateActivity(activity.id, {
-                                            settings: {
-                                              ...activity.settings,
-                                              voting_locked: newLockState
-                                            }
-                                          });
-                                          
-                                          // Update local state immediately
-                                          const updatedRoom = {
-                                            ...selectedRoom,
-                                            activities: selectedRoom.activities?.map(a => 
-                                              a.id === activity.id 
-                                                ? {
-                                                    ...a,
-                                                    settings: {
-                                                      ...a.settings,
-                                                      voting_locked: newLockState
-                                                    }
-                                                  }
-                                                : a
-                                            ) || []
-                                          };
-                                          setSelectedRoom(updatedRoom);
-                                          setRooms(prev => prev.map(room => 
-                                            room.id === selectedRoom.id ? updatedRoom : room
-                                          ));
-                                          
-                                          console.log('Vote lock toggled:', newLockState ? 'LOCKED' : 'UNLOCKED');
-                                        } catch (err) {
-                                          console.error('Failed to toggle vote lock:', err);
-                                          setError('Failed to toggle vote lock');
-                                        }
-                                      }}
-                                      className="text-slate-400 hover:text-white"
-                                      title={activity.settings?.voting_locked ? 'Unlock Votes' : 'Lock Votes'}
-                                    >
-                                      {activity.settings?.voting_locked ? (
-                                        <Lock className="w-4 h-4" />
-                                      ) : (
-                                        <Unlock className="w-4 h-4" />
-                                      )}
-                                    </Button>
-                                  )}
-                                  
                                   <Button
                                     variant="ghost"
                                     size="sm"
@@ -644,28 +674,6 @@ export const AdminPage: React.FC = () => {
                                   >
                                     <Trash2 className="w-4 h-4" />
                                   </Button>
-                                  {isActive ? (
-                                    <div className="flex items-center gap-2">
-                                      <Button
-                                        variant="danger"
-                                        size="sm"
-                                        onClick={() => handleEndActivity(activity.id)}
-                                      >
-                                        <Square className="w-4 h-4" />
-                                        Stop
-                                      </Button>
-                                      <span className="text-xs text-green-400 font-medium">ACTIVE</span>
-                                    </div>
-                                  ) : (
-                                    <Button
-                                      size="sm"
-                                      onClick={() => handleStartActivity(selectedRoom.id, activity.id)}
-                                      className="bg-green-600 hover:bg-green-700"
-                                    >
-                                      <Play className="w-4 h-4" />
-                                      Start
-                                    </Button>
-                                  )}
                                 </div>
                               </div>
                             </motion.div>
@@ -739,26 +747,96 @@ export const AdminPage: React.FC = () => {
               <p className="text-slate-300 mb-6">
                 Are you sure you want to delete "{deleteConfirmation.name}"? This action cannot be undone.
               </p>
-              <div className="flex gap-3 justify-end">
+              <div className="flex items-center gap-3">
                 <Button
                   variant="ghost"
                   onClick={() => setDeleteConfirmation(null)}
                   disabled={deleteConfirmation.loading}
+                  className="flex-1"
                 >
                   Cancel
                 </Button>
                 <Button
-                  variant="danger"
-                  onClick={() => {
-                    if (deleteConfirmation.type === 'room') {
-                      handleDeleteRoom(deleteConfirmation.id);
-                    } else {
-                      handleDeleteActivity(deleteConfirmation.id);
-                    }
-                  }}
+                  onClick={() => deleteConfirmation.type === 'room' 
+                    ? handleDeleteRoom(deleteConfirmation.id)
+                    : handleDeleteActivity(deleteConfirmation.id)
+                  }
                   disabled={deleteConfirmation.loading}
+                  className="flex-1 bg-red-600 hover:bg-red-700"
                 >
-                  {deleteConfirmation.loading ? 'Deleting...' : 'Delete'}
+                  {deleteConfirmation.loading ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin mr-2" />
+                      Deleting...
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      Delete
+                    </>
+                  )}
+                </Button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+
+        {resetConfirmation && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-slate-800 rounded-lg p-6 max-w-md w-full"
+            >
+              <h3 className="text-lg font-semibold text-white mb-4">
+                Reset Room
+              </h3>
+              <p className="text-slate-300 mb-4">
+                Are you sure you want to reset "{resetConfirmation.roomName}"?
+              </p>
+              <div className="bg-orange-900/30 border border-orange-700 rounded-lg p-4 mb-6">
+                <p className="text-orange-300 text-sm font-medium mb-2">This will:</p>
+                <ul className="text-orange-200 text-sm space-y-1">
+                  <li>• Clear all participant responses and votes</li>
+                  <li>• Reset all activity vote counts to 0</li>
+                  <li>• Stop any currently active activities</li>
+                  <li>• Reset participant count to 0</li>
+                </ul>
+                <p className="text-orange-300 text-sm mt-3 font-medium">
+                  This action cannot be undone.
+                </p>
+              </div>
+              <div className="flex items-center gap-3">
+                <Button
+                  variant="ghost"
+                  onClick={() => setResetConfirmation(null)}
+                  disabled={resetConfirmation.loading}
+                  className="flex-1"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={() => handleResetRoom(resetConfirmation.roomId)}
+                  disabled={resetConfirmation.loading}
+                  className="flex-1 bg-orange-600 hover:bg-orange-700"
+                >
+                  {resetConfirmation.loading ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin mr-2" />
+                      Resetting...
+                    </>
+                  ) : (
+                    <>
+                      <RotateCcw className="w-4 h-4 mr-2" />
+                      Reset Room
+                    </>
+                  )}
                 </Button>
               </div>
             </motion.div>
