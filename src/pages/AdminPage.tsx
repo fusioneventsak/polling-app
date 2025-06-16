@@ -30,6 +30,8 @@ export const AdminPage: React.FC = () => {
     name: string;
     loading?: boolean;
   } | null>(null);
+  // Track activities that are being deleted to prevent them from reappearing
+  const [deletingActivities, setDeletingActivities] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     loadRooms();
@@ -45,34 +47,54 @@ export const AdminPage: React.FC = () => {
     const channelName = `admin-updates-${Date.now()}`;
     const adminChannel = supabase.channel(channelName);
     
+    // Track recent deletions to avoid refreshing immediately after our own deletions
+    let recentDeletions = new Set<string>();
+    
     // Subscribe to all room changes
     adminChannel
       .on('postgres_changes', 
         { event: '*', schema: 'public', table: 'rooms' },
         (payload) => {
           console.log('Admin: Room change received:', payload);
-          loadRooms();
+          // Always refresh for room changes
+          setTimeout(loadRooms, 100);
         }
       )
       .on('postgres_changes',
         { event: '*', schema: 'public', table: 'activities' },
         (payload) => {
           console.log('Admin: Activity change received:', payload);
-          loadRooms();
+          
+          // If this is a DELETE event that we just performed, skip the refresh for a moment
+          if (payload.eventType === 'DELETE' && payload.old?.id) {
+            const deletedId = payload.old.id;
+            recentDeletions.add(deletedId);
+            
+            // Remove from recent deletions after 2 seconds
+            setTimeout(() => {
+              recentDeletions.delete(deletedId);
+            }, 2000);
+            
+            console.log('Skipping immediate refresh for recent deletion:', deletedId);
+            return;
+          }
+          
+          // For other activity events (INSERT, UPDATE), refresh normally
+          setTimeout(loadRooms, 100);
         }
       )
       .on('postgres_changes',
         { event: '*', schema: 'public', table: 'activity_options' },
         (payload) => {
           console.log('Admin: Activity options change received:', payload);
-          loadRooms();
+          setTimeout(loadRooms, 100);
         }
       )
       .on('postgres_changes',
         { event: '*', schema: 'public', table: 'participant_responses' },
         (payload) => {
           console.log('Admin: Response change received:', payload);
-          loadRooms();
+          setTimeout(loadRooms, 100);
         }
       )
       .subscribe((status, err) => {
@@ -95,11 +117,18 @@ export const AdminPage: React.FC = () => {
     try {
       setLoading(true);
       const roomsData = await roomService.getAllRooms();
-      setRooms(roomsData);
+      
+      // Filter out any activities that are currently being deleted
+      const filteredRoomsData = roomsData.map(room => ({
+        ...room,
+        activities: room.activities?.filter(activity => !deletingActivities.has(activity.id)) || []
+      }));
+      
+      setRooms(filteredRoomsData);
       
       // Update selected room if it exists
       if (selectedRoom) {
-        const updatedSelectedRoom = roomsData.find(room => room.id === selectedRoom.id);
+        const updatedSelectedRoom = filteredRoomsData.find(room => room.id === selectedRoom.id);
         if (updatedSelectedRoom) {
           setSelectedRoom(updatedSelectedRoom);
         }
@@ -160,7 +189,13 @@ export const AdminPage: React.FC = () => {
       // Show loading state
       setDeleteConfirmation(prev => prev ? { ...prev, loading: true } : null);
       
-      // Optimistic update: immediately remove the activity from UI
+      // Add to deleting activities set to prevent it from reappearing
+      setDeletingActivities(prev => new Set(prev).add(activityId));
+      
+      // Store the activity being deleted for potential rollback
+      const activityToDelete = selectedRoom.activities?.find(a => a.id === activityId);
+      
+      // Immediate optimistic update: remove activity from UI immediately
       const optimisticRoom = {
         ...selectedRoom,
         activities: selectedRoom.activities?.filter(a => a.id !== activityId) || []
@@ -170,19 +205,63 @@ export const AdminPage: React.FC = () => {
         room.id === selectedRoom.id ? optimisticRoom : room
       ));
       
-      // Call the delete API
-      await roomService.deleteActivity(activityId);
-      
-      // Clear confirmation modal
+      // Clear confirmation modal immediately
       setDeleteConfirmation(null);
       
-      console.log('Admin: Activity deletion completed');
+      try {
+        // Perform the actual deletion
+        await roomService.deleteActivity(activityId);
+        console.log('Admin: Activity deleted successfully from database');
+        
+        // Keep the activity in the deleting set for a bit longer to prevent race conditions
+        setTimeout(() => {
+          setDeletingActivities(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(activityId);
+            return newSet;
+          });
+          console.log('Admin: Removed activity from deleting set:', activityId);
+        }, 2000);
+        
+        // Force a complete refresh after successful deletion to ensure consistency
+        setTimeout(async () => {
+          console.log('Admin: Refreshing rooms after successful deletion');
+          await loadRooms();
+        }, 500);
+        
+      } catch (deleteError) {
+        console.error('Failed to delete activity from database:', deleteError);
+        
+        // Remove from deleting set since deletion failed
+        setDeletingActivities(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(activityId);
+          return newSet;
+        });
+        
+        // Revert optimistic update by restoring the deleted activity
+        if (activityToDelete) {
+          const revertedActivities = [...(optimisticRoom.activities || []), activityToDelete]
+            .sort((a, b) => a.activity_order - b.activity_order);
+          
+          const revertedRoom = {
+            ...selectedRoom,
+            activities: revertedActivities
+          };
+          
+          setSelectedRoom(revertedRoom);
+          setRooms(prev => prev.map(room => 
+            room.id === selectedRoom.id ? revertedRoom : room
+          ));
+        }
+        
+        setError(`Failed to delete activity: ${deleteError instanceof Error ? deleteError.message : 'Unknown error'}`);
+        throw deleteError;
+      }
+      
     } catch (err) {
-      // Revert optimistic update on error
-      console.error('Failed to delete activity, reverting optimistic update');
-      await loadRooms(); // Reload to get correct state
-      setError(`Failed to delete activity: ${err instanceof Error ? err.message : 'Unknown error'}`);
-      setDeleteConfirmation(null);
+      console.error('Error in handleDeleteActivity:', err);
+      // The error handling above should have already reverted the UI
     }
   };
 
