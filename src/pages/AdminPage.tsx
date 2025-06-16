@@ -25,11 +25,11 @@ export const AdminPage: React.FC = () => {
   } | null>(null);
   const [deletingActivities, setDeletingActivities] = useState<Set<string>>(new Set());
 
-  // Enhanced real-time subscriptions
+  // Real-time subscriptions with improved logic to prevent unnecessary refreshes
   useEffect(() => {
     if (!supabase) return;
 
-    console.log('Admin: Setting up enhanced real-time subscriptions');
+    console.log('Admin: Setting up optimized real-time subscriptions');
 
     const adminChannel = supabase
       .channel(`admin-realtime-${Date.now()}`)
@@ -43,13 +43,32 @@ export const AdminPage: React.FC = () => {
             newCurrentActivityId: payload.new?.current_activity_id
           });
           
-          // Immediate reload for room changes
+          // Skip reload for DELETE events to prevent conflicts with optimistic updates
           if (payload.eventType === 'DELETE') {
             console.log('Admin: Skipping reload for DELETE event to prevent conflicts with optimistic updates');
             return;
           }
           
-          // For INSERT and UPDATE events, refresh immediately
+          // For room changes, only reload if we don't have optimistic updates pending
+          // This prevents the "refreshing" issue when starting activities
+          if (payload.eventType === 'UPDATE' && payload.new?.current_activity_id) {
+            // Check if this is an activity start/stop that we initiated
+            const roomId = payload.new.id;
+            const currentRoomInState = rooms.find(r => r.id === roomId);
+            
+            if (currentRoomInState && selectedRoom?.id === roomId) {
+              // If our local state already matches this change (optimistic update), don't reload
+              const localCurrentActivityId = selectedRoom.current_activity_id;
+              const newCurrentActivityId = payload.new.current_activity_id;
+              
+              if (localCurrentActivityId === newCurrentActivityId) {
+                console.log('Admin: Skipping reload - optimistic update already applied');
+                return;
+              }
+            }
+          }
+          
+          // Reload for other room changes
           loadRooms();
         }
       )
@@ -69,7 +88,22 @@ export const AdminPage: React.FC = () => {
             return;
           }
           
-          // For INSERT and UPDATE events, refresh immediately
+          // For activity changes, check if we initiated this change (optimistic update)
+          if (payload.eventType === 'UPDATE' && payload.new?.is_active !== undefined) {
+            const activityId = payload.new.id;
+            const roomId = payload.new.room_id;
+            
+            if (selectedRoom?.id === roomId) {
+              // Check if our local state already reflects this change
+              const localActivity = selectedRoom.activities?.find(a => a.id === activityId);
+              if (localActivity && localActivity.is_active === payload.new.is_active) {
+                console.log('Admin: Skipping reload - activity optimistic update already applied');
+                return;
+              }
+            }
+          }
+          
+          // Reload for other activity changes
           loadRooms();
         }
       )
@@ -82,7 +116,7 @@ export const AdminPage: React.FC = () => {
             activityId: payload.new?.activity_id || payload.old?.activity_id
           });
           
-          // Refresh rooms to update response counts
+          // Always refresh for response changes to update counts
           loadRooms();
         }
       )
@@ -92,7 +126,7 @@ export const AdminPage: React.FC = () => {
       console.log('Admin: Cleaning up real-time subscriptions');
       supabase.removeChannel(adminChannel);
     };
-  }, []);
+  }, [rooms, selectedRoom]); // Include dependencies to check current state
 
   const loadRooms = async () => {
     try {
@@ -101,6 +135,14 @@ export const AdminPage: React.FC = () => {
       const roomsData = await roomService.getAllRooms();
       console.log('Admin: Loaded rooms:', roomsData.length);
       setRooms(roomsData);
+      
+      // Update selected room if it exists in the new data
+      if (selectedRoom) {
+        const updatedSelectedRoom = roomsData.find(r => r.id === selectedRoom.id);
+        if (updatedSelectedRoom) {
+          setSelectedRoom(updatedSelectedRoom);
+        }
+      }
     } catch (err) {
       setError('Failed to load rooms');
       console.error('Error loading rooms:', err);
@@ -133,7 +175,7 @@ export const AdminPage: React.FC = () => {
     try {
       console.log('Admin: Starting activity:', activityId);
       
-      // Optimistic update: immediately update activity status
+      // Optimistic update: immediately update activity status without triggering refresh
       if (selectedRoom) {
         const optimisticRoom = {
           ...selectedRoom,
@@ -334,196 +376,165 @@ export const AdminPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900">
-      <div className="container mx-auto px-6 py-8">
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-3xl font-bold text-white">Room Administration</h1>
-            <p className="text-slate-300 mt-2">Manage your interactive sessions and activities</p>
-          </div>
-          <Button onClick={() => setShowCreateRoom(true)} className="flex items-center gap-2">
-            <Plus className="w-4 h-4" />
-            Create Room
-          </Button>
-        </div>
-
-        {error && (
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-red-500/10 border border-red-500/20 rounded-lg p-4 mb-6"
-          >
-            <p className="text-red-400">{error}</p>
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={() => setError(null)}
-              className="mt-2 text-red-400 hover:text-red-300"
-            >
-              Dismiss
-            </Button>
-          </motion.div>
-        )}
-
-        <div className="grid lg:grid-cols-3 gap-8">
-          {/* Rooms List */}
-          <div className="lg:col-span-1">
+      <div className="container mx-auto px-4 py-8">
+        <div className="flex flex-col lg:flex-row gap-8">
+          {/* Left Sidebar - Room List */}
+          <div className="lg:w-80">
             <Card className="p-6">
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-semibold text-white">Rooms</h2>
-                {loading && (
-                  <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-                )}
+                <h1 className="text-2xl font-bold text-white">Room Manager</h1>
+                <Button
+                  onClick={() => setShowCreateRoom(true)}
+                  size="sm"
+                  className="bg-blue-600 hover:bg-blue-700"
+                >
+                  <Plus className="w-4 h-4" />
+                  New Room
+                </Button>
               </div>
-              
-              <div className="space-y-3 max-h-96 overflow-y-auto">
-                {rooms.map((room) => (
-                  <motion.div
-                    key={room.id}
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    className={`p-4 rounded-lg border-2 cursor-pointer transition-all ${
-                      selectedRoom?.id === room.id
-                        ? 'bg-blue-500/20 border-blue-500/50'
-                        : 'bg-slate-800/50 border-slate-700 hover:border-slate-600'
-                    }`}
-                    onClick={() => setSelectedRoom(room)}
-                  >
-                    <div className="flex items-center justify-between mb-2">
-                      <h3 className="font-medium text-white truncate">{room.name}</h3>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs px-2 py-1 bg-slate-700 rounded text-slate-300">
-                          {room.code}
-                        </span>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            openDisplayPage(room.code);
-                          }}
-                          className="text-blue-400 hover:text-blue-300"
-                          title="Open Display Page"
-                        >
-                          <ExternalLink className="w-4 h-4" />
-                        </button>
+
+              {error && (
+                <div className="mb-4 p-3 bg-red-900/50 border border-red-700 rounded-lg text-red-300 text-sm">
+                  {error}
+                </div>
+              )}
+
+              <div className="space-y-3">
+                <AnimatePresence>
+                  {rooms.map((room) => (
+                    <motion.div
+                      key={room.id}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -20 }}
+                      className={`p-4 rounded-lg border transition-all cursor-pointer ${
+                        selectedRoom?.id === room.id
+                          ? 'bg-blue-900/50 border-blue-600'
+                          : 'bg-slate-800/50 border-slate-700 hover:border-slate-600'
+                      }`}
+                      onClick={() => setSelectedRoom(room)}
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-semibold text-white truncate">{room.name}</h3>
+                          <p className="text-sm text-slate-400">Code: {room.code}</p>
+                          <div className="flex items-center gap-4 mt-2 text-xs text-slate-500">
+                            <span className="flex items-center gap-1">
+                              <Users className="w-3 h-3" />
+                              {room.participants}
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <Target className="w-3 h-3" />
+                              {room.activities?.length || 0}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 ml-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openDisplayPage(room.code);
+                            }}
+                            className="text-slate-400 hover:text-white"
+                          >
+                            <ExternalLink className="w-4 h-4" />
+                          </Button>
+                          <div className="relative">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setDeleteConfirmation({
+                                  type: 'room',
+                                  id: room.id,
+                                  name: room.name
+                                });
+                              }}
+                              className="text-slate-400 hover:text-red-400"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                    
-                    <div className="flex items-center justify-between text-sm text-slate-400">
-                      <span>{room.participants} participants</span>
-                      <span>{room.activities?.length || 0} activities</span>
-                    </div>
-                    
-                    {room.current_activity_id && (
-                      <div className="mt-2 text-xs text-green-400 flex items-center gap-1">
-                        <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-                        Live activity active
-                      </div>
-                    )}
-                  </motion.div>
-                ))}
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
+
+                {rooms.length === 0 && !loading && (
+                  <div className="text-center py-8 text-slate-400">
+                    <Users className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                    <p>No rooms created yet</p>
+                    <p className="text-sm">Create your first room to get started</p>
+                  </div>
+                )}
               </div>
             </Card>
           </div>
 
-          {/* Room Details and Activities */}
-          <div className="lg:col-span-2">
+          {/* Main Content - Activity Management */}
+          <div className="flex-1">
             {selectedRoom ? (
               <Card className="p-6">
                 <div className="flex items-center justify-between mb-6">
                   <div>
                     <h2 className="text-2xl font-bold text-white">{selectedRoom.name}</h2>
-                    <p className="text-slate-300">{selectedRoom.description}</p>
-                    <div className="flex items-center gap-4 mt-2 text-sm text-slate-400">
-                      <span className="flex items-center gap-1">
-                        <Users className="w-4 h-4" />
-                        {selectedRoom.participants} participants
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <BarChart3 className="w-4 h-4" />
-                        {selectedRoom.activities?.length || 0} activities
-                      </span>
-                      <span className="font-mono bg-slate-700 px-2 py-1 rounded">
-                        {selectedRoom.code}
-                      </span>
+                    <p className="text-slate-400">Room Code: {selectedRoom.code}</p>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <div className="text-sm text-slate-400">
+                      {selectedRoom.participants} participants
                     </div>
-                  </div>
-                  <div className="flex items-center gap-2">
                     <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => openDisplayPage(selectedRoom.code)}
-                      className="flex items-center gap-2"
-                    >
-                      <ExternalLink className="w-4 h-4" />
-                      Display
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setDeleteConfirmation({
-                        type: 'room',
-                        id: selectedRoom.id,
-                        name: selectedRoom.name
-                      })}
-                      className="text-red-400 hover:text-red-300"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </div>
-
-                {/* Activities Section */}
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-lg font-semibold text-white">Activities</h3>
-                    <Button 
                       onClick={() => setShowCreateActivity(true)}
-                      className="flex items-center gap-2"
+                      className="bg-green-600 hover:bg-green-700"
                     >
                       <Plus className="w-4 h-4" />
                       Add Activity
                     </Button>
                   </div>
+                </div>
 
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold text-white mb-4">Activities</h3>
+                  
                   <div className="space-y-3">
                     <AnimatePresence>
                       {selectedRoom.activities
                         ?.filter(activity => !deletingActivities.has(activity.id))
                         .map((activity) => {
                           const isActive = activity.is_active;
-                          const isCurrentActivity = selectedRoom.current_activity_id === activity.id;
-                          
                           return (
                             <motion.div
                               key={activity.id}
                               initial={{ opacity: 0, y: 20 }}
                               animate={{ opacity: 1, y: 0 }}
-                              exit={{ opacity: 0, y: -20 }}
-                              className={`p-4 rounded-lg border-2 ${
-                                isActive 
-                                  ? 'bg-green-500/10 border-green-500/30' 
-                                  : 'bg-slate-700/30 border-slate-600'
+                              exit={{ opacity: 0, x: -300 }}
+                              className={`p-4 rounded-lg border transition-all ${
+                                isActive
+                                  ? 'bg-green-900/30 border-green-600'
+                                  : 'bg-slate-800/50 border-slate-700'
                               }`}
                             >
                               <div className="flex items-center justify-between">
                                 <div className="flex-1">
-                                  <div className="flex items-center gap-3 mb-2">
-                                    <h4 className="font-medium text-white">{activity.title}</h4>
+                                  <div className="flex items-center gap-3">
+                                    <h4 className="font-semibold text-white">{activity.title}</h4>
                                     {isActive && (
-                                      <span className="px-2 py-1 text-xs rounded-full bg-green-500/20 text-green-400 border border-green-500/30">
-                                        ● LIVE
+                                      <span className="px-2 py-1 bg-green-600 text-white text-xs rounded-full">
+                                        Active
                                       </span>
                                     )}
-                                    <span className={`px-2 py-1 text-xs rounded-full ${
-                                      isActive 
-                                        ? 'bg-green-500/20 text-green-400' 
-                                        : 'bg-slate-500/20 text-slate-400'
-                                    }`}>
-                                      {activity.type.charAt(0).toUpperCase() + activity.type.slice(1)}
-                                    </span>
                                   </div>
-                                  <div className="text-sm text-slate-400">
-                                    {activity.total_responses || 0} responses • {activity.options?.length || 0} options
-                                  </div>
+                                  <p className="text-sm text-slate-400 mt-1">
+                                    Type: {activity.type} • Responses: {activity.total_responses || 0}
+                                  </p>
+                                  {activity.description && (
+                                    <p className="text-sm text-slate-500 mt-2">{activity.description}</p>
+                                  )}
                                 </div>
                                 
                                 <div className="flex items-center gap-2">
@@ -531,11 +542,10 @@ export const AdminPage: React.FC = () => {
                                     variant="ghost"
                                     size="sm"
                                     onClick={() => setEditingActivity(activity)}
-                                    className="opacity-70 hover:opacity-100"
+                                    className="text-slate-400 hover:text-white"
                                   >
                                     <Edit3 className="w-4 h-4" />
                                   </Button>
-                                  
                                   <Button
                                     variant="ghost"
                                     size="sm"
@@ -544,11 +554,10 @@ export const AdminPage: React.FC = () => {
                                       id: activity.id,
                                       name: activity.title
                                     })}
-                                    className="opacity-70 hover:opacity-100 text-red-400 hover:text-red-300"
+                                    className="text-slate-400 hover:text-red-400"
                                   >
                                     <Trash2 className="w-4 h-4" />
                                   </Button>
-
                                   {isActive ? (
                                     <Button
                                       variant="danger"
@@ -612,9 +621,9 @@ export const AdminPage: React.FC = () => {
           />
         )}
 
-        {editingActivity && selectedRoom && (
+        {editingActivity && (
           <ActivityEditor
-            roomId={selectedRoom.id}
+            roomId={selectedRoom!.id}
             activity={editingActivity}
             onSave={handleSaveActivity}
             onCancel={() => setEditingActivity(null)}
@@ -629,12 +638,12 @@ export const AdminPage: React.FC = () => {
             className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
           >
             <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-slate-800 border border-slate-700 rounded-lg p-6 max-w-md w-full"
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-slate-800 rounded-lg p-6 max-w-md w-full"
             >
-              <h3 className="text-xl font-semibold text-white mb-4">
+              <h3 className="text-lg font-semibold text-white mb-4">
                 Delete {deleteConfirmation.type === 'room' ? 'Room' : 'Activity'}
               </h3>
               <p className="text-slate-300 mb-6">
@@ -650,17 +659,16 @@ export const AdminPage: React.FC = () => {
                 </Button>
                 <Button
                   variant="danger"
-                  onClick={deleteConfirmation.type === 'room' 
-                    ? () => handleDeleteRoom(deleteConfirmation.id)
-                    : () => handleDeleteActivity(deleteConfirmation.id)
-                  }
+                  onClick={() => {
+                    if (deleteConfirmation.type === 'room') {
+                      handleDeleteRoom(deleteConfirmation.id);
+                    } else {
+                      handleDeleteActivity(deleteConfirmation.id);
+                    }
+                  }}
                   disabled={deleteConfirmation.loading}
-                  className="flex items-center gap-2"
                 >
-                  {deleteConfirmation.loading && (
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                  )}
-                  Delete
+                  {deleteConfirmation.loading ? 'Deleting...' : 'Delete'}
                 </Button>
               </div>
             </motion.div>
