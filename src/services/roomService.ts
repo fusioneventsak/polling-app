@@ -376,6 +376,24 @@ export const roomService = {
     try {
       console.log('Deleting activity:', activityId);
       
+      // First, get the activity to check if it's currently active
+      const { data: activity } = await supabase
+        .from('activities')
+        .select('room_id, is_active')
+        .eq('id', activityId)
+        .single();
+      
+      // If the activity is currently active, clear it from the room
+      if (activity?.is_active) {
+        await supabase
+          .from('rooms')
+          .update({
+            current_activity_id: null,
+            current_activity_type: null
+          })
+          .eq('id', activity.room_id);
+      }
+      
       // Delete the activity - foreign key constraints will handle cascading deletes
       const { error } = await supabase
         .from('activities')

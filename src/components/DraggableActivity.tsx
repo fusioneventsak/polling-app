@@ -124,12 +124,7 @@ export const DraggableActivity: React.FC<DraggableActivityProps> = ({
         <Button
           variant="ghost"
           size="sm"
-          onClick={(e) => {
-            e.stopPropagation();
-            e.preventDefault();
-            console.log('Delete button clicked for activity:', activity.id);
-            onDelete(activity.id);
-          }}
+          onClick={() => onDelete(activity.id)}
           className="opacity-70 hover:opacity-100 text-red-400 hover:text-red-300"
         >
           <Trash2 className="w-4 h-4" />

@@ -150,11 +150,12 @@ export const AdminPage: React.FC = () => {
       await roomService.deleteActivity(activityId);
       console.log('Admin: Activity deleted, refreshing rooms');
       
-      setDeleteConfirmation(null);
-      console.log('Admin: Activity deletion completed');
-      
       // Refresh rooms data to get updated state
       await loadRooms();
+      
+      // Clear confirmation modal after successful deletion and refresh
+      setDeleteConfirmation(null);
+      console.log('Admin: Activity deletion completed');
     } catch (err) {
       setDeleteConfirmation(prev => prev ? { ...prev, loading: false } : null);
       setError(`Failed to delete activity: ${err instanceof Error ? err.message : 'Unknown error'}`);
