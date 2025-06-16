@@ -5,7 +5,7 @@ import { supabase } from '../lib/supabase';
 import { roomService } from '../services/roomService';
 import { useTheme } from '../components/ThemeProvider';
 import { Poll3DVisualization } from '../components/Poll3DVisualization';
-import { Users, BarChart, Clock, MessageSquare, HelpCircle, Cloud, Trophy, Target, Calendar, Activity } from 'lucide-react';
+import { Users, BarChart, Clock, MessageSquare, HelpCircle, Cloud, Trophy, Target, Calendar, Activity as ActivityIcon } from 'lucide-react';
 import type { ActivityType, Room, Activity } from '../types';
 
 export const DisplayPage: React.FC = () => {
@@ -57,39 +57,37 @@ export const DisplayPage: React.FC = () => {
     if (!pollId || !supabase) return;
     
     try {
-      console.log('DisplayPage: Loading room data for code:', pollId, forceRefresh ? '(forced)' : '');
+      console.log('DisplayPage: Loading room data for code:', pollId, forceRefresh ? '(forced refresh)' : '(normal load)');
+      setLastUpdateTime(new Date());
+
       const room = await roomService.getRoomByCode(pollId);
       
-      if (!room) {
-        console.error('DisplayPage: Room not found');
-        setCurrentRoom(null);
-        return;
-      }
-      
-      setCurrentRoom(room);
-      setLastUpdateTime(new Date());
-      
-      console.log('DisplayPage: Loaded room data:', {
-        roomName: room.name,
-        currentActivityId: room.current_activity_id,
-        currentActivityType: room.current_activity_type,
-        activitiesCount: room.activities?.length,
-        participants: room.participants
-      });
-      
-      // Enhanced activity status debugging
-      if (room.activities) {
-        const activeByFlag = room.activities.filter(a => a.is_active);
+      if (room) {
+        console.log('DisplayPage: Room loaded successfully:', {
+          id: room.id,
+          name: room.name,
+          activities: room.activities?.length || 0,
+          currentActivityId: room.current_activity_id,
+          participants: room.participants
+        });
+
+        setCurrentRoom(room);
+
+        // Log activity status for debugging
+        const activeByFlag = room.activities?.filter(a => a.is_active) || [];
         const activeByCurrent = room.current_activity_id ? 
-          room.activities.find(a => a.id === room.current_activity_id) : null;
+          room.activities?.find(a => a.id === room.current_activity_id) : null;
         
         console.log('DisplayPage: Activity status analysis:', {
-          totalActivities: room.activities.length,
+          totalActivities: room.activities?.length || 0,
           activeByFlag: activeByFlag.map(a => ({ id: a.id, title: a.title })),
           activeByCurrent: activeByCurrent ? { id: activeByCurrent.id, title: activeByCurrent.title } : null,
           roomCurrentActivityId: room.current_activity_id,
           mismatch: activeByFlag.length > 1 || (activeByFlag.length === 1 && activeByFlag[0].id !== room.current_activity_id)
         });
+      } else {
+        console.log('DisplayPage: Room not found for code:', pollId);
+        setCurrentRoom(null);
       }
     } catch (error) {
       console.error('DisplayPage: Error loading room:', error);
@@ -164,65 +162,48 @@ export const DisplayPage: React.FC = () => {
         console.log('DisplayPage: Activity change received:', {
           eventType: payload.eventType,
           activityId: payload.new?.id || payload.old?.id,
-          activityTitle: payload.new?.title || payload.old?.title,
-          oldIsActive: payload.old?.is_active,
-          newIsActive: payload.new?.is_active
+          isActive: payload.new?.is_active,
+          title: payload.new?.title || payload.old?.title
         });
         
-        // Immediate reload without delay for activity changes
+        // Immediate reload for activity changes
         await loadRoom(true);
       }
     );
 
-    // Subscribe to activity options changes
+    // Subscribe to response changes for activities in this room
     channel.on('postgres_changes',
-      { 
-        event: '*', 
-        schema: 'public', 
-        table: 'activity_options'
+      {
+        event: '*',
+        schema: 'public',
+        table: 'responses'
       },
       async (payload) => {
-        console.log('DisplayPage: Activity options change received:', payload.eventType);
+        // Check if this response belongs to an activity in our room
+        const activityId = payload.new?.activity_id || payload.old?.activity_id;
+        const roomActivity = currentRoom.activities?.find(a => a.id === activityId);
         
-        // Check if this option belongs to an activity in our room
-        if (currentRoom.activities?.some(activity => 
-          activity.options?.some(option => 
-            option.id === payload.old?.id || option.id === payload.new?.id
-          )
-        )) {
+        if (roomActivity) {
+          console.log('DisplayPage: Response change for room activity:', {
+            eventType: payload.eventType,
+            activityId,
+            responseId: payload.new?.id || payload.old?.id
+          });
+          
+          // Reload to update response counts
           await loadRoom(true);
         }
       }
     );
 
-    // Subscribe to participant responses
-    channel.on('postgres_changes',
-      { 
-        event: '*', 
-        schema: 'public', 
-        table: 'participant_responses',
-        filter: `room_id=eq.${currentRoom.id}`
-      },
-      async (payload) => {
-        console.log('DisplayPage: Response change received');
-        await loadRoom(true);
-      }
-    );
-
     // Subscribe to the channel
-    channel.subscribe((status, err) => {
+    channel.subscribe((status) => {
       console.log('DisplayPage: Subscription status:', status);
-      if (err) {
-        console.error('DisplayPage: Subscription error:', err);
-      }
-      if (status === 'SUBSCRIBED') {
-        console.log('✅ DisplayPage: Real-time subscriptions active');
-      }
     });
 
     return () => {
-      console.log('DisplayPage: Cleaning up subscriptions');
-      channel.unsubscribe();
+      console.log('DisplayPage: Cleaning up real-time subscriptions');
+      supabase.removeChannel(channel);
     };
   }, [currentRoom?.id, loadRoom]);
 
@@ -341,88 +322,75 @@ export const DisplayPage: React.FC = () => {
         <AnimatePresence mode="wait">
           {activeActivity ? (
             <motion.div
-              key={`activity-${activeActivity.id}`}
+              key={`active-${activeActivity.id}`}
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.9 }}
               transition={{ duration: 0.5 }}
-              className="w-full max-w-6xl px-6"
+              className="w-full max-w-6xl mx-auto px-6"
             >
               <Poll3DVisualization 
                 activity={activeActivity} 
-                className="w-full h-full"
+                roomCode={currentRoom.code}
+                themeColors={themeColors}
               />
-              
-              {/* Activity Status Badge */}
-              <div className="absolute top-24 right-6">
-                <div 
-                  className="px-4 py-2 rounded-full text-sm font-medium flex items-center gap-2"
-                  style={{ 
-                    backgroundColor: `${themeColors.accent}20`,
-                    borderColor: themeColors.accent,
-                    color: themeColors.accent
-                  }}
-                >
-                  <Activity className="w-4 h-4" />
-                  <span>Live: {getActivityTypeLabel(activeActivity.type)}</span>
-                </div>
-              </div>
             </motion.div>
           ) : (
             <motion.div
-              key="room-stats"
+              key="waiting"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
               transition={{ duration: 0.5 }}
-              className="text-center max-w-4xl px-6"
+              className="text-center max-w-4xl mx-auto px-6"
             >
-              <div className="mb-8">
-                <div 
-                  className="w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6"
-                  style={{ backgroundColor: `${themeColors.primary}20` }}
-                >
-                  <BarChart className="w-12 h-12" style={{ color: themeColors.primary }} />
-                </div>
-                
-                <h2 className="text-4xl font-bold text-white mb-4">
-                  {allActivities.length === 0 ? 'Welcome!' : 'Room Statistics'}
-                </h2>
-                
-                {roomStats && allActivities.length > 0 && (
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8">
-                    <div className="bg-slate-800/30 backdrop-blur-sm border border-slate-700 rounded-lg p-4">
-                      <div className="text-3xl font-bold" style={{ color: themeColors.accent }}>
-                        {roomStats.totalActivities}
-                      </div>
-                      <div className="text-slate-300 text-sm">Total Activities</div>
+              {/* Room Statistics */}
+              {roomStats && (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-12">
+                  <div className="bg-slate-800/30 backdrop-blur-sm border border-slate-700 rounded-lg p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Users className="w-5 h-5" style={{ color: themeColors.accent }} />
+                      <span className="text-slate-300 text-sm">Participants</span>
                     </div>
-                    
-                    <div className="bg-slate-800/30 backdrop-blur-sm border border-slate-700 rounded-lg p-4">
-                      <div className="text-3xl font-bold" style={{ color: themeColors.accent }}>
-                        {roomStats.completedActivities}
-                      </div>
-                      <div className="text-slate-300 text-sm">Completed</div>
-                    </div>
-                    
-                    <div className="bg-slate-800/30 backdrop-blur-sm border border-slate-700 rounded-lg p-4">
-                      <div className="text-3xl font-bold" style={{ color: themeColors.accent }}>
-                        {roomStats.totalResponses}
-                      </div>
-                      <div className="text-slate-300 text-sm">Total Responses</div>
-                    </div>
-                    
-                    <div className="bg-slate-800/30 backdrop-blur-sm border border-slate-700 rounded-lg p-4">
-                      <div className="text-3xl font-bold" style={{ color: themeColors.accent }}>
-                        {roomStats.participants}
-                      </div>
-                      <div className="text-slate-300 text-sm">Participants</div>
-                    </div>
+                    <p className="text-2xl font-bold text-white">{roomStats.participants}</p>
                   </div>
-                )}
-                
-                <p className="text-slate-400 text-lg mb-8">
-                  {allActivities.length === 0
+                  
+                  <div className="bg-slate-800/30 backdrop-blur-sm border border-slate-700 rounded-lg p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <BarChart className="w-5 h-5" style={{ color: themeColors.accent }} />
+                      <span className="text-slate-300 text-sm">Activities</span>
+                    </div>
+                    <p className="text-2xl font-bold text-white">{roomStats.totalActivities}</p>
+                  </div>
+                  
+                  <div className="bg-slate-800/30 backdrop-blur-sm border border-slate-700 rounded-lg p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Trophy className="w-5 h-5" style={{ color: themeColors.accent }} />
+                      <span className="text-slate-300 text-sm">Completed</span>
+                    </div>
+                    <p className="text-2xl font-bold text-white">{roomStats.completedActivities}</p>
+                  </div>
+                  
+                  <div className="bg-slate-800/30 backdrop-blur-sm border border-slate-700 rounded-lg p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Target className="w-5 h-5" style={{ color: themeColors.accent }} />
+                      <span className="text-slate-300 text-sm">Responses</span>
+                    </div>
+                    <p className="text-2xl font-bold text-white">{roomStats.totalResponses}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Waiting Message */}
+              <div className="mb-12">
+                <div className="w-24 h-24 bg-slate-700/50 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <Clock className="w-12 h-12" style={{ color: themeColors.accent }} />
+                </div>
+                <h2 className="text-3xl font-bold text-white mb-4">
+                  {allActivities.length === 0 ? "Getting Ready..." : "Activity Paused"}
+                </h2>
+                <p className="text-xl text-slate-300 max-w-2xl mx-auto">
+                  {allActivities.length === 0 
                     ? "No activities have been created yet. The presenter will start activities soon."
                     : "Waiting for the next activity to begin..."
                   }
