@@ -126,13 +126,21 @@ export const AdminPage: React.FC = () => {
 
   const handleDeleteRoom = async (roomId: string) => {
     try {
-      await roomService.deleteRoom(roomId);
+      // Optimistic update: immediately remove room from UI
       setRooms(prev => prev.filter(room => room.id !== roomId));
       if (selectedRoom?.id === roomId) {
         setSelectedRoom(null);
       }
       setDeleteConfirmation(null);
+      
+      await roomService.deleteRoom(roomId);
+      
+      // Refresh to ensure consistency
+      await loadRooms();
     } catch (err) {
+      // Revert optimistic update on error
+      console.error('Failed to delete room, reverting optimistic update');
+      await loadRooms();
       setError('Failed to delete room');
       console.error('Error deleting room:', err);
     }
@@ -147,30 +155,64 @@ export const AdminPage: React.FC = () => {
       // Show loading state
       setDeleteConfirmation(prev => prev ? { ...prev, loading: true } : null);
       
+      // Optimistic update: immediately remove the activity from UI
+      if (selectedRoom) {
+        const optimisticRoom = {
+          ...selectedRoom,
+          activities: selectedRoom.activities?.filter(a => a.id !== activityId) || []
+        };
+        setSelectedRoom(optimisticRoom);
+        setRooms(prev => prev.map(room => 
+          room.id === selectedRoom.id ? optimisticRoom : room
+        ));
+      }
+      
+      // Clear confirmation modal immediately after optimistic update
+      setDeleteConfirmation(null);
+      
       await roomService.deleteActivity(activityId);
       console.log('Admin: Activity deleted, refreshing rooms');
       
       // Refresh rooms data to get updated state
       await loadRooms();
       
-      // Clear confirmation modal after successful deletion and refresh
-      setDeleteConfirmation(null);
       console.log('Admin: Activity deletion completed');
     } catch (err) {
-      setDeleteConfirmation(prev => prev ? { ...prev, loading: false } : null);
+      // Revert optimistic update on error
+      console.error('Failed to delete activity, reverting optimistic update');
+      await loadRooms(); // Reload to get correct state
       setError(`Failed to delete activity: ${err instanceof Error ? err.message : 'Unknown error'}`);
-      console.error('Error deleting activity:', err);
     }
   };
 
   const handleStartActivity = async (roomId: string, activityId: string) => {
     try {
       console.log('Starting activity:', activityId, 'in room:', roomId);
+      
+      // Optimistic update: immediately update activity status
+      if (selectedRoom) {
+        const optimisticRoom = {
+          ...selectedRoom,
+          activities: selectedRoom.activities?.map(a => ({
+            ...a,
+            is_active: a.id === activityId ? true : false
+          })) || [],
+          current_activity_id: activityId
+        };
+        setSelectedRoom(optimisticRoom);
+        setRooms(prev => prev.map(room => 
+          room.id === selectedRoom.id ? optimisticRoom : room
+        ));
+      }
+      
       await roomService.startActivity(roomId, activityId);
       console.log('Activity started successfully');
       // Force refresh to ensure UI updates immediately
       await loadRooms();
     } catch (err) {
+      // Revert optimistic update on error
+      console.error('Failed to start activity, reverting optimistic update');
+      await loadRooms();
       setError('Failed to start activity');
       console.error('Error starting activity:', err);
     }
@@ -179,11 +221,31 @@ export const AdminPage: React.FC = () => {
   const handleEndActivity = async (activityId: string) => {
     try {
       console.log('Ending activity:', activityId);
+      
+      // Optimistic update: immediately update activity status
+      if (selectedRoom) {
+        const optimisticRoom = {
+          ...selectedRoom,
+          activities: selectedRoom.activities?.map(a => ({
+            ...a,
+            is_active: a.id === activityId ? false : a.is_active
+          })) || [],
+          current_activity_id: null
+        };
+        setSelectedRoom(optimisticRoom);
+        setRooms(prev => prev.map(room => 
+          room.id === selectedRoom.id ? optimisticRoom : room
+        ));
+      }
+      
       await roomService.endActivity(activityId);
       console.log('Activity ended successfully');
       // Force refresh to ensure UI updates immediately
       await loadRooms();
     } catch (err) {
+      // Revert optimistic update on error
+      console.error('Failed to end activity, reverting optimistic update');
+      await loadRooms();
       setError('Failed to end activity');
       console.error('Error ending activity:', err);
     }
@@ -192,21 +254,26 @@ export const AdminPage: React.FC = () => {
   const handleActivitySaved = (activity: Activity) => {
     if (!selectedRoom) return;
 
+    // Optimistic update: immediately update the activity in UI
     const updatedActivities = editingActivity
       ? selectedRoom.activities?.map(a => a.id === activity.id ? activity : a) || []
-      : [...(selectedRoom.activities || []), activity];
+      : [...(selectedRoom.activities || []), activity].sort((a, b) => a.activity_order - b.activity_order);
 
     const updatedRoom = {
       ...selectedRoom,
-      activities: updatedActivities.sort((a, b) => a.activity_order - b.activity_order)
+      activities: updatedActivities
     };
 
     setSelectedRoom(updatedRoom);
     setRooms(prev => prev.map(room => 
       room.id === selectedRoom.id ? updatedRoom : room
     ));
+    
     setShowActivityEditor(false);
     setEditingActivity(null);
+    
+    // Refresh to ensure consistency
+    loadRooms();
   };
 
   const handleDragEnd = (result: DropResult) => {
@@ -230,7 +297,7 @@ export const AdminPage: React.FC = () => {
     if (!selectedRoom) return;
 
     try {
-      await roomService.reorderActivities(selectedRoom.id, activityIds);
+      // Optimistic update: immediately reorder activities in UI
       const reorderedActivities = activityIds.map((id, index) => {
         const activity = selectedRoom.activities?.find(a => a.id === id);
         return activity ? { ...activity, activity_order: index + 1 } : null;
@@ -245,7 +312,15 @@ export const AdminPage: React.FC = () => {
       setRooms(prev => prev.map(room => 
         room.id === selectedRoom.id ? updatedRoom : room
       ));
+      
+      await roomService.reorderActivities(selectedRoom.id, activityIds);
+      
+      // Refresh to ensure consistency
+      await loadRooms();
     } catch (err) {
+      // Revert optimistic update on error
+      console.error('Failed to reorder activities, reverting optimistic update');
+      await loadRooms();
       setError('Failed to reorder activities');
       console.error('Error reordering activities:', err);
     }
