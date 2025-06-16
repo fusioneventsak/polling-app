@@ -281,12 +281,6 @@ export const roomService = {
           .select('id')
           .eq('activity_id', id);
         
-        // First, get existing options to avoid orphaned data
-        const { data: existingOptions } = await supabase
-          .from('activity_options')
-          .select('id')
-          .eq('activity_id', id);
-        
         // Delete all existing options for this activity
         const { error: deleteError } = await supabase
           .from('activity_options')
