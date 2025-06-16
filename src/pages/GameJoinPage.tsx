@@ -126,13 +126,15 @@ export const GameJoinPage: React.FC = () => {
       },
       async (payload) => {
         console.log('Activity change received:', payload);
-        await loadJoinedRoom();
         
         // Auto-navigate to newly started activity
         if (payload.eventType === 'UPDATE' && payload.new?.is_active === true && payload.old?.is_active === false) {
           console.log('Activity started, navigating to vote page:', payload.new.id);
           navigate(`/vote/${payload.new.id}`);
+          return;
         }
+        
+        await loadJoinedRoom();
       }
     );
 

@@ -224,7 +224,7 @@ const AnimatedBar: React.FC<BarProps> = ({
         maxWidth={1.5}
         font="/fonts/inter-medium.woff"
       >
-        Option {Math.floor(position[0] / 2.5) + Math.ceil(position.length / 2) + 1}
+        Option {Math.floor((position[0] + 10) / 2.5) + 1}
       </Text>
     </group>
   );
@@ -299,9 +299,10 @@ const Scene: React.FC<{ options: ActivityOption[]; totalResponses: number; theme
       {/* Bars for each option */}
       {options.map((option, index) => {
         const percentage = totalResponses > 0 ? Math.round((option.responses / totalResponses) * 100) : 0;
+        // Always show bars with minimum height, scale based on responses if any exist
         const height = totalResponses > 0 
-          ? (option.responses / maxResponses) * maxHeight 
-          : 0.3; // Show small bars even with no responses
+          ? Math.max((option.responses / maxResponses) * maxHeight, 0.3)
+          : 0.8; // Show visible bars even with no responses
         
         // Calculate spacing and positioning
         const spacing = Math.min(2.5, 15 / Math.max(options.length, 1));
@@ -343,7 +344,7 @@ const Scene: React.FC<{ options: ActivityOption[]; totalResponses: number; theme
         anchorY="middle"
         font="/fonts/inter-bold.woff"
       >
-        Live Poll Results
+        {totalResponses > 0 ? 'Live Poll Results' : 'Poll Options'}
       </Text>
       
       {/* Total responses indicator */}
@@ -355,7 +356,7 @@ const Scene: React.FC<{ options: ActivityOption[]; totalResponses: number; theme
         anchorY="middle"
         font="/fonts/inter-regular.woff"
       >
-        {totalResponses} total responses
+        {totalResponses > 0 ? `${totalResponses} total responses` : 'Waiting for responses...'}
       </Text>
     </>
   );
@@ -436,13 +437,6 @@ export const Poll3DVisualization: React.FC<Poll3DVisualizationProps> = ({
           <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
           <span className="text-green-400 text-xs font-medium">LIVE</span>
         </div>
-      </div>
-
-      {/* Debug info */}
-      <div className="absolute bottom-4 left-4 bg-black/40 backdrop-blur-sm rounded-lg p-2 border border-white/10 text-xs text-white">
-        <div>Options: {options.length}</div>
-        <div>Total: {totalResponses}</div>
-        <div>Data: {options.map(o => `${o.text}: ${o.responses}`).join(', ')}</div>
       </div>
     </motion.div>
   );

@@ -61,6 +61,7 @@ export const VotePage: React.FC = () => {
         };
         setActivity(formattedActivity);
         setRoomCode(activityData.rooms?.code || null);
+        console.log('Vote page loaded activity:', formattedActivity);
       } else {
         setActivity(null);
       }
@@ -103,7 +104,7 @@ export const VotePage: React.FC = () => {
 
   // Set up real-time subscriptions
   useEffect(() => {
-    if (!pollId || !supabase || !activity?.room_id) return;
+    if (!pollId || !supabase) return;
 
     console.log('Setting up real-time subscriptions for activity:', pollId);
 
@@ -111,38 +112,42 @@ export const VotePage: React.FC = () => {
     const channelName = `activity-vote-${pollId}-${Date.now()}`;
     const channel = supabase.channel(channelName);
 
-    // Subscribe to room changes to detect new active activities
+    // Subscribe to all room changes to detect activity switches
     channel.on('postgres_changes', 
       { 
         event: '*', 
         schema: 'public', 
-        table: 'rooms',
-        filter: `id=eq.${activity.room_id}`
+        table: 'rooms'
       },
       async (payload) => {
         console.log('Room change received:', payload);
         
-        // Check if a new activity was started
-        if (payload.eventType === 'UPDATE' && 
-            payload.new?.current_activity_id && 
-            payload.new.current_activity_id !== pollId) {
-          console.log('New activity started, redirecting to:', payload.new.current_activity_id);
-          navigate(`/vote/${payload.new.current_activity_id}`);
-          return;
+        // Only handle changes for our room
+        if (activity?.room_id && payload.new?.id === activity.room_id) {
+          // Check if a new activity was started
+          if (payload.eventType === 'UPDATE' && 
+              payload.new?.current_activity_id && 
+              payload.new.current_activity_id !== pollId) {
+            console.log('New activity started, redirecting to:', payload.new.current_activity_id);
+            navigate(`/vote/${payload.new.current_activity_id}`);
+            return;
+          }
+          
+          // If current activity was cleared, go back to room waiting area
+          if (payload.eventType === 'UPDATE' && 
+              payload.old?.current_activity_id === pollId && 
+              !payload.new?.current_activity_id) {
+            console.log('Activity ended, redirecting to room waiting area');
+            if (roomCode) {
+              navigate(`/game?joined=${roomCode}`);
+            } else {
+              navigate('/game');
+            }
+            return;
+          }
         }
         
-        // If current activity was cleared, go back to room waiting area
-        if (payload.eventType === 'UPDATE' && 
-            payload.old?.current_activity_id === pollId && 
-            !payload.new?.current_activity_id) {
-          console.log('Activity ended, redirecting to room waiting area');
-          if (roomCode) {
-            navigate(`/game?joined=${roomCode}`);
-          } else {
-            navigate('/game');
-          }
-          return;
-        }
+        await loadActivity();
       }
     );
 
@@ -215,7 +220,7 @@ export const VotePage: React.FC = () => {
       console.log('Cleaning up vote subscriptions');
       channel.unsubscribe();
     };
-  }, [pollId, navigate, roomCode, activity?.room_id, loadActivity]);
+  }, [pollId, navigate, roomCode, activity?.room_id]);
 
   const handleVote = async (optionId: string) => {
     if (!activity || hasVoted || voting || !supabase) return;

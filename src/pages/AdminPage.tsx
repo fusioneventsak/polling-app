@@ -140,16 +140,8 @@ export const AdminPage: React.FC = () => {
   const handleDeleteActivity = async (activityId: string) => {
     try {
       await roomService.deleteActivity(activityId);
-      if (selectedRoom) {
-        const updatedRoom = {
-          ...selectedRoom,
-          activities: selectedRoom.activities?.filter(activity => activity.id !== activityId) || []
-        };
-        setSelectedRoom(updatedRoom);
-        setRooms(prev => prev.map(room => 
-          room.id === selectedRoom.id ? updatedRoom : room
-        ));
-      }
+      // Force refresh to ensure UI updates immediately
+      await loadRooms();
       setDeleteConfirmation(null);
     } catch (err) {
       setError('Failed to delete activity');
