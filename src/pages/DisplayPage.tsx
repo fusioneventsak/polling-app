@@ -111,7 +111,7 @@ export const DisplayPage: React.FC = () => {
       console.error('DisplayPage: Error loading room:', error);
       setCurrentRoom(null);
     }
-  }, [pollId]); // Only pollId dependency
+  }, [pollId]);
 
   // Initialize room on mount
   useEffect(() => {
@@ -217,15 +217,7 @@ export const DisplayPage: React.FC = () => {
       console.log('DisplayPage: Cleaning up subscription');
       channel.unsubscribe();
     };
-  }, [pollId, currentRoom?.id]); // Include currentRoom.id so we can check activities
-      });
-
-    return () => {
-      mounted = false;
-      console.log('DisplayPage: Cleaning up subscription');
-      channel.unsubscribe();
-    };
-  }, [pollId]); // Only pollId dependency - no currentRoom or activeActivity to prevent re-subscriptions
+  }, [pollId, currentRoom?.id]);
 
   const getActivityIcon = (type: ActivityType) => {
     switch (type) {
