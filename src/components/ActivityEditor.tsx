@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { Button } from './Button';
 import { Card } from './Card';
 import { ImageUpload } from './ImageUpload';
-import { Plus, Trash2, Check, X } from 'lucide-react';
+import { Plus, Trash2, Check, X, Lock, Unlock } from 'lucide-react';
 import { roomService } from '../services/roomService';
 import type { Activity, ActivityType, CreateActivityData } from '../types';
 
@@ -24,6 +24,9 @@ export const ActivityEditor: React.FC<ActivityEditorProps> = ({
   const [description, setDescription] = useState(activity?.description || '');
   const [type, setType] = useState<ActivityType>(activity?.type || 'poll');
   const [mediaUrl, setMediaUrl] = useState(activity?.media_url || '');
+  const [isVotingLocked, setIsVotingLocked] = useState(
+    activity?.settings?.voting_locked || false
+  );
   const [options, setOptions] = useState(
     activity?.options?.map(opt => ({ 
       text: opt.text, 
@@ -87,6 +90,10 @@ export const ActivityEditor: React.FC<ActivityEditorProps> = ({
           title,
           description,
           media_url: mediaUrl,
+          settings: {
+            ...activity.settings,
+            voting_locked: isVotingLocked
+          },
           options: options.map(opt => ({
             text: opt.text,
             is_correct: opt.isCorrect,
@@ -104,6 +111,9 @@ export const ActivityEditor: React.FC<ActivityEditorProps> = ({
           title,
           description,
           media_url: mediaUrl,
+          settings: {
+            voting_locked: isVotingLocked
+          },
           options: options.map(opt => ({
             text: opt.text,
             is_correct: opt.isCorrect,
@@ -199,6 +209,48 @@ export const ActivityEditor: React.FC<ActivityEditorProps> = ({
               maxSizeMB={5}
             />
           </div>
+
+          {/* Vote Locking Control */}
+          {activity && (
+            <div className="border-t border-slate-600 pt-6">
+              <div className="flex items-center justify-between p-4 bg-slate-800/50 rounded-lg border border-slate-600">
+                <div className="flex items-center gap-3">
+                  {isVotingLocked ? (
+                    <Lock className="w-5 h-5 text-red-400" />
+                  ) : (
+                    <Unlock className="w-5 h-5 text-green-400" />
+                  )}
+                  <div>
+                    <h3 className="font-medium text-white">Voting Control</h3>
+                    <p className="text-sm text-slate-400">
+                      {isVotingLocked 
+                        ? 'Voting is currently locked - participants cannot vote'
+                        : 'Voting is open - participants can submit responses'
+                      }
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  onClick={() => setIsVotingLocked(!isVotingLocked)}
+                  variant={isVotingLocked ? "danger" : "primary"}
+                  size="sm"
+                  disabled={saving}
+                >
+                  {isVotingLocked ? (
+                    <>
+                      <Unlock className="w-4 h-4" />
+                      Unlock Votes
+                    </>
+                  ) : (
+                    <>
+                      <Lock className="w-4 h-4" />
+                      Lock Votes
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          )}
 
           <div>
             <label className="block text-sm font-medium text-slate-300 mb-2">
