@@ -99,6 +99,11 @@ export const DraggableActivity: React.FC<DraggableActivityProps> = ({
             }`}>
               {getActivityTypeLabel(activity.type)}
             </span>
+            {activity.is_active && (
+              <span className="px-2 py-1 text-xs rounded-full bg-green-500/20 text-green-400 border border-green-500/30">
+                ● LIVE
+              </span>
+            )}
           </div>
           <div className="text-sm text-slate-400">
             {activity.total_responses} responses • {activity.options?.length || 0} options

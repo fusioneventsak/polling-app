@@ -35,6 +35,16 @@ export const DisplayPage: React.FC = () => {
       const room = await roomService.getRoomByCode(pollId);
       setCurrentRoom(room);
       console.log('Loaded room data:', room);
+      
+      // Debug log the active activity and its options
+      if (room?.activities) {
+        const activeActivity = room.activities.find(a => a.is_active);
+        console.log('Active activity:', activeActivity);
+        if (activeActivity?.options) {
+          console.log('Activity options:', activeActivity.options);
+          console.log('Total responses:', activeActivity.total_responses);
+        }
+      }
     } catch (error) {
       console.error('Error loading room:', error);
     }
@@ -384,6 +394,12 @@ export const DisplayPage: React.FC = () => {
 
               {/* 3D Visualization - Takes remaining space */}
               <div className="flex-1 min-h-0">
+                {console.log('Rendering 3D viz with:', {
+                  options: activeActivity.options,
+                  totalResponses: activeActivity.total_responses,
+                  optionsLength: activeActivity.options?.length,
+                  hasOptions: !!activeActivity.options
+                })}
                 <Poll3DVisualization
                   options={activeActivity.options || []}
                   totalResponses={activeActivity.total_responses}

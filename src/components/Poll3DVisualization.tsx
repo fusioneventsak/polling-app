@@ -72,19 +72,22 @@ const AnimatedBar: React.FC<BarProps> = ({
   imageUrl
 }) => {
   const meshRef = useRef<THREE.Mesh>(null);
-  const textRef = useRef<THREE.Group>(null);
   const glowRef = useRef<THREE.Mesh>(null);
+  const [animatedHeight, setAnimatedHeight] = useState(0.3);
   
   // Animate the bar height
   useFrame((state) => {
+    const targetHeight = Math.max(height, 0.3); // Minimum height for visibility
+    
     if (meshRef.current) {
-      const targetHeight = Math.max(height, 0.3); // Minimum height for visibility
       const currentHeight = meshRef.current.scale.y;
       const animationSpeed = 0.06;
       
       if (Math.abs(currentHeight - targetHeight) > 0.01) {
-        meshRef.current.scale.y = THREE.MathUtils.lerp(currentHeight, targetHeight, animationSpeed);
-        meshRef.current.position.y = meshRef.current.scale.y / 2;
+        const newHeight = THREE.MathUtils.lerp(currentHeight, targetHeight, animationSpeed);
+        meshRef.current.scale.y = newHeight;
+        meshRef.current.position.y = newHeight / 2;
+        setAnimatedHeight(newHeight);
       }
     }
     
@@ -95,8 +98,9 @@ const AnimatedBar: React.FC<BarProps> = ({
       const animationSpeed = 0.06;
       
       if (Math.abs(currentHeight - targetHeight) > 0.01) {
-        glowRef.current.scale.y = THREE.MathUtils.lerp(currentHeight, targetHeight, animationSpeed);
-        glowRef.current.position.y = glowRef.current.scale.y / 2;
+        const newHeight = THREE.MathUtils.lerp(currentHeight, targetHeight, animationSpeed);
+        glowRef.current.scale.y = newHeight;
+        glowRef.current.position.y = newHeight / 2;
       }
       
       // Pulsing glow effect
@@ -114,8 +118,6 @@ const AnimatedBar: React.FC<BarProps> = ({
     if (isCorrect) return '#34d399';
     return color;
   }, [color, isCorrect]);
-
-  const actualHeight = Math.max(height, 0.3);
 
   return (
     <group>
@@ -157,13 +159,13 @@ const AnimatedBar: React.FC<BarProps> = ({
       {imageUrl && (
         <ImagePlane 
           imageUrl={imageUrl} 
-          position={[position[0], actualHeight + 1.2, position[2]]} 
+          position={[position[0], animatedHeight + 1.2, position[2]]} 
         />
       )}
       
       {/* Percentage text */}
       <Text
-        position={[position[0], actualHeight + (imageUrl ? 2.2 : 1.5), position[2]]}
+        position={[position[0], animatedHeight + (imageUrl ? 2.2 : 1.5), position[2]]}
         fontSize={0.35}
         color="#ffffff"
         anchorX="center"
@@ -175,7 +177,7 @@ const AnimatedBar: React.FC<BarProps> = ({
       
       {/* Response count */}
       <Text
-        position={[position[0], actualHeight + (imageUrl ? 1.9 : 1.2), position[2]]}
+        position={[position[0], animatedHeight + (imageUrl ? 1.9 : 1.2), position[2]]}
         fontSize={0.15}
         color="#94a3b8"
         anchorX="center"
@@ -187,7 +189,7 @@ const AnimatedBar: React.FC<BarProps> = ({
       
       {/* Option label */}
       <Text
-        position={[position[0], actualHeight + (imageUrl ? 1.6 : 0.9), position[2]]}
+        position={[position[0], animatedHeight + (imageUrl ? 1.6 : 0.9), position[2]]}
         fontSize={0.18}
         color="#e2e8f0"
         anchorX="center"
@@ -201,7 +203,7 @@ const AnimatedBar: React.FC<BarProps> = ({
       {/* Correct indicator */}
       {isCorrect && (
         <Text
-          position={[position[0], actualHeight + (imageUrl ? 1.3 : 0.6), position[2]]}
+          position={[position[0], animatedHeight + (imageUrl ? 1.3 : 0.6), position[2]]}
           fontSize={0.12}
           color="#10b981"
           anchorX="center"
@@ -222,7 +224,7 @@ const AnimatedBar: React.FC<BarProps> = ({
         maxWidth={1.5}
         font="/fonts/inter-medium.woff"
       >
-        Option {position[0] === 0 ? Math.floor(position[0] / 2.5) + Math.ceil(position.length / 2) : Math.floor((position[0] + 5) / 2.5) + 1}
+        Option {Math.floor(position[0] / 2.5) + Math.ceil(position.length / 2) + 1}
       </Text>
     </group>
   );
@@ -365,6 +367,8 @@ export const Poll3DVisualization: React.FC<Poll3DVisualizationProps> = ({
   themeColors,
   className = '' 
 }) => {
+  console.log('Poll3DVisualization props:', { options, totalResponses, themeColors });
+
   // Always render the 3D scene, even with no responses
   if (!options || options.length === 0) {
     return (
@@ -432,6 +436,13 @@ export const Poll3DVisualization: React.FC<Poll3DVisualizationProps> = ({
           <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
           <span className="text-green-400 text-xs font-medium">LIVE</span>
         </div>
+      </div>
+
+      {/* Debug info */}
+      <div className="absolute bottom-4 left-4 bg-black/40 backdrop-blur-sm rounded-lg p-2 border border-white/10 text-xs text-white">
+        <div>Options: {options.length}</div>
+        <div>Total: {totalResponses}</div>
+        <div>Data: {options.map(o => `${o.text}: ${o.responses}`).join(', ')}</div>
       </div>
     </motion.div>
   );
