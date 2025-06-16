@@ -433,36 +433,79 @@ export const roomService = {
     try {
       console.log('Deleting activity:', activityId);
       
-      // First, get the activity to check if it's currently active
-      const { data: activity } = await supabase
+      // First, verify the activity exists
+      const { data: activityCheck, error: checkError } = await supabase
         .from('activities')
-        .select('room_id, is_active')
+        .select('id, room_id, is_active, title')
         .eq('id', activityId)
         .single();
       
+      if (checkError) {
+        if (checkError.code === 'PGRST116') {
+          console.log('Activity not found, may already be deleted:', activityId);
+          return; // Activity doesn't exist, consider it successfully deleted
+        }
+        console.error('Error checking activity existence:', checkError);
+        throw checkError;
+      }
+      
+      console.log('Found activity to delete:', activityCheck.title);
+      
       // If the activity is currently active, clear it from the room
-      if (activity?.is_active) {
-        await supabase
+      if (activityCheck.is_active) {
+        console.log('Activity is active, clearing from room first');
+        const { error: roomUpdateError } = await supabase
           .from('rooms')
           .update({
             current_activity_id: null,
             current_activity_type: null
           })
-          .eq('id', activity.room_id);
+          .eq('id', activityCheck.room_id);
+          
+        if (roomUpdateError) {
+          console.error('Error clearing active activity from room:', roomUpdateError);
+          // Don't throw here, continue with deletion
+        }
       }
       
       // Delete the activity - foreign key constraints will handle cascading deletes
-      const { error } = await supabase
+      console.log('Attempting to delete activity from database...');
+      const { error, data } = await supabase
         .from('activities')
         .delete()
-        .eq('id', activityId);
+        .eq('id', activityId)
+        .select(); // Request data to see what was deleted
 
       if (error) {
         console.error('Error deleting activity:', error);
-        throw new Error(`Failed to delete activity: ${error.message}`);
+        console.error('Error details:', {
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint
+        });
+        throw new Error(`Failed to delete activity: ${error.message} (Code: ${error.code})`);
       }
       
-      console.log('Activity deleted successfully:', activityId);
+      console.log('Delete operation result:', data);
+      
+      // Verify the deletion worked
+      const { data: verifyData, error: verifyError } = await supabase
+        .from('activities')
+        .select('id')
+        .eq('id', activityId)
+        .maybeSingle();
+        
+      if (verifyError && verifyError.code !== 'PGRST116') {
+        console.error('Error verifying deletion:', verifyError);
+      }
+      
+      if (verifyData) {
+        console.error('Activity still exists after deletion attempt!');
+        throw new Error('Activity deletion failed - activity still exists in database');
+      }
+      
+      console.log('Activity deleted and verified successfully:', activityId);
     } catch (error) {
       console.error('Error in deleteActivity:', error);
       throw error;
