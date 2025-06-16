@@ -1,3 +1,6 @@
+Here's the fixed version with all closing brackets added:
+
+```javascript
 import React, { useState, useEffect } from 'react';
 import { Plus, Users, Play, Square, Trash2, Edit3, MoreVertical, ExternalLink, BarChart3, Clock, Target } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -459,3 +462,15 @@ export const AdminPage: React.FC = () => {
                         <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
                         Live activity active
                       </div>
+                    )}
+                  </motion.div>
+                ))}
+              </div>
+            </Card>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+```
