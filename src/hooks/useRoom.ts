@@ -247,50 +247,129 @@ export const roomService = {
     }
     
     try {
-      // If options are being updated, handle them separately
+      // If options are being updated, handle them with a proper transaction approach
       if (updates.options) {
-        // Use a more careful approach to avoid constraint violations
-        // First, get existing options to track what needs to be updated
-        const { data: existingOptions } = await supabase
+        // First, create a backup of current options in case we need to rollback
+        const { data: currentOptions } = await supabase
           .from('activity_options')
-          .select('id, option_order')
+          .select('*')
           .eq('activity_id', id)
           .order('option_order');
 
-        // Delete all existing options in one operation
-        const { error: deleteError } = await supabase
-          .from('activity_options')
-          .delete()
-          .eq('activity_id', id);
-        
-        if (deleteError) {
-          console.error('Error deleting existing options:', deleteError);
-          throw deleteError;
-        }
-        
-        // Wait a moment to ensure the delete is committed
-        await new Promise(resolve => setTimeout(resolve, 100));
-        
-        // Create new options one by one to avoid constraint conflicts
-        if (updates.options.length > 0) {
-          for (let index = 0; index < updates.options.length; index++) {
-            const option = updates.options[index];
-            const { error } = await supabase
-              .from('activity_options')
-              .insert({
-                activity_id: id,
-                text: option.text,
-                media_url: option.media_url,
-                is_correct: option.is_correct || false,
-                responses: 0,
-                option_order: index
-              });
+        try {
+          // Use a more aggressive approach: delete and wait longer for commit
+          const { error: deleteError } = await supabase
+            .from('activity_options')
+            .delete()
+            .eq('activity_id', id);
+          
+          if (deleteError) {
+            console.error('Error deleting existing options:', deleteError);
+            throw deleteError;
+          }
+          
+          // Wait longer for the delete to be fully committed
+          await new Promise(resolve => setTimeout(resolve, 500));
+          
+          // Verify the delete was successful before proceeding
+          const { data: remainingOptions, error: checkError } = await supabase
+            .from('activity_options')
+            .select('id')
+            .eq('activity_id', id);
             
-            if (error) {
-              console.error('Error creating option:', error);
-              throw error;
+          if (checkError) {
+            throw checkError;
+          }
+          
+          if (remainingOptions && remainingOptions.length > 0) {
+            console.warn('Options still exist after delete, waiting longer...');
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          }
+          
+          // Create new options with explicit ordering and better error handling
+          if (updates.options.length > 0) {
+            for (let index = 0; index < updates.options.length; index++) {
+              const option = updates.options[index];
+              
+              // Add retry logic for each insert
+              let retryCount = 0;
+              const maxRetries = 3;
+              
+              while (retryCount < maxRetries) {
+                try {
+                  const { error } = await supabase
+                    .from('activity_options')
+                    .insert({
+                      activity_id: id,
+                      text: option.text,
+                      media_url: option.media_url,
+                      is_correct: option.is_correct || false,
+                      responses: 0,
+                      option_order: index
+                    });
+                  
+                  if (error) {
+                    if (error.code === '23505' && retryCount < maxRetries - 1) {
+                      // Constraint violation, wait and retry
+                      console.warn(`Constraint violation on option ${index}, retrying... (${retryCount + 1}/${maxRetries})`);
+                      await new Promise(resolve => setTimeout(resolve, 200 * (retryCount + 1)));
+                      retryCount++;
+                      continue;
+                    }
+                    throw error;
+                  }
+                  
+                  // Success, break retry loop
+                  break;
+                  
+                } catch (insertError) {
+                  if (retryCount === maxRetries - 1) {
+                    console.error('Max retries reached for option insert:', insertError);
+                    throw insertError;
+                  }
+                  retryCount++;
+                  await new Promise(resolve => setTimeout(resolve, 200 * retryCount));
+                }
+              }
             }
           }
+          
+        } catch (optionError) {
+          console.error('Error handling options, attempting to restore backup:', optionError);
+          
+          // Attempt to restore the backup if we have it
+          if (currentOptions && currentOptions.length > 0) {
+            try {
+              // Clear any partial inserts first
+              await supabase
+                .from('activity_options')
+                .delete()
+                .eq('activity_id', id);
+                
+              // Restore original options
+              const restorePromises = currentOptions.map(option => 
+                supabase
+                  .from('activity_options')
+                  .insert({
+                    id: option.id,
+                    activity_id: option.activity_id,
+                    text: option.text,
+                    media_url: option.media_url,
+                    is_correct: option.is_correct,
+                    responses: option.responses,
+                    option_order: option.option_order,
+                    created_at: option.created_at
+                  })
+              );
+              
+              await Promise.all(restorePromises);
+              console.log('Successfully restored backup options');
+            } catch (restoreError) {
+              console.error('Failed to restore backup options:', restoreError);
+            }
+          }
+          
+          throw optionError;
         }
         
         // Remove options from updates object since we handled them separately
