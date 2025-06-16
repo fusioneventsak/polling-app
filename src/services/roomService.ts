@@ -1,7 +1,7 @@
 import { supabase } from '../lib/supabase';
 import type { Room, Activity, CreateRoomData, CreateActivityData, ParticipantResponse } from '../types';
 
-export const roomService = {
+const roomService = {
   async getAllRooms(): Promise<Room[]> {
     if (!supabase) {
       throw new Error('Supabase not available - cannot fetch rooms');
@@ -744,4 +744,4 @@ export const roomService = {
   }
 };
 
-export { roomService }
+export { roomService };
