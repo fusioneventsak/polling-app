@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Check, Clock, Users, ArrowLeft, Loader2 } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import { ArrowLeft, Check, Users, Loader2, Lock } from 'lucide-react';
 import { roomService } from '../services/roomService';
+import { supabase } from '../lib/supabase';
 import { useTheme } from '../components/ThemeProvider';
 import type { Activity } from '../types';
 
@@ -12,26 +12,20 @@ export const VotePage: React.FC = () => {
   const navigate = useNavigate();
   const [activity, setActivity] = useState<Activity | null>(null);
   const [roomCode, setRoomCode] = useState<string | null>(null);
-  const [selectedOption, setSelectedOption] = useState<string | null>(null);
   const [hasVoted, setHasVoted] = useState(false);
   const [voting, setVoting] = useState(false);
+  const [selectedOption, setSelectedOption] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [participantId] = useState(() => 
-    localStorage.getItem('participantId') || 
-    (() => {
-      const id = `participant_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      localStorage.setItem('participantId', id);
-      return id;
-    })()
+    `participant_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
   );
   const { applyTheme, resetTheme } = useTheme();
 
-  // Load activity data with enhanced error handling
   const loadActivity = useCallback(async (forceRefresh = false) => {
     if (!pollId || !supabase) return;
-
+    
     try {
-      console.log('VotePage: Loading activity data for ID:', pollId, forceRefresh ? '(forced)' : '');
+      console.log('VotePage: Loading activity', pollId, forceRefresh ? '(forced)' : '');
       const activityData = await roomService.getActivityById(pollId);
       
       if (!activityData) {
@@ -66,7 +60,8 @@ export const VotePage: React.FC = () => {
         type: formattedActivity.type,
         optionsCount: formattedActivity.options.length,
         totalResponses: formattedActivity.total_responses,
-        isActive: formattedActivity.is_active
+        isActive: formattedActivity.is_active,
+        votingLocked: formattedActivity.settings?.voting_locked || false
       });
     } catch (error) {
       console.error('VotePage: Error loading activity:', error);
@@ -172,7 +167,9 @@ export const VotePage: React.FC = () => {
           eventType: payload.eventType,
           activityId: payload.new?.id || payload.old?.id,
           oldIsActive: payload.old?.is_active,
-          newIsActive: payload.new?.is_active
+          newIsActive: payload.new?.is_active,
+          oldVotingLocked: payload.old?.settings?.voting_locked,
+          newVotingLocked: payload.new?.settings?.voting_locked
         });
         
         // If activity was stopped, redirect back to room waiting area
@@ -238,6 +235,12 @@ export const VotePage: React.FC = () => {
   const handleVote = async (optionId: string) => {
     if (!activity || hasVoted || voting || !supabase) return;
 
+    // Check if voting is locked
+    if (activity.settings?.voting_locked) {
+      alert('Voting has been locked by the presenter. No more votes can be submitted.');
+      return;
+    }
+
     setVoting(true);
     setSelectedOption(optionId);
 
@@ -264,14 +267,6 @@ export const VotePage: React.FC = () => {
     }
   };
 
-  const handleGoBack = () => {
-    if (roomCode) {
-      navigate(`/game?joined=${roomCode}`);
-    } else {
-      navigate('/game');
-    }
-  };
-
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 flex items-center justify-center">
@@ -286,20 +281,14 @@ export const VotePage: React.FC = () => {
   if (!activity) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-red-900 to-slate-900 flex items-center justify-center">
-        <div className="text-center max-w-md mx-auto p-6">
-          <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-            <Clock className="w-8 h-8 text-red-400" />
-          </div>
-          <h2 className="text-2xl font-bold text-white mb-2">Activity Not Available</h2>
-          <p className="text-red-400 mb-6">
-            This activity is no longer active or doesn't exist.
-          </p>
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-white mb-2">Activity Not Found</h1>
+          <p className="text-red-300 mb-4">This activity may have ended or doesn't exist.</p>
           <button
-            onClick={handleGoBack}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg flex items-center gap-2 mx-auto transition-colors"
+            onClick={() => navigate('/game')}
+            className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
           >
-            <ArrowLeft className="w-4 h-4" />
-            Back to Room
+            Join Another Room
           </button>
         </div>
       </div>
@@ -313,13 +302,21 @@ export const VotePage: React.FC = () => {
     text: activity.room?.settings?.theme?.text_color || '#FFFFFF'
   };
 
+  const isVotingLocked = activity.settings?.voting_locked || false;
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900">
       <div className="max-w-4xl mx-auto p-6">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <button
-            onClick={handleGoBack}
+            onClick={() => {
+              if (roomCode) {
+                navigate(`/game?joined=${roomCode}`);
+              } else {
+                navigate('/game');
+              }
+            }}
             className="flex items-center gap-2 text-slate-300 hover:text-white transition-colors"
           >
             <ArrowLeft className="w-5 h-5" />
@@ -382,6 +379,23 @@ export const VotePage: React.FC = () => {
           )}
         </div>
 
+        {/* Voting Locked Notice */}
+        {isVotingLocked && !hasVoted && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-8 p-6 bg-red-900/20 border border-red-600/30 rounded-lg text-center"
+          >
+            <div className="flex items-center justify-center gap-3 mb-4">
+              <Lock className="w-6 h-6 text-red-400" />
+              <h2 className="text-xl font-bold text-red-400">Voting Locked</h2>
+            </div>
+            <p className="text-red-300">
+              The presenter has locked voting for this activity. No more responses can be submitted.
+            </p>
+          </motion.div>
+        )}
+
         {/* Voting Options */}
         <AnimatePresence mode="wait">
           {hasVoted ? (
@@ -406,79 +420,42 @@ export const VotePage: React.FC = () => {
                 Your response has been recorded. Results will be shown when the presenter ends this activity.
               </p>
               
-              <div className="grid gap-3 max-w-2xl mx-auto">
-                {activity.options?.map((option) => {
-                  const percentage = activity.total_responses > 0 
-                    ? (option.responses / activity.total_responses) * 100 
-                    : 0;
-                  const isSelected = selectedOption === option.id;
-                  
-                  return (
-                    <motion.div
-                      key={option.id}
-                      initial={{ opacity: 0, x: -20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      className={`p-4 rounded-lg border-2 relative overflow-hidden ${
-                        isSelected 
-                          ? 'border-green-500 bg-green-500/10' 
-                          : 'border-slate-600 bg-slate-800/50'
-                      }`}
-                    >
-                      <div 
-                        className="absolute inset-0 transition-all duration-500"
-                        style={{
-                          background: `linear-gradient(90deg, ${themeColors.accent}15 ${percentage}%, transparent ${percentage}%)`,
-                        }}
-                      />
-                      
-                      <div className="relative flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          {isSelected && (
-                            <Check className="w-5 h-5 text-green-400" />
-                          )}
-                          <span className="text-white font-medium">
-                            {option.text}
-                          </span>
-                        </div>
-                        
-                        <div className="flex items-center gap-3 text-sm">
-                          <span className="text-slate-300">
-                            {option.responses} votes
-                          </span>
-                          <span 
-                            className="font-bold min-w-[3rem] text-right"
-                            style={{ color: themeColors.accent }}
-                          >
-                            {percentage.toFixed(1)}%
-                          </span>
-                        </div>
-                      </div>
-                    </motion.div>
-                  );
-                })}
-              </div>
+              <button
+                onClick={() => {
+                  if (roomCode) {
+                    navigate(`/game?joined=${roomCode}`);
+                  } else {
+                    navigate('/game');
+                  }
+                }}
+                className="px-6 py-3 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors"
+              >
+                Return to Room
+              </button>
             </motion.div>
           ) : (
             <motion.div
               key="voting"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="max-w-2xl mx-auto"
+              className="space-y-4"
             >
-              <div className="grid gap-4">
+              <div className="grid gap-4 max-w-2xl mx-auto">
                 {activity.options?.map((option, index) => (
                   <motion.button
                     key={option.id}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: index * 0.1 }}
                     onClick={() => handleVote(option.id)}
-                    disabled={voting}
-                    className={`p-6 rounded-lg border-2 text-left transition-all duration-200 ${
-                      voting && selectedOption === option.id
+                    disabled={voting || isVotingLocked}
+                    className={`p-6 rounded-lg border-2 transition-all duration-200 ${
+                      selectedOption === option.id
                         ? 'border-blue-500 bg-blue-500/10 scale-[0.98]'
-                        : 'border-slate-600 bg-slate-800/50 hover:border-slate-500 hover:bg-slate-800/70 hover:scale-[1.02]'
-                    } ${voting ? 'cursor-not-allowed' : 'cursor-pointer'}`}
+                        : isVotingLocked
+                        ? 'border-slate-600 bg-slate-800/50 opacity-50 cursor-not-allowed'
+                        : 'border-slate-600 bg-slate-800/50 hover:border-slate-500 hover:bg-slate-800/70 hover:scale-[1.02] cursor-pointer'
+                    } ${voting ? 'cursor-not-allowed' : ''}`}
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex-1">
