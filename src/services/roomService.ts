@@ -12,7 +12,7 @@ export const roomService = {
         .from('rooms')
         .select(`
           *,
-          activities (
+          activities!activities_room_id_fkey (
             *,
             activity_options (*)
           )
@@ -47,7 +47,7 @@ export const roomService = {
         .from('rooms')
         .select(`
           *,
-          activities (
+          activities!activities_room_id_fkey (
             *,
             activity_options (*)
           )
