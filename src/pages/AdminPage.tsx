@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Users, Play, Square, Trash2, Edit3, MoreVertical, ExternalLink, BarChart3, Clock, Target } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Card } from '../components/ui/Card';
-import { Button } from '../components/ui/Button';
+import { Card } from '../components/Card';
+import { Button } from '../components/Button';
 import { RoomEditor } from '../components/RoomEditor';
 import { ActivityEditor } from '../components/ActivityEditor';
 import { roomService } from '../services/roomService';
