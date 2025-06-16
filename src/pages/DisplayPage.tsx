@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../lib/supabase';
@@ -7,7 +7,7 @@ import { useTheme } from '../components/ThemeProvider';
 import { Users, BarChart, Clock, MessageSquare, HelpCircle, Cloud, Trophy, Target, Calendar, Activity as ActivityIcon, TrendingUp, CheckCircle } from 'lucide-react';
 import type { ActivityType, Room, Activity } from '../types';
 
-// Fixed Poll3D component without font errors
+// Fixed Poll3D component with real-time animations
 const FixedPoll3DVisualization: React.FC<{
   options: any[];
   totalResponses: number;
@@ -15,6 +15,89 @@ const FixedPoll3DVisualization: React.FC<{
   activityTitle?: string;
   activityMedia?: string;
 }> = ({ options, totalResponses, themeColors, activityTitle, activityMedia }) => {
+  const [animatedCounts, setAnimatedCounts] = useState<number[]>([]);
+  const [animatedPercentages, setAnimatedPercentages] = useState<number[]>([]);
+  const prevTotalResponses = useRef(totalResponses);
+
+  // Initialize animated values
+  useEffect(() => {
+    if (options.length > 0) {
+      setAnimatedCounts(options.map(opt => opt.responses || 0));
+      setAnimatedPercentages(options.map((opt, index) => 
+        totalResponses > 0 ? Math.round((opt.responses / totalResponses) * 100) : 0
+      ));
+    }
+  }, [options.length]);
+
+  // Animate values when they change
+  useEffect(() => {
+    if (totalResponses !== prevTotalResponses.current && options.length > 0) {
+      console.log('DisplayPage: Animating vote count changes:', { 
+        oldTotal: prevTotalResponses.current, 
+        newTotal: totalResponses 
+      });
+      
+      const newCounts = options.map(opt => opt.responses || 0);
+      const newPercentages = options.map(opt => 
+        totalResponses > 0 ? Math.round((opt.responses / totalResponses) * 100) : 0
+      );
+
+      // Animate counts
+      animatedCounts.forEach((currentCount, index) => {
+        const targetCount = newCounts[index];
+        if (currentCount !== targetCount) {
+          const duration = 1000; // 1 second animation
+          const steps = 30;
+          const stepValue = (targetCount - currentCount) / steps;
+          
+          let step = 0;
+          const interval = setInterval(() => {
+            step++;
+            const newValue = Math.round(currentCount + (stepValue * step));
+            
+            setAnimatedCounts(prev => {
+              const updated = [...prev];
+              updated[index] = step === steps ? targetCount : newValue;
+              return updated;
+            });
+            
+            if (step === steps) {
+              clearInterval(interval);
+            }
+          }, duration / steps);
+        }
+      });
+
+      // Animate percentages
+      animatedPercentages.forEach((currentPercentage, index) => {
+        const targetPercentage = newPercentages[index];
+        if (currentPercentage !== targetPercentage) {
+          const duration = 1000; // 1 second animation
+          const steps = 30;
+          const stepValue = (targetPercentage - currentPercentage) / steps;
+          
+          let step = 0;
+          const interval = setInterval(() => {
+            step++;
+            const newValue = Math.round(currentPercentage + (stepValue * step));
+            
+            setAnimatedPercentages(prev => {
+              const updated = [...prev];
+              updated[index] = step === steps ? targetPercentage : newValue;
+              return updated;
+            });
+            
+            if (step === steps) {
+              clearInterval(interval);
+            }
+          }, duration / steps);
+        }
+      });
+
+      prevTotalResponses.current = totalResponses;
+    }
+  }, [totalResponses, options, animatedCounts, animatedPercentages]);
+
   if (!options || options.length === 0) {
     return (
       <motion.div
@@ -43,7 +126,23 @@ const FixedPoll3DVisualization: React.FC<{
       className="w-full bg-gradient-to-br from-slate-900/40 to-blue-900/20 rounded-xl border border-slate-700 overflow-hidden shadow-2xl relative"
       style={{ height: '100%', minHeight: '400px' }}
     >
-      {/* Simple 2D visualization instead of 3D to avoid font errors */}
+      {/* Real-time vote counter */}
+      <div className="absolute top-4 left-4 bg-black/40 backdrop-blur-sm rounded-lg p-3 border border-white/10">
+        <div className="text-white text-sm">
+          <motion.div 
+            key={totalResponses}
+            initial={{ scale: 1.2, color: '#22c55e' }}
+            animate={{ scale: 1, color: '#ffffff' }}
+            transition={{ duration: 0.5 }}
+            className="font-semibold"
+          >
+            {totalResponses} Total Responses
+          </motion.div>
+          <div className="text-slate-300 text-xs">{options.length} Options</div>
+        </div>
+      </div>
+
+      {/* Simple 2D visualization with animations */}
       <div className="h-full flex flex-col p-8">
         <div className="text-center mb-8">
           {/* Activity Media */}
@@ -72,9 +171,10 @@ const FixedPoll3DVisualization: React.FC<{
         <div className="flex-1 flex items-center justify-center">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 w-full max-w-4xl">
             {options.map((option, index) => {
-              const percentage = totalResponses > 0 ? Math.round((option.responses / totalResponses) * 100) : 0;
+              const animatedCount = animatedCounts[index] || 0;
+              const animatedPercentage = animatedPercentages[index] || 0;
               const maxResponses = Math.max(...options.map(opt => opt.responses || 0), 1);
-              const heightPercentage = totalResponses > 0 ? (option.responses / maxResponses) * 100 : 20;
+              const heightPercentage = totalResponses > 0 ? (animatedCount / maxResponses) * 100 : 20;
               
               return (
                 <motion.div
@@ -82,8 +182,17 @@ const FixedPoll3DVisualization: React.FC<{
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: index * 0.1 }}
-                  className="bg-slate-800/50 rounded-lg p-4 border border-slate-600"
+                  className="bg-slate-800/50 rounded-lg p-4 border border-slate-600 relative overflow-hidden"
                 >
+                  {/* Pulse animation for new votes */}
+                  <motion.div
+                    key={`pulse-${option.responses}`}
+                    initial={{ opacity: 0, scale: 1 }}
+                    animate={{ opacity: [0, 0.3, 0], scale: [1, 1.1, 1] }}
+                    transition={{ duration: 0.6 }}
+                    className="absolute inset-0 bg-blue-500/20 rounded-lg"
+                  />
+
                   {/* Option Media */}
                   {option.media_url && (
                     <div className="mb-4">
@@ -95,28 +204,71 @@ const FixedPoll3DVisualization: React.FC<{
                     </div>
                   )}
                   
-                  <div className="text-center mb-4">
+                  <div className="text-center mb-4 relative z-10">
                     <h4 className="text-white font-medium text-sm mb-2">{option.text}</h4>
-                    <div className="text-2xl font-bold text-blue-400">{percentage}%</div>
-                    <div className="text-xs text-slate-400">
-                      {option.responses || 0} {(option.responses || 0) === 1 ? 'vote' : 'votes'}
-                    </div>
+                    
+                    {/* Animated percentage with color change */}
+                    <motion.div 
+                      key={`percentage-${animatedPercentage}`}
+                      initial={{ scale: 1.3, color: '#22c55e' }}
+                      animate={{ scale: 1, color: '#60a5fa' }}
+                      transition={{ duration: 0.5 }}
+                      className="text-2xl font-bold"
+                    >
+                      {animatedPercentage}%
+                    </motion.div>
+                    
+                    {/* Animated vote count */}
+                    <motion.div 
+                      key={`count-${animatedCount}`}
+                      initial={{ scale: 1.2, color: '#22c55e' }}
+                      animate={{ scale: 1, color: '#94a3b8' }}
+                      transition={{ duration: 0.5 }}
+                      className="text-xs"
+                    >
+                      {animatedCount} {animatedCount === 1 ? 'vote' : 'votes'}
+                    </motion.div>
                   </div>
                   
-                  {/* Progress bar */}
-                  <div className="w-full bg-slate-700 rounded-full h-3">
+                  {/* Animated progress bar */}
+                  <div className="w-full bg-slate-700 rounded-full h-3 relative z-10">
                     <motion.div
                       initial={{ width: 0 }}
                       animate={{ width: `${heightPercentage}%` }}
-                      transition={{ duration: 1, delay: index * 0.1 }}
-                      className="h-3 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full"
-                    />
+                      transition={{ 
+                        duration: 1, 
+                        delay: index * 0.1,
+                        type: "spring",
+                        stiffness: 100,
+                        damping: 15
+                      }}
+                      className="h-3 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full relative"
+                    >
+                      {/* Shine effect on progress bar */}
+                      <motion.div
+                        animate={{ 
+                          x: ['-100%', '100%'],
+                          opacity: [0, 1, 0]
+                        }}
+                        transition={{ 
+                          duration: 2, 
+                          repeat: Infinity, 
+                          delay: index * 0.5 
+                        }}
+                        className="absolute inset-0 bg-white/30 w-1/4 rounded-full"
+                      />
+                    </motion.div>
                   </div>
                   
                   {option.is_correct && (
-                    <div className="mt-2 text-center">
+                    <motion.div 
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      transition={{ delay: 0.5 + index * 0.1 }}
+                      className="mt-2 text-center"
+                    >
                       <span className="text-green-400 text-xs font-medium">✓ CORRECT</span>
-                    </div>
+                    </motion.div>
                   )}
                 </motion.div>
               );
@@ -128,7 +280,17 @@ const FixedPoll3DVisualization: React.FC<{
       {/* Status indicator */}
       <div className="absolute top-4 right-4 bg-black/40 backdrop-blur-sm rounded-lg p-2 border border-white/10">
         <div className="flex items-center gap-2">
-          <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+          <motion.div
+            animate={{ 
+              scale: [1, 1.2, 1],
+              opacity: [1, 0.7, 1]
+            }}
+            transition={{ 
+              duration: 2, 
+              repeat: Infinity 
+            }}
+            className="w-2 h-2 bg-green-400 rounded-full"
+          />
           <span className="text-green-400 text-xs font-medium">LIVE</span>
         </div>
       </div>
