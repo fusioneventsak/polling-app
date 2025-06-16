@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { DragDropContext, Droppable, Draggable, DropResult } from 'react-beautiful-dnd';
 import { Plus, Settings, Play, Square, Trash2, Edit, Users, BarChart3, ArrowLeft } from 'lucide-react';
 import { Layout } from '../components/Layout';
 import { Button } from '../components/Button';
@@ -156,6 +157,21 @@ export const AdminPage: React.FC = () => {
     ));
     setShowActivityEditor(false);
     setEditingActivity(null);
+  };
+
+  const handleDragEnd = (result: DropResult) => {
+    if (!result.destination || !selectedRoom) return;
+
+    const items = Array.from(selectedRoom.activities);
+    const [reorderedItem] = items.splice(result.source.index, 1);
+    items.splice(result.destination.index, 0, reorderedItem);
+
+    const activityIds = items.map(activity => activity.id);
+    handleReorderActivities(activityIds);
+  };
+
+  const handleDisplayActivity = (activityId: string) => {
+    navigate(`/display/${selectedRoom?.code}/${activityId}`);
   };
 
   const handleReorderActivities = async (activityIds: string[]) => {
@@ -346,23 +362,55 @@ export const AdminPage: React.FC = () => {
                   </h3>
                   
                   {selectedRoom.activities && selectedRoom.activities.length > 0 ? (
-                    <DraggableActivity
-                      activities={selectedRoom.activities}
-                      onReorder={handleReorderActivities}
-                      onEdit={(activity) => {
-                        setEditingActivity(activity);
-                        setShowActivityEditor(true);
-                      }}
-                      onDelete={(activity) => {
-                        setDeleteConfirmation({
-                          type: 'activity',
-                          id: activity.id,
-                          name: activity.title
-                        });
-                      }}
-                      onStart={handleStartActivity}
-                      onEnd={handleEndActivity}
-                    />
+                    <DragDropContext onDragEnd={handleDragEnd}>
+                      <Droppable droppableId="activities">
+                        {(provided) => (
+                          <div
+                            {...provided.droppableProps}
+                            ref={provided.innerRef}
+                            className="space-y-3"
+                          >
+                            {selectedRoom.activities.map((activity, index) => (
+                              <Draggable
+                                key={activity.id}
+                                draggableId={activity.id}
+                                index={index}
+                              >
+                                {(provided, snapshot) => (
+                                  <div
+                                    ref={provided.innerRef}
+                                    {...provided.draggableProps}
+                                  >
+                                    <DraggableActivity
+                                      activity={activity}
+                                      index={index}
+                                      onStart={handleStartActivity}
+                                      onStop={handleEndActivity}
+                                      onEdit={(activity) => {
+                                        setEditingActivity(activity);
+                                        setShowActivityEditor(true);
+                                      }}
+                                      onDelete={(activityId) => {
+                                        setDeleteConfirmation({
+                                          type: 'activity',
+                                          id: activityId,
+                                          name: activity.title
+                                        });
+                                      }}
+                                      onDisplay={() => handleDisplayActivity(activity.id)}
+                                      roomId={selectedRoom.id}
+                                      isDragging={snapshot.isDragging}
+                                      dragHandleProps={provided.dragHandleProps}
+                                    />
+                                  </div>
+                                )}
+                              </Draggable>
+                            ))}
+                            {provided.placeholder}
+                          </div>
+                        )}
+                      </Droppable>
+                    </DragDropContext>
                   ) : (
                     <div className="text-center py-12 bg-gray-50 dark:bg-gray-800 rounded-lg">
                       <BarChart3 className="w-12 h-12 text-gray-400 mx-auto mb-4" />
