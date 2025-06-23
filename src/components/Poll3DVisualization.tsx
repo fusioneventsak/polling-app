@@ -349,7 +349,7 @@ const Scene: React.FC<{
         anchorY="middle"
         maxWidth={20}
       >
-        {activityTitle || (totalResponses > 0 ? 'Live Poll Results' : 'Poll Options')}
+        {activityTitle || 'Poll Question'}
       </Text>
       
       {/* Title shadow for 3D effect */}
@@ -361,19 +361,9 @@ const Scene: React.FC<{
         anchorY="middle"
         maxWidth={20}
       >
-        {activityTitle || (totalResponses > 0 ? 'Live Poll Results' : 'Poll Options')}
+        {activityTitle || 'Poll Question'}
       </Text>
       
-      {/* Subtitle showing response count */}
-      <Text
-        position={[0, 7.8, -5]}
-        fontSize={0.4}
-        color="#94a3b8"
-        anchorX="center"
-        anchorY="middle"
-      >
-        {totalResponses > 0 ? `${totalResponses} total responses` : 'Waiting for responses...'}
-      </Text>
     </>
   );
 };
