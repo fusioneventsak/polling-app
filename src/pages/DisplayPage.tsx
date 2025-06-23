@@ -10,16 +10,14 @@ import { useTheme } from '../components/ThemeProvider';
 import { Users, BarChart, Clock, MessageSquare, HelpCircle, Cloud, Trophy, Target, Calendar, Activity as ActivityIcon, TrendingUp, CheckCircle, Lock, QrCode } from 'lucide-react';
 import type { ActivityType, Room, Activity } from '../types';
 
-// QR Code Generator Component
+// QR Code Generator Component (inline to avoid import issues)
 const QRCodeDisplay: React.FC<{ url: string; size?: number }> = ({ url, size = 200 }) => {
   const [qrDataUrl, setQrDataUrl] = useState<string>('');
 
   useEffect(() => {
-    // Generate QR code data URL using a simple QR code generation approach
-    // In a real app, you'd use a proper QR code library like qrcode or react-qr-code
+    // Generate QR code data URL using QR Server API
     const generateQRCode = async () => {
       try {
-        // For now, we'll use a QR code API service
         const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(url)}&bgcolor=1e293b&color=ffffff&format=svg`;
         setQrDataUrl(qrApiUrl);
       } catch (error) {
@@ -27,7 +25,9 @@ const QRCodeDisplay: React.FC<{ url: string; size?: number }> = ({ url, size = 2
       }
     };
 
-    generateQRCode();
+    if (url) {
+      generateQRCode();
+    }
   }, [url, size]);
 
   if (!qrDataUrl) {
@@ -47,7 +47,11 @@ const QRCodeDisplay: React.FC<{ url: string; size?: number }> = ({ url, size = 2
         src={qrDataUrl} 
         alt="QR Code to join room" 
         className="w-full h-full"
-        style={{ width: size, height: size }}
+        style={{ width: size - 32, height: size - 32 }}
+        onError={() => {
+          console.error('Failed to load QR code');
+          setQrDataUrl('');
+        }}
       />
     </div>
   );
