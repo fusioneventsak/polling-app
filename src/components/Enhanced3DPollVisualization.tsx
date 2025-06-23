@@ -87,7 +87,7 @@ const OptionMediaPlane: React.FC<{
     <mesh position={position} renderOrder={1}>
       <planeGeometry args={[2.5, 1.875]} />
       <meshBasicMaterial 
-        map={texture} 
+        map={texture || undefined} 
         transparent 
         opacity={0.9}
         side={THREE.FrontSide}
@@ -123,6 +123,7 @@ const StandingImagePlane: React.FC<{
         (error) => {
           console.warn('StandingImagePlane: Failed to load texture:', error);
           setLoadError(true);
+          setTexture(null);
         }
       );
     }
@@ -136,7 +137,7 @@ const StandingImagePlane: React.FC<{
     <mesh position={position} renderOrder={2}>
       <planeGeometry args={[2.0, 1.5]} />
       <meshBasicMaterial 
-        map={texture} 
+        map={texture || undefined} 
         transparent 
         opacity={0.7}
         emissive="#00ffff"
