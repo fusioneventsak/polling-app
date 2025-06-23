@@ -143,14 +143,54 @@ const StandingImagePlane: React.FC<{
   }
 
   return (
-    <mesh position={position} rotation={[-Math.PI / 6, 0, 0]} renderOrder={2}>
-      <planeGeometry args={[2.0, 1.5]} />
-      <meshBasicMaterial 
-        map={texture}
-        transparent 
-        opacity={0.7}
-      />
-    </mesh>
+    <group>
+      {/* Main image - no transparency for better pop */}
+      <mesh position={position} rotation={[-Math.PI / 6, 0, 0]} renderOrder={2}>
+        <planeGeometry args={[2.0, 1.5]} />
+        <meshBasicMaterial 
+          map={texture}
+          transparent={false}
+        />
+      </mesh>
+      
+      {/* Neon glow border effect */}
+      <mesh position={[position[0], position[1], position[2] - 0.01]} rotation={[-Math.PI / 6, 0, 0]} renderOrder={1}>
+        <planeGeometry args={[2.2, 1.7]} />
+        <meshBasicMaterial 
+          color="#00ffff"
+          transparent
+          opacity={0.6}
+          emissive="#00ffff"
+          emissiveIntensity={0.8}
+        />
+      </mesh>
+      
+      {/* Outer glow effect */}
+      <mesh position={[position[0], position[1], position[2] - 0.02]} rotation={[-Math.PI / 6, 0, 0]} renderOrder={0}>
+        <planeGeometry args={[2.6, 2.1]} />
+        <meshBasicMaterial 
+          color="#0088ff"
+          transparent
+          opacity={0.2}
+          emissive="#0088ff"
+          emissiveIntensity={0.4}
+        />
+      </mesh>
+      
+      {/* Animated pulse ring */}
+      <Float speed={2} rotationIntensity={0} floatIntensity={0.1}>
+        <mesh position={[position[0], position[1], position[2] - 0.03]} rotation={[-Math.PI / 6, 0, 0]} renderOrder={-1}>
+          <ringGeometry args={[1.8, 2.0, 32]} />
+          <meshBasicMaterial 
+            color="#00ffff"
+            transparent
+            opacity={0.8}
+            emissive="#00ffff"
+            emissiveIntensity={1.2}
+          />
+        </mesh>
+      </Float>
+    </group>
   );
 };
 
