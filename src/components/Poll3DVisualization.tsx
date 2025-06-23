@@ -349,7 +349,7 @@ const Scene: React.FC<{
         anchorY="middle"
         maxWidth={20}
       >
-        {activityTitle || 'Poll Question'}
+        {activityTitle || (totalResponses > 0 ? 'Live Poll Results' : 'Poll Options')}
       </Text>
       
       {/* Title shadow for 3D effect */}
@@ -361,7 +361,7 @@ const Scene: React.FC<{
         anchorY="middle"
         maxWidth={20}
       >
-        {activityTitle || 'Poll Question'}
+        {activityTitle || (totalResponses > 0 ? 'Live Poll Results' : 'Poll Options')}
       </Text>
       
       {/* Subtitle showing response count */}
