@@ -15,7 +15,7 @@ export class RoomService {
         .from('rooms')
         .select(`
           *,
-          activities:activities(
+          activities!activities_room_id_fkey(
             *,
             options:activity_options(*)
           )
@@ -126,7 +126,7 @@ export class RoomService {
         .from('rooms')
         .select(`
           *,
-          activities:activities(
+          activities!activities_room_id_fkey(
             *,
             options:activity_options(*)
           )
@@ -171,7 +171,7 @@ export class RoomService {
         .from('rooms')
         .select(`
           *,
-          activities:activities(
+          activities!activities_room_id_fkey(
             *,
             options:activity_options(*)
           )
