@@ -2,6 +2,39 @@ import { supabase } from '../lib/supabase';
 import type { Room, Activity, ActivityOption } from '../types';
 
 export class RoomService {
+  // Get all rooms (for admin)
+  async getAllRooms(): Promise<Room[]> {
+    if (!supabase) {
+      throw new Error('Supabase not initialized');
+    }
+
+    try {
+      console.log('RoomService: Getting all rooms');
+
+      const { data: rooms, error } = await supabase
+        .from('rooms')
+        .select(`
+          *,
+          activities:activities(
+            *,
+            options:activity_options(*)
+          )
+        `)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('RoomService: Error getting all rooms:', error);
+        throw new Error('Failed to get rooms');
+      }
+
+      console.log('RoomService: Retrieved', rooms?.length || 0, 'rooms');
+      return rooms || [];
+    } catch (error) {
+      console.error('RoomService: Error in getAllRooms:', error);
+      throw error;
+    }
+  }
+
   // Submit response to an activity
   async submitResponse(roomId: string, activityId: string, optionId: string, participantId: string): Promise<void> {
     if (!supabase) {
@@ -510,6 +543,58 @@ export class RoomService {
       console.log('RoomService: Activity voting toggled successfully');
     } catch (error) {
       console.error('RoomService: Error in toggleActivityVoting:', error);
+      throw error;
+    }
+  }
+
+  // Delete room
+  async deleteRoom(id: string): Promise<void> {
+    if (!supabase) {
+      throw new Error('Supabase not initialized');
+    }
+
+    try {
+      console.log('RoomService: Deleting room:', id);
+
+      const { error } = await supabase
+        .from('rooms')
+        .delete()
+        .eq('id', id);
+
+      if (error) {
+        console.error('RoomService: Error deleting room:', error);
+        throw new Error('Failed to delete room');
+      }
+
+      console.log('RoomService: Room deleted successfully');
+    } catch (error) {
+      console.error('RoomService: Error in deleteRoom:', error);
+      throw error;
+    }
+  }
+
+  // Delete activity
+  async deleteActivity(id: string): Promise<void> {
+    if (!supabase) {
+      throw new Error('Supabase not initialized');
+    }
+
+    try {
+      console.log('RoomService: Deleting activity:', id);
+
+      const { error } = await supabase
+        .from('activities')
+        .delete()
+        .eq('id', id);
+
+      if (error) {
+        console.error('RoomService: Error deleting activity:', error);
+        throw new Error('Failed to delete activity');
+      }
+
+      console.log('RoomService: Activity deleted successfully');
+    } catch (error) {
+      console.error('RoomService: Error in deleteActivity:', error);
       throw error;
     }
   }
