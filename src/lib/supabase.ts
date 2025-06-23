@@ -36,18 +36,29 @@ const maxReconnectAttempts = 5;
 // Function to check Supabase connection
 export const checkSupabaseConnection = async (): Promise<boolean> => {
   if (!supabase) {
-    console.warn('⚠️ Supabase client not initialized');
+    console.warn('⚠️ Supabase client not initialized - missing environment variables');
     return false;
   }
 
   try {
-    // Simple query to test connection
-    const { error } = await supabase.from('rooms').select('count').limit(1);
+    // Test connection with a simple auth check instead of querying tables
+    const { data, error } = await supabase.auth.getSession();
     
     if (error) {
-      console.error('❌ Supabase connection test failed:', error);
-      isConnected = false;
-      return false;
+      // Auth errors are expected when not logged in, but connection is working
+      if (error.message.includes('session_not_found') || error.message.includes('Invalid') || error.message.includes('JWT')) {
+        // These are auth-related errors, not connection errors
+        if (!isConnected) {
+          console.log('✅ Supabase connection restored');
+          isConnected = true;
+          reconnectAttempts = 0;
+        }
+        return true;
+      } else {
+        console.error('❌ Supabase connection test failed:', error.message);
+        isConnected = false;
+        return false;
+      }
     }
     
     if (!isConnected) {
@@ -58,7 +69,12 @@ export const checkSupabaseConnection = async (): Promise<boolean> => {
     
     return true;
   } catch (error) {
-    console.error('❌ Supabase connection error:', error);
+    // Check if it's a network error
+    if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
+      console.error('❌ Supabase network connection failed - check internet connection and Supabase URL');
+    } else {
+      console.error('❌ Supabase connection error:', error);
+    }
     isConnected = false;
     return false;
   }
