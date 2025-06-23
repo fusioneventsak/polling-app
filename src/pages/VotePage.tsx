@@ -1,6 +1,4 @@
 import React, { useEffect, useState, useCallback, useRef }
-
-export { VotePage }; from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../lib/supabase';
