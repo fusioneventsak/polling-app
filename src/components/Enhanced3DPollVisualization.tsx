@@ -448,28 +448,6 @@ const Enhanced3DBar: React.FC<{
       )}
     </group>
   );
-    {/* Debug URL display */}
-    <Text
-      position={[position[0], 0.3, position[2] + 1.0]}
-      fontSize={0.15}
-      color={hasValidImage ? "#22c55e" : "#ef4444"}
-      anchorX="center"
-      anchorY="middle"
-      maxWidth={3}
-    >
-      {hasValidImage ? `✅ ${imageUrl?.substring(0, 30)}...` : '❌ No Image URL'}
-    </Text>
-    const distance = Math.max(12, optionsCount * 1.5);
-    
-    camera.position.x = THREE.MathUtils.lerp(camera.position.x, 0, 0.02);
-    camera.position.z = THREE.MathUtils.lerp(camera.position.z, distance, 0.02);
-    camera.position.y = THREE.MathUtils.lerp(camera.position.y, 6, 0.02);
-    
-    // Look at a point that shows both title and bars well
-    camera.lookAt(0, 2, 0);
-  });
-  
-  return null;
 };
 
 // Main 3D Scene with Enhanced Title
