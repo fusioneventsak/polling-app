@@ -268,6 +268,7 @@ export class RoomService {
     type: 'poll' | 'trivia' | 'quiz';
     media_url?: string;
     settings?: any;
+    options?: any[];
   }): Promise<Activity> {
     if (!supabase) {
       throw new Error('Supabase not initialized');
@@ -276,14 +277,34 @@ export class RoomService {
     return retrySupabaseOperation(async () => {
       console.log('RoomService: Creating activity:', activityData);
 
+      // Extract options from activityData
+      const { options, ...activityFields } = activityData;
+
+      // Get the next activity order for this room
+      const { data: maxOrderResult, error: orderError } = await supabase
+        .from('activities')
+        .select('activity_order')
+        .eq('room_id', roomId)
+        .order('activity_order', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (orderError && orderError.code !== 'PGRST116') {
+        throw handleSupabaseError(orderError, 'getMaxActivityOrder');
+      }
+
+      const nextOrder = (maxOrderResult?.activity_order || -1) + 1;
+
+      // Create the activity record first
       const { data: activity, error } = await supabase
         .from('activities')
         .insert({
-          ...activityData,
+          ...activityFields,
           room_id: roomId,
           is_active: false,
           total_responses: 0,
-          settings: activityData.settings || {}
+          activity_order: nextOrder,
+          settings: activityFields.settings || {}
         })
         .select()
         .single();
@@ -293,7 +314,46 @@ export class RoomService {
       }
 
       console.log('RoomService: Activity created successfully:', activity.id);
-      return activity;
+
+      // Create options if provided
+      if (options && Array.isArray(options) && options.length > 0) {
+        console.log('RoomService: Creating activity options');
+        
+        const optionsToInsert = options.map((option: any, index: number) => ({
+          activity_id: activity.id,
+          text: option.text,
+          media_url: option.media_url || null,
+          is_correct: option.is_correct || false,
+          responses: 0,
+          option_order: option.option_order !== undefined ? option.option_order : index
+        }));
+
+        const { error: optionsError } = await supabase
+          .from('activity_options')
+          .insert(optionsToInsert);
+
+        if (optionsError) {
+          throw handleSupabaseError(optionsError, 'createActivityOptions');
+        }
+
+        console.log('RoomService: Activity options created successfully');
+      }
+
+      // Return the activity with its options
+      const { data: fullActivity, error: fetchError } = await supabase
+        .from('activities')
+        .select(`
+          *,
+          options:activity_options(*)
+        `)
+        .eq('id', activity.id)
+        .single();
+
+      if (fetchError) {
+        throw handleSupabaseError(fetchError, 'fetchFullActivity');
+      }
+
+      return fullActivity;
     }, 'createActivity');
   }
 
@@ -338,11 +398,53 @@ export class RoomService {
     return retrySupabaseOperation(async () => {
       console.log('RoomService: Updating activity:', activityId, updates);
 
+      // Extract options from updates if present
+      const { options, ...activityUpdates } = updates as any;
+
+      // Handle options separately if they exist
+      if (options && Array.isArray(options)) {
+        console.log('RoomService: Updating activity options');
+        
+        // Delete existing options for this activity
+        const { error: deleteError } = await supabase
+          .from('activity_options')
+          .delete()
+          .eq('activity_id', activityId);
+
+        if (deleteError) {
+          throw handleSupabaseError(deleteError, 'deleteExistingOptions');
+        }
+
+        // Insert new options
+        if (options.length > 0) {
+          const optionsToInsert = options.map((option: any, index: number) => ({
+            activity_id: activityId,
+            text: option.text,
+            media_url: option.media_url || null,
+            is_correct: option.is_correct || false,
+            responses: option.responses || 0,
+            option_order: option.option_order !== undefined ? option.option_order : index
+          }));
+
+          const { error: insertError } = await supabase
+            .from('activity_options')
+            .insert(optionsToInsert);
+
+          if (insertError) {
+            throw handleSupabaseError(insertError, 'insertNewOptions');
+          }
+        }
+      }
+
+      // Update the activity record (without options)
       const { data: activity, error } = await supabase
         .from('activities')
-        .update(updates)
+        .update(activityUpdates)
         .eq('id', activityId)
-        .select()
+        .select(`
+          *,
+          options:activity_options(*)
+        `)
         .single();
 
       if (error) {
