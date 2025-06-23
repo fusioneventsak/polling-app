@@ -336,7 +336,7 @@ export const AdminPage: React.FC = () => {
         ));
       }
       
-      await roomService.endActivity(activityId);
+      await roomService.stopActivity(activityId);
       console.log('✅ Admin: Activity ended successfully');
     } catch (err) {
       // Revert optimistic update on error
