@@ -428,7 +428,7 @@ const Enhanced3DScene: React.FC<{
     // Animate to final position
     const animateCamera = () => {
       const targetX = 0;
-      const targetY = 2; // Much lower to look at images head-on
+      const targetY = 0.75; // Same height as image centers for straight-on view
       const targetZ = 15; // Closer than original 20
       
       const animationDuration = 2000; // 2 seconds
@@ -445,6 +445,9 @@ const Enhanced3DScene: React.FC<{
         camera.position.x = startPos.x + (targetX - startPos.x) * easeProgress;
         camera.position.y = startPos.y + (targetY - startPos.y) * easeProgress;
         camera.position.z = startPos.z + (targetZ - startPos.z) * easeProgress;
+        
+        // Point camera directly at the center of the scene at image height
+        camera.lookAt(0, 0.75, 0);
         
         if (progress < 1) {
           requestAnimationFrame(animate);
@@ -757,10 +760,11 @@ export const Enhanced3DPollVisualization: React.FC<Enhanced3DPollVisualizationPr
               enableRotate={true}
               minDistance={8}
               maxDistance={25}
-              minPolarAngle={0}
-              maxPolarAngle={Math.PI / 2.5}
+              minPolarAngle={Math.PI / 2 - 0.1}
+              maxPolarAngle={Math.PI / 2 + 0.1}
               autoRotate={false}
               rotateSpeed={0.5}
+              target={[0, 0.75, 0]}
             />
           </Canvas>
         </Suspense>
