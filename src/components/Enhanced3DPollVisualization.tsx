@@ -510,7 +510,7 @@ const Enhanced3DScene: React.FC<{
     const timer = setTimeout(animateCamera, 100);
     
     return () => clearTimeout(timer);
-  }, [camera, options.length]); // Add options.length as dependency
+  }, [camera, options.length]); // Only run when camera or initial options.length changes
   
   // Calculate dynamic font sizes
   const titleFontSize = activityTitle ? calculateTitleFontSize(activityTitle) : 1.8;
