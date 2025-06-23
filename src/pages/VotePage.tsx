@@ -91,7 +91,7 @@ function VotePage() {
         .from('activities')
         .select(`
           *,
-          room:rooms(*),
+          room:rooms!activities_room_id_fkey(*),
           options:activity_options(*)
         `)
         .eq('id', pollId)
