@@ -823,7 +823,7 @@ function DisplayPage() {
           </div>
 
           {/* Activity Results Visualization */}
-          <div className="flex-1 p-4">
+          <div className="flex-1 p-4" style={{ height: 'calc(100vh - 120px)' }}>
             <Enhanced3DPollVisualization
               options={activeActivity.options || []}
               totalResponses={activeActivity.total_responses || 0}

@@ -257,15 +257,13 @@ const Enhanced3DBar: React.FC<{
 const CameraController: React.FC<{ optionsCount: number }> = ({ optionsCount }) => {
   const { camera } = useThree();
   
-  useFrame((state) => {
-    // Smooth camera movement based on number of options
-    const radius = Math.max(8, optionsCount * 1.5);
-    const x = Math.sin(state.clock.elapsedTime * 0.1) * radius;
-    const z = Math.cos(state.clock.elapsedTime * 0.1) * radius;
+  useFrame(() => {
+    // Fixed camera position facing the poll results head-on
+    const distance = Math.max(8, optionsCount * 1.2);
     
-    camera.position.x = THREE.MathUtils.lerp(camera.position.x, x, 0.02);
-    camera.position.z = THREE.MathUtils.lerp(camera.position.z, z, 0.02);
-    camera.position.y = THREE.MathUtils.lerp(camera.position.y, 6, 0.02);
+    camera.position.x = THREE.MathUtils.lerp(camera.position.x, 0, 0.02);
+    camera.position.z = THREE.MathUtils.lerp(camera.position.z, distance, 0.02);
+    camera.position.y = THREE.MathUtils.lerp(camera.position.y, 5, 0.02);
     
     camera.lookAt(0, 2, 0);
   });
@@ -469,7 +467,7 @@ export const Enhanced3DPollVisualization: React.FC<Enhanced3DPollVisualizationPr
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.8 }}
       className={`w-full bg-gradient-to-br from-slate-900/40 to-blue-900/20 rounded-xl border border-slate-700 overflow-hidden shadow-2xl relative ${className}`}
-      style={{ height: '100%', minHeight: '500px' }}
+      style={{ height: '100%', minHeight: '600px' }}
     >
       {/* Activity media display */}
       {activityMedia && (
@@ -525,17 +523,22 @@ export const Enhanced3DPollVisualization: React.FC<Enhanced3DPollVisualizationPr
       <Suspense fallback={<LoadingFallback />}>
         <Canvas
           camera={{ 
-            position: [0, 6, 10], 
+            position: [0, 5, 12], 
             fov: 60,
             near: 0.1,
             far: 1000
           }}
-          style={{ background: 'transparent' }}
+          style={{ 
+            background: 'transparent',
+            width: '100%',
+            height: '100%'
+          }}
           shadows
           gl={{ 
             antialias: true, 
             alpha: true,
-            powerPreference: "high-performance"
+            powerPreference: "high-performance",
+            preserveDrawingBuffer: true
           }}
         >
           <Enhanced3DScene 
@@ -547,13 +550,12 @@ export const Enhanced3DPollVisualization: React.FC<Enhanced3DPollVisualizationPr
           <OrbitControls 
             enablePan={false}
             enableZoom={true}
-            enableRotate={true}
+            enableRotate={false}
             minDistance={5}
             maxDistance={20}
             minPolarAngle={Math.PI / 6}
             maxPolarAngle={Math.PI / 2}
             autoRotate={false}
-            autoRotateSpeed={0.5}
           />
         </Canvas>
       </Suspense>
