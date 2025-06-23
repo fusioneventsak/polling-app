@@ -1,6 +1,6 @@
 import React, { useRef, useMemo, useEffect, useState, Suspense } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { Text, OrbitControls, Float } from '@react-three/drei';
+import { Text, OrbitControls, Float, useTexture } from '@react-three/drei';
 import { motion } from 'framer-motion';
 import * as THREE from 'three';
 import type { ActivityOption } from '../types';
@@ -18,6 +18,35 @@ interface Enhanced3DPollVisualizationProps {
   isVotingLocked?: boolean;
   className?: string;
 }
+
+// Separate component for handling texture loading
+const OptionMediaPlane: React.FC<{
+  imageUrl: string;
+  position: [number, number, number];
+}> = ({ imageUrl, position }) => {
+  const [texture, setTexture] = useState<THREE.Texture | null>(null);
+  
+  useEffect(() => {
+    if (imageUrl) {
+      const loader = new THREE.TextureLoader();
+      loader.load(
+        imageUrl,
+        (loadedTexture) => {
+          loadedTexture.flipY = false;
+          loadedTexture.wrapS = THREE.ClampToEdgeWrapping;
+          loadedTexture.wrapT = THREE.ClampToEdgeWrapping;
+          loadedTexture.minFilter = THREE.LinearFilter;
+          loadedTexture.magFilter = THREE.LinearFilter;
+          setTexture(loadedTexture);
+        },
+        undefined,
+        (error) => console.warn('Failed to load option media texture:', error)
+      );
+    }
+  }, [imageUrl]);
+
+  return texture ? <primitive object={texture} attach="map" /> : null;
+};
 
 // 3D Bar Component with Enhanced Image Display
 const Enhanced3DBar: React.FC<{
@@ -48,31 +77,8 @@ const Enhanced3DBar: React.FC<{
   const meshRef = useRef<THREE.Mesh>(null);
   const glowRef = useRef<THREE.Mesh>(null);
   const backgroundImageRef = useRef<THREE.Mesh>(null);
+  const imagePlaneRef = useRef<THREE.Mesh>(null);
   const [animatedHeight, setAnimatedHeight] = useState(0.2);
-  const [texture, setTexture] = useState<THREE.Texture | null>(null);
-  
-  // Load texture for option image
-  useEffect(() => {
-    if (imageUrl) {
-      const loader = new THREE.TextureLoader();
-      loader.load(
-        imageUrl,
-        (loadedTexture) => {
-          loadedTexture.flipY = false;
-          loadedTexture.wrapS = THREE.ClampToEdgeWrapping;
-          loadedTexture.wrapT = THREE.ClampToEdgeWrapping;
-          // Set texture filtering for better quality
-          loadedTexture.minFilter = THREE.LinearFilter;
-          loadedTexture.magFilter = THREE.LinearFilter;
-          setTexture(loadedTexture);
-        },
-        undefined,
-        (error) => {
-          console.warn('Failed to load texture:', error);
-        }
-      );
-    }
-  }, [imageUrl]);
   
   // Animate the bar height and image position
   useFrame((state) => {
@@ -110,10 +116,10 @@ const Enhanced3DBar: React.FC<{
     }
 
     // Subtle animation for background image
-    if (backgroundImageRef.current && texture) {
+    if (imagePlaneRef.current && imageUrl) {
       // Very subtle floating motion
-      backgroundImageRef.current.position.y = 2.5 + Math.sin(state.clock.elapsedTime * 0.5 + delay) * 0.05;
-    }
+      imagePlaneRef.current.position.y = 3.0 + Math.sin(state.clock.elapsedTime * 0.5 + delay) * 0.1;
+    } 
   });
 
   const barColor = useMemo(() => {
@@ -128,64 +134,48 @@ const Enhanced3DBar: React.FC<{
 
   return (
     <group>
-      {/* Background image behind the bar - with vertical mask */}
-      {texture && (
-        <group ref={backgroundImageRef}>
-          {/* Main background image with consistent vertical sizing */}
-          <mesh position={[position[0], 2.5, position[2] - 2.5]}>
-            <planeGeometry args={[2.4, 3.2]} />
-            <meshStandardMaterial 
-              map={texture} 
-              transparent
-              opacity={0.8}
-              side={THREE.DoubleSide}
-            />
-          </mesh>
-          
-          {/* Vertical gradient mask overlay to create consistent height effect */}
-          <mesh position={[position[0], 2.5, position[2] - 2.4]}>
-            <planeGeometry args={[2.4, 3.2]} />
-            <meshBasicMaterial 
-              transparent
-              opacity={0.3}
-              color="#0f172a"
-              side={THREE.DoubleSide}
-            />
-          </mesh>
-          
-          {/* Top fade mask for consistent vertical cropping */}
-          <mesh position={[position[0], 3.8, position[2] - 2.3]}>
-            <planeGeometry args={[2.6, 0.8]} />
-            <meshBasicMaterial 
-              transparent
-              opacity={0.8}
-              color="#0f172a"
-              side={THREE.DoubleSide}
-            />
-          </mesh>
-          
-          {/* Bottom fade mask */}
-          <mesh position={[position[0], 1.2, position[2] - 2.3]}>
-            <planeGeometry args={[2.6, 0.8]} />
-            <meshBasicMaterial 
-              transparent
-              opacity={0.8}
-              color="#0f172a"
-              side={THREE.DoubleSide}
-            />
-          </mesh>
-          
-          {/* Subtle frame around the image */}
-          <mesh position={[position[0], 2.5, position[2] - 2.6]}>
-            <planeGeometry args={[2.6, 3.4]} />
-            <meshStandardMaterial 
-              color="#1e293b"
-              transparent
-              opacity={0.6}
-              side={THREE.DoubleSide}
-            />
-          </mesh>
-        </group>
+      {/* Option media image behind the bar with vertical masking */}
+      {imageUrl && (
+        <Suspense fallback={null}>
+          <group ref={imagePlaneRef}>
+            {/* Main background image plane */}
+            <mesh position={[position[0], 3.0, position[2] - 3.0]}>
+              <planeGeometry args={[2.8, 4.0]} />
+              <meshBasicMaterial transparent opacity={0.85}>
+                <OptionMediaPlane imageUrl={imageUrl} position={position} />
+              </meshBasicMaterial>
+            </mesh>
+            
+            {/* Vertical gradient mask overlay */}
+            <mesh position={[position[0], 3.0, position[2] - 2.9]}>
+              <planeGeometry args={[2.8, 4.0]} />
+              <meshBasicMaterial 
+                transparent
+                opacity={0.4}
+                color="#0f172a"
+              />
+            </mesh>
+            
+            {/* Top and bottom fade masks for consistent vertical sizing */}
+            <mesh position={[position[0], 4.8, position[2] - 2.8]}>
+              <planeGeometry args={[3.0, 1.0]} />
+              <meshBasicMaterial 
+                transparent
+                opacity={0.9}
+                color="#0f172a"
+              />
+            </mesh>
+            
+            <mesh position={[position[0], 1.2, position[2] - 2.8]}>
+              <planeGeometry args={[3.0, 1.0]} />
+              <meshBasicMaterial 
+                transparent
+                opacity={0.9}
+                color="#0f172a"
+              />
+            </mesh>
+          </group>
+        </Suspense>
       )}
       
       {/* Base platform with enhanced design */}
@@ -268,7 +258,7 @@ const Enhanced3DBar: React.FC<{
       {/* 3D Percentage on the floor in front of the bar */}
       <Text
         position={[position[0], 0.1, position[2] + 2.0]}
-        fontSize={1.2}
+        fontSize={1.0}
         color="#ffffff"
         anchorX="center"
         anchorY="middle"
@@ -280,7 +270,7 @@ const Enhanced3DBar: React.FC<{
       {/* 3D Percentage shadow for depth effect */}
       <Text
         position={[position[0], 0.05, position[2] + 2.05]}
-        fontSize={1.2}
+        fontSize={1.0}
         color="#1e293b"
         anchorX="center"
         anchorY="middle"
@@ -412,7 +402,7 @@ const Enhanced3DScene: React.FC<{
         return (
           <Enhanced3DBar
             key={option.id}
-            position={[startX + index * spacing, 0, 0]}
+            position={[startX + index * spacing, 0, 1]}
             height={height}
             color={barColor}
             label={option.text}
@@ -431,7 +421,7 @@ const Enhanced3DScene: React.FC<{
       <Float speed={0.3} rotationIntensity={0.01} floatIntensity={0.05}>
         {/* Main title with thick 3D effect */}
         <Text
-          position={[0, 9, -12]}
+          position={[0, 8, -8]}
           fontSize={2.0}
           color="#ffffff"
           anchorX="center"
@@ -442,7 +432,7 @@ const Enhanced3DScene: React.FC<{
         
         {/* Title shadow/depth effect */}
         <Text
-          position={[0.1, 8.9, -12.1]}
+          position={[0.1, 7.9, -8.1]}
           fontSize={2.0}
           color="#1e293b"
           anchorX="center"
@@ -453,7 +443,7 @@ const Enhanced3DScene: React.FC<{
         
         {/* Subtitle */}
         <Text
-          position={[0, 7.8, -12]}
+          position={[0, 7.2, -8]}
           fontSize={0.8}
           color="#94a3b8"
           anchorX="center"
@@ -465,7 +455,7 @@ const Enhanced3DScene: React.FC<{
         {/* Activity title if different from main title */}
         {activityTitle && totalResponses > 0 && (
           <Text
-            position={[0, 7.0, -12]}
+            position={[0, 6.6, -8]}
             fontSize={0.6}
             color="#e2e8f0"
             anchorX="center"
@@ -590,7 +580,7 @@ export const Enhanced3DPollVisualization: React.FC<Enhanced3DPollVisualizationPr
       <Suspense fallback={<LoadingFallback />}>
         <Canvas
           camera={{ 
-            position: [0, 4, 10], 
+            position: [0, 5, 12], 
             fov: 75,
             near: 0.1,
             far: 1000
