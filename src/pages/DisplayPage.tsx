@@ -81,11 +81,6 @@ const FixedPoll3DVisualization: React.FC<{
   // Animate values when they change with enhanced animations
   useEffect(() => {
     if (totalResponses !== prevTotalResponses.current && options.length > 0) {
-      console.log('DisplayPage: Animating vote count changes:', { 
-        oldTotal: prevTotalResponses.current, 
-        newTotal: totalResponses 
-      });
-      
       const newCounts = options.map(opt => opt.responses || 0);
       const newPercentages = options.map(opt => 
         totalResponses > 0 ? Math.round(((opt.responses || 0) / totalResponses) * 100) : 0
@@ -327,28 +322,8 @@ function DisplayPage() {
     if (currentRoom.current_activity_id) {
       const currentActivity = currentRoom.activities.find(a => a.id === currentRoom.current_activity_id) as Activity | undefined;
       if (currentActivity) {
-        console.log('DisplayPage: Found current activity via current_activity_id:', {
-          id: currentActivity.id,
-          title: currentActivity.title,
-          optionsCount: currentActivity.options?.length || 0,
-          totalResponses: currentActivity.total_responses || 0,
-          optionsWithMedia: currentActivity.options?.filter(opt => opt.media_url && opt.media_url.trim() !== '').length || 0,
-          optionMediaUrls: currentActivity.options?.map(opt => ({
-            id: opt.id,
-            text: opt.text.substring(0, 20),
-            media_url: opt.media_url,
-            hasMedia: !!(opt.media_url && opt.media_url.trim() !== '')
-          })) || []
-        });
-        
         // Ensure options are properly formatted
         currentActivity.options = currentActivity.options?.map((opt, index) => {
-          console.log(`DisplayPage: Processing option ${index}:`, {
-            id: opt.id,
-            text: opt.text.substring(0, 30),
-            media_url: opt.media_url,
-            responses: opt.responses || 0
-          });
           return {
             id: opt.id,
             text: opt.text,
@@ -361,24 +336,15 @@ function DisplayPage() {
           };
         }) || [];
         return currentActivity;
-      } else {
-        console.log('DisplayPage: Warning - current_activity_id points to non-existent activity:', currentRoom.current_activity_id);
       }
     }
     
     // Priority 2: Fallback to any activity marked as active (in case of data inconsistency)
     const flaggedActive = currentRoom.activities?.find(a => a.is_active) as Activity | undefined;
     if (flaggedActive) {
-      console.log('DisplayPage: Found active activity via is_active flag (fallback):', {
-        id: flaggedActive.id,
-        title: flaggedActive.title,
-        optionsCount: flaggedActive.options?.length || 0,
-        totalResponses: flaggedActive.total_responses || 0
-      });
       return flaggedActive;
     }
     
-    console.log('DisplayPage: No active activity found - showing dashboard');
     return null;
   }, [currentRoom?.current_activity_id, currentRoom?.activities]);
 
@@ -397,8 +363,6 @@ function DisplayPage() {
     if (!pollId || !supabase) return;
     
     try {
-      console.log('DisplayPage: Loading room data for code:', pollId, forceRefresh ? '(forced)' : '');
-      
       const { data: roomData, error } = await supabase
         .from('rooms')
         .select(`
@@ -428,7 +392,6 @@ function DisplayPage() {
       }
 
       if (!roomData) {
-        console.log('DisplayPage: Room not found for code:', pollId);
         setCurrentRoom(null);
         return;
       }
@@ -451,16 +414,6 @@ function DisplayPage() {
         })).sort((a: any, b: any) => a.activity_order - b.activity_order) || []
       };
 
-      console.log('DisplayPage: Room loaded successfully:', {
-        id: transformedRoom.id,
-        name: transformedRoom.name,
-        code: transformedRoom.code,
-        activitiesCount: transformedRoom.activities?.length || 0,
-        currentActivityId: transformedRoom.current_activity_id,
-        participants: transformedRoom.participants,
-        optionsWithMedia: transformedRoom.activities?.flatMap(a => a.options || []).filter(opt => opt.media_url).length || 0
-      });
-
       setCurrentRoom(transformedRoom);
     } catch (error) {
       console.error('DisplayPage: Error in loadRoom:', error);
@@ -478,8 +431,6 @@ function DisplayPage() {
   useEffect(() => {
     if (!pollId || !supabase) return;
 
-    console.log('DisplayPage: Setting up real-time subscriptions for room code:', pollId);
-
     // Clean up existing subscription
     if (subscriptionRef.current) {
       subscriptionRef.current.unsubscribe();
@@ -495,7 +446,6 @@ function DisplayPage() {
           filter: `code=eq.${pollId}`
         },
         async (payload) => {
-          console.log('DisplayPage: Room change received:', payload);
           await loadRoom(true);
         }
       )
@@ -506,7 +456,6 @@ function DisplayPage() {
           table: 'activities'
         },
         async (payload) => {
-          console.log('DisplayPage: Activity change received:', payload);
           await loadRoom(true);
         }
       )
@@ -517,7 +466,6 @@ function DisplayPage() {
           table: 'activity_options'
         },
         async (payload) => {
-          console.log('DisplayPage: Activity options change received:', payload);
           await loadRoom(true);
         }
       )
@@ -528,28 +476,18 @@ function DisplayPage() {
           table: 'participant_responses'
         },
         async (payload) => {
-          console.log('DisplayPage: Participant response change received:', {
-            eventType: payload.eventType,
-            activityId: payload.new?.activity_id || payload.old?.activity_id,
-            optionId: payload.new?.option_id || payload.old?.option_id
-          });
           await loadRoom(true);
         }
       );
 
     subscriptionRef.current = channel;
     channel.subscribe((status, err) => {
-      console.log('DisplayPage: Subscription status:', status);
       if (err) {
         console.error('DisplayPage: Subscription error:', err);
-      }
-      if (status === 'SUBSCRIBED') {
-        console.log('✅ DisplayPage: Real-time subscriptions active');
       }
     });
 
     return () => {
-      console.log('DisplayPage: Cleaning up subscriptions');
       if (subscriptionRef.current) {
         subscriptionRef.current.unsubscribe();
         subscriptionRef.current = null;
@@ -870,23 +808,8 @@ function DisplayPage() {
             </div>
           </div>
 
-          {/* Activity Results Visualization */}
+          {/* Activity Results Visualization - CLEAN, NO DEBUG OVERLAY */}
           <div className="flex-1 p-4" style={{ height: 'calc(100vh - 120px)' }}>
-            {/* Debug info overlay */}
-            <div className="absolute top-20 left-4 bg-black/80 text-white p-2 rounded text-xs z-20 max-w-md">
-              <div>Activity: {activeActivity.title}</div>
-              <div>Options: {activeActivity.options?.length || 0}</div>
-              <div>With Media: {activeActivity.options?.filter(opt => opt.media_url && opt.media_url.trim() !== '').length || 0}</div>
-              <div className="mt-1 max-h-32 overflow-y-auto">
-                {activeActivity.options?.map((opt, i) => (
-                  <div key={opt.id} className="text-xs">
-                    {i + 1}: {opt.media_url ? '✅' : '❌'} {opt.text.substring(0, 20)}...
-                    {opt.media_url && <div className="text-blue-300 break-all">{opt.media_url.substring(0, 50)}...</div>}
-                  </div>
-                ))}
-              </div>
-            </div>
-            
             <Enhanced3DPollVisualization
               options={activeActivity.options || []}
               totalResponses={activeActivity.total_responses || 0}
