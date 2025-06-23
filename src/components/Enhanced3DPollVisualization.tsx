@@ -3,7 +3,6 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { Text, OrbitControls, Float, Text3D, Center, MeshTransmissionMaterial } from '@react-three/drei';
 import { motion } from 'framer-motion';
 import * as THREE from 'three';
-import * as THREE from 'three';
 import type { ActivityOption } from '../types';
 
 interface Enhanced3DPollVisualizationProps {
