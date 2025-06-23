@@ -59,11 +59,9 @@ const OptionMediaPlane: React.FC<{
         loadedTexture.needsUpdate = true;
         setTexture(loadedTexture);
         setLoadError(false);
-        console.log('OptionMediaPlane: Texture loaded successfully for:', imageUrl);
       },
       undefined,
       (error) => {
-        console.error('OptionMediaPlane: Failed to load texture:', imageUrl, error);
         setLoadError(true);
         setTexture(null);
       }
