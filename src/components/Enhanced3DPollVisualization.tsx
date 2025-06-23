@@ -394,10 +394,10 @@ const StandingImagesDisplay: React.FC<{
             fallback={<group />}
           >
             <group>
-              {/* Standing image - positioned closer to bars */}
+              {/* Standing image - positioned closer to bars and higher up */}
               <StandingImagePlane
                 imageUrl={option.media_url}
-                position={[xPosition, 1.5, -1]}
+                position={[xPosition, 2.5, -1]}
                 fallbackText={`Option ${String.fromCharCode(65 + index)}`}
               />
             </group>
