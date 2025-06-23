@@ -317,14 +317,14 @@ const Enhanced3DBar: React.FC<{
         />
       </mesh>
       
-      {/* Glow effect for bars with responses - even bigger */}
+      {/* Glow effect for bars with responses - smaller to prevent overlap */}
       {responses > 0 && (
-        <mesh ref={glowRef} position={[position[0], 0.15, position[2]]} scale={[2.4, 0.2, 2.4]}>
-          <cylinderGeometry args={[2.0, 2.0, 1]} />
+        <mesh ref={glowRef} position={[position[0], 0.15, position[2]]} scale={[1.8, 0.2, 1.8]}>
+          <cylinderGeometry args={[1.6, 1.6, 1]} />
           <meshBasicMaterial 
             color={glowColor}
             transparent
-            opacity={0.15}
+            opacity={0.12}
           />
         </mesh>
       )}
@@ -342,8 +342,10 @@ const FloorStatsDisplay: React.FC<{
       {options.map((option, index) => {
         const percentage = totalResponses > 0 ? Math.round((option.responses / totalResponses) * 100) : 0;
         
-        // Calculate optimal spacing
-        const spacing = Math.min(5.0, 30 / Math.max(options.length, 1));
+        // Calculate optimal spacing that scales with number of options - improved algorithm
+        const minSpacing = 6.0; // Minimum spacing to prevent glow overlap
+        const maxSpacing = 12.0; // Maximum spacing for 1-2 options
+        const spacing = Math.max(minSpacing, Math.min(maxSpacing, 50 / Math.max(options.length, 1)));
         const totalWidth = (options.length - 1) * spacing;
         const startX = -totalWidth / 2;
         const xPosition = startX + index * spacing;
@@ -416,8 +418,10 @@ const StandingImagesDisplay: React.FC<{
           return null;
         }
         
-        // Calculate optimal spacing that scales with number of options
-        const spacing = Math.min(5.0, Math.max(3.0, 25 / Math.max(options.length, 1)));
+        // Calculate optimal spacing that scales with number of options - improved algorithm
+        const minSpacing = 6.0; // Minimum spacing to prevent glow overlap
+        const maxSpacing = 12.0; // Maximum spacing for 1-2 options
+        const spacing = Math.max(minSpacing, Math.min(maxSpacing, 50 / Math.max(options.length, 1)));
         const totalWidth = (options.length - 1) * spacing;
         const startX = -totalWidth / 2;
         const xPosition = startX + index * spacing;
@@ -474,9 +478,9 @@ const Enhanced3DScene: React.FC<{
       const targetX = 0;
       const targetY = 4; // Higher to see floor stats
       
-      // Dynamic zoom based on number of options - optimized for text readability
-      const baseDistance = 22; // Good for 1-3 options
-      const extraDistance = Math.max(0, (options.length - 2) * 2.5); // Reduced from 4 to 2.5 for closer view
+      // Dynamic zoom based on number of options - adjusted for better spacing visibility
+      const baseDistance = 20; // Base distance for good overview
+      const extraDistance = Math.max(0, (options.length - 2) * 2.8); // Adjusted for new spacing
       const targetZ = baseDistance + extraDistance;
       
       const animationDuration = 2000; // 2 seconds
