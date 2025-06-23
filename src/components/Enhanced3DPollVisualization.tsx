@@ -355,7 +355,7 @@ const FloorStatsDisplay: React.FC<{
             {/* Option text on floor */}
             <Text
               position={[xPosition, 0.1, 8]}
-              fontSize={0.4}
+              fontSize={0.6}
               color="#e2e8f0"
               anchorX="center"
               anchorY="middle"
