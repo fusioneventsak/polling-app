@@ -171,6 +171,45 @@ function VotePage() {
     if (subscriptionRef.current) {
       subscriptionRef.current.unsubscribe();
     }
+    // Subscribe to room changes to detect resets
+    channel.on('postgres_changes', 
+      { 
+        event: '*', 
+        schema: 'public', 
+        table: 'rooms',
+        filter: `id=eq.${activity.room_id}`
+      },
+      async (payload) => {
+        console.log('VotePage: Room change received:', {
+          eventType: payload.eventType,
+          roomId: payload.new?.id || payload.old?.id,
+          oldParticipants: payload.old?.participants,
+          newParticipants: payload.new?.participants
+        });
+        
+        // Detect room reset (participants count reset to 0)
+        if (payload.eventType === 'UPDATE' && 
+            payload.old?.participants > 0 && 
+            payload.new?.participants === 0) {
+          console.log('VotePage: Room reset detected - clearing all localStorage votes');
+          
+          // Clear all localStorage votes for this room's activities
+          const votedActivities = JSON.parse(localStorage.getItem('votedActivities') || '[]');
+          const roomActivityIds = activity.room?.activities?.map(a => a.id) || [pollId];
+          const filteredVotes = votedActivities.filter((id: string) => !roomActivityIds.includes(id));
+          localStorage.setItem('votedActivities', JSON.stringify(filteredVotes));
+          
+          // Reset voting status for current activity
+          setHasVoted(false);
+          setSelectedOption(null);
+          
+          console.log('VotePage: Cleared localStorage votes after room reset');
+        }
+        
+        await loadActivity(true);
+      }
+    );
+
 
     const channel = supabase
       .channel(`vote-page-${pollId}`)
@@ -242,34 +281,6 @@ function VotePage() {
           await loadActivity(true);
         }
       );
-
-    // Subscribe to bulk deletes at room level for reset detection
-    if (activity?.room_id) {
-      channel.on('postgres_changes',
-        { 
-          event: 'DELETE', 
-          schema: 'public', 
-          table: 'participant_responses',
-          filter: `room_id=eq.${activity.room_id}`
-        },
-        async (payload) => {
-          console.log('VotePage: Bulk participant responses deleted - likely room reset');
-          
-          // Clear all localStorage votes for this room's activities
-          if (activity.room?.activities) {
-            const votedActivities = JSON.parse(localStorage.getItem('votedActivities') || '[]');
-            const roomActivityIds = activity.room.activities.map(a => a.id);
-            const filteredVotes = votedActivities.filter((id: string) => !roomActivityIds.includes(id));
-            localStorage.setItem('votedActivities', JSON.stringify(filteredVotes));
-            console.log('VotePage: Cleared localStorage votes for room activities');
-          }
-          
-          // Recheck voting status
-          await checkVotingStatus();
-          await loadActivity(true);
-        }
-      );
-    }
 
     // Subscribe to the channel
     subscriptionRef.current = channel;

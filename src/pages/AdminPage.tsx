@@ -204,8 +204,21 @@ export const AdminPage: React.FC = () => {
       // Show loading state
       setResetConfirmation(prev => prev ? { ...prev, loading: true } : null);
       
+      // Get the room before reset to access its activities
+      const roomBeforeReset = rooms.find(r => r.id === roomId);
+      
       // Reset the room
       const resetRoom = await roomService.resetRoom(roomId);
+      
+      // Clear localStorage votes for all activities in this room
+      if (roomBeforeReset?.activities) {
+        console.log('Admin: Clearing localStorage votes for room activities');
+        const votedActivities = JSON.parse(localStorage.getItem('votedActivities') || '[]');
+        const roomActivityIds = roomBeforeReset.activities.map(a => a.id);
+        const filteredVotes = votedActivities.filter((id: string) => !roomActivityIds.includes(id));
+        localStorage.setItem('votedActivities', JSON.stringify(filteredVotes));
+        console.log('Admin: Cleared localStorage votes for', roomActivityIds.length, 'activities');
+      }
       
       // Update the room in state
       setRooms(prev => prev.map(room => 

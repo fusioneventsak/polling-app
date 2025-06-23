@@ -668,6 +668,9 @@ export class RoomService {
         }
       }
 
+      // Add a small delay to ensure all database changes are committed
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
       // Fetch and return the updated room
       const { data: room, error: fetchError } = await supabase
         .from('rooms')

@@ -104,7 +104,13 @@ function GameJoinPage() {
           filter: `id=eq.${joinedRoom.id}`
         },
         async (payload) => {
-          console.log('GameJoin: Room change received:', payload);
+          console.log('GameJoin: Room change received:', {
+            eventType: payload.eventType,
+            roomId: payload.new?.id || payload.old?.id,
+            oldParticipants: payload.old?.participants,
+            newParticipants: payload.new?.participants
+          });
+          
           if (payload.eventType === 'DELETE' || (payload.new && !payload.new.is_active)) {
             console.log('GameJoin: Room deleted or deactivated');
             setJoinedRoom(null);
@@ -112,6 +118,23 @@ function GameJoinPage() {
             navigate('/game');
             return;
           }
+          
+          // Detect room reset (participants count reset to 0)
+          if (payload.eventType === 'UPDATE' && 
+              payload.old?.participants > 0 && 
+              payload.new?.participants === 0) {
+            console.log('GameJoin: Room reset detected - clearing all localStorage votes');
+            
+            // Clear all localStorage votes for this room's activities
+            if (joinedRoom.activities) {
+              const votedActivities = JSON.parse(localStorage.getItem('votedActivities') || '[]');
+              const roomActivityIds = joinedRoom.activities.map(a => a.id);
+              const filteredVotes = votedActivities.filter((id: string) => !roomActivityIds.includes(id));
+              localStorage.setItem('votedActivities', JSON.stringify(filteredVotes));
+              console.log('GameJoin: Cleared localStorage votes after room reset');
+            }
+          }
+          
           await loadJoinedRoom(joinedRoom.code);
         }
       )
