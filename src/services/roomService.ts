@@ -591,6 +591,105 @@ export class RoomService {
     }, 'resetRoomResponses');
   }
 
+  // Reset room (clear all responses and reset counts)
+  async resetRoom(roomId: string): Promise<Room> {
+    if (!supabase) {
+      throw new Error('Supabase not initialized');
+    }
+
+    return retrySupabaseOperation(async () => {
+      console.log('RoomService: Resetting room:', roomId);
+
+      // Try to use the database function if it exists
+      try {
+        const { error: resetError } = await supabase
+          .rpc('reset_room_vote_counts', { room_id: roomId });
+
+        if (resetError) {
+          console.warn('RoomService: Database function not available, using manual reset:', resetError);
+          throw resetError;
+        }
+
+        console.log('RoomService: Room reset using database function');
+      } catch (rpcError) {
+        console.warn('RoomService: Database function not available, using manual reset');
+        
+        // Manual reset process
+        // Step 1: Delete all participant responses for this room
+        const { error: deleteResponsesError } = await supabase
+          .from('participant_responses')
+          .delete()
+          .eq('room_id', roomId);
+
+        if (deleteResponsesError) {
+          throw handleSupabaseError(deleteResponsesError, 'deleteResponses');
+        }
+
+        // Step 2: Reset all activity option response counts to 0
+        const { error: resetOptionsError } = await supabase
+          .from('activity_options')
+          .update({ responses: 0 })
+          .in('activity_id', 
+            supabase
+              .from('activities')
+              .select('id')
+              .eq('room_id', roomId)
+          );
+
+        if (resetOptionsError) {
+          throw handleSupabaseError(resetOptionsError, 'resetOptionCounts');
+        }
+
+        // Step 3: Reset all activity total response counts and deactivate activities
+        const { error: resetActivitiesError } = await supabase
+          .from('activities')
+          .update({ 
+            total_responses: 0,
+            is_active: false
+          })
+          .eq('room_id', roomId);
+
+        if (resetActivitiesError) {
+          throw handleSupabaseError(resetActivitiesError, 'resetActivityCounts');
+        }
+
+        // Step 4: Reset room state
+        const { error: resetRoomError } = await supabase
+          .from('rooms')
+          .update({
+            participants: 0,
+            current_activity_id: null,
+            current_activity_type: null
+          })
+          .eq('id', roomId);
+
+        if (resetRoomError) {
+          throw handleSupabaseError(resetRoomError, 'resetRoomState');
+        }
+      }
+
+      // Fetch and return the updated room
+      const { data: room, error: fetchError } = await supabase
+        .from('rooms')
+        .select(`
+          *,
+          activities!activities_room_id_fkey(
+            *,
+            options:activity_options(*)
+          )
+        `)
+        .eq('id', roomId)
+        .single();
+
+      if (fetchError) {
+        throw handleSupabaseError(fetchError, 'fetchResetRoom');
+      }
+
+      console.log('RoomService: Room reset successfully');
+      return room;
+    }, 'resetRoom');
+  }
+
   // Lock/unlock voting for an activity
   async toggleActivityVoting(activityId: string, locked: boolean): Promise<void> {
     if (!supabase) {
