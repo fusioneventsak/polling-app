@@ -1,6 +1,4 @@
-import React, { useEffect, useState, useCallback, useRef }
-
-export { GameJoinPage }; from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../lib/supabase';
@@ -561,3 +559,5 @@ function GameJoinPage() {
     </div>
   );
 }
+
+export { GameJoinPage };
