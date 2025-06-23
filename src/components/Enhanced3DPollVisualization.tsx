@@ -143,7 +143,7 @@ const StandingImagePlane: React.FC<{
   }
 
   return (
-    <mesh position={position} renderOrder={2}>
+    <mesh position={position} rotation={[Math.PI / 6, 0, 0]} renderOrder={2}>
       <planeGeometry args={[2.0, 1.5]} />
       <meshBasicMaterial 
         map={texture}
@@ -394,7 +394,7 @@ const StandingImagesDisplay: React.FC<{
             fallback={<group />}
           >
             <group>
-              {/* Standing image - bottom edge sits on floor plane */}
+              {/* Standing image - tilted up towards camera */}
               <StandingImagePlane
                 imageUrl={option.media_url}
                 position={[xPosition, 0.75, 3]}
@@ -428,7 +428,7 @@ const Enhanced3DScene: React.FC<{
     // Animate to final position
     const animateCamera = () => {
       const targetX = 0;
-      const targetY = 0.75; // Same height as image centers for straight-on view
+      const targetY = 4; // Higher to see floor stats
       const targetZ = 15; // Closer than original 20
       
       const animationDuration = 2000; // 2 seconds
@@ -445,9 +445,6 @@ const Enhanced3DScene: React.FC<{
         camera.position.x = startPos.x + (targetX - startPos.x) * easeProgress;
         camera.position.y = startPos.y + (targetY - startPos.y) * easeProgress;
         camera.position.z = startPos.z + (targetZ - startPos.z) * easeProgress;
-        
-        // Point camera directly at the center of the scene at image height
-        camera.lookAt(0, 0.75, 0);
         
         if (progress < 1) {
           requestAnimationFrame(animate);
@@ -760,11 +757,10 @@ export const Enhanced3DPollVisualization: React.FC<Enhanced3DPollVisualizationPr
               enableRotate={true}
               minDistance={8}
               maxDistance={25}
-              minPolarAngle={Math.PI / 2 - 0.1}
-              maxPolarAngle={Math.PI / 2 + 0.1}
+              minPolarAngle={Math.PI / 8}
+              maxPolarAngle={Math.PI / 2.5}
               autoRotate={false}
               rotateSpeed={0.5}
-              target={[0, 0.75, 0]}
             />
           </Canvas>
         </Suspense>
