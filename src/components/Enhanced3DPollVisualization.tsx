@@ -143,7 +143,7 @@ const StandingImagePlane: React.FC<{
   }
 
   return (
-    <mesh position={position} rotation={[Math.PI / 6, 0, 0]} renderOrder={2}>
+    <mesh position={position} rotation={[-Math.PI / 6, 0, 0]} renderOrder={2}>
       <planeGeometry args={[2.0, 1.5]} />
       <meshBasicMaterial 
         map={texture}
