@@ -1,7 +1,6 @@
 import React, { useEffect, useState, useCallback, useRef }
 
-export { GameJoinPage };
-export default GameJoinPage; from 'react';
+export { GameJoinPage }; from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../lib/supabase';
