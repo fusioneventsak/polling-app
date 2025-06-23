@@ -1,7 +1,8 @@
 import React, { useRef, useMemo, useEffect, useState, Suspense } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { Text, OrbitControls, Float } from '@react-three/drei';
+import { Text, OrbitControls, Float, Text3D, Center, MeshTransmissionMaterial } from '@react-three/drei';
 import { motion } from 'framer-motion';
+import * as THREE from 'three';
 import * as THREE from 'three';
 import type { ActivityOption } from '../types';
 
@@ -240,7 +241,7 @@ const Enhanced3DBar: React.FC<{
   );
 };
 
-// Floor Stats Component
+// Floor Stats Component with 3D Text
 const FloorStatsDisplay: React.FC<{
   options: ActivityOption[];
   totalResponses: number;
@@ -257,72 +258,135 @@ const FloorStatsDisplay: React.FC<{
         const startX = -totalWidth / 2;
         const xPosition = startX + index * spacing;
         
+        // Dynamic colors based on percentage
+        const hue = (index / Math.max(options.length - 1, 1)) * 300;
+        const barColor = option.is_correct 
+          ? '#10b981' 
+          : `hsl(${200 + hue}, 75%, 60%)`;
+        
         return (
           <group key={option.id}>
-            {/* Percentage text with enhanced visibility */}
+            {/* Background platform for text */}
+            <mesh position={[xPosition, 0.05, 7]} rotation={[-Math.PI / 2, 0, 0]}>
+              <planeGeometry args={[spacing * 0.9, 3.5]} />
+              <meshStandardMaterial 
+                color="#1e293b"
+                transparent
+                opacity={0.8}
+                metalness={0.5}
+                roughness={0.3}
+              />
+            </mesh>
+            
+            {/* 3D Percentage text with depth */}
+            <Center position={[xPosition, 0.3, 6]}>
+              <Text3D
+                font="/fonts/Inter_Bold.json" // You'll need to add this font
+                size={0.8}
+                height={0.1}
+                curveSegments={12}
+                bevelEnabled
+                bevelThickness={0.02}
+                bevelSize={0.02}
+                bevelOffset={0}
+                bevelSegments={5}
+                rotation={[-Math.PI / 2, 0, 0]}
+              >
+                {percentage}%
+                <meshStandardMaterial 
+                  color={barColor}
+                  metalness={0.8}
+                  roughness={0.2}
+                  emissive={barColor}
+                  emissiveIntensity={0.3}
+                />
+              </Text3D>
+            </Center>
+            
+            {/* Glowing flat percentage text as backup */}
             <Text
-              position={[xPosition, 0.12, 6]}
-              fontSize={2.0}
-              color="#ffffff"
+              position={[xPosition, 0.15, 6]}
+              fontSize={1.6}
+              color={barColor}
               anchorX="center"
               anchorY="middle"
               rotation={[-Math.PI / 2, 0, 0]}
-              strokeWidth={0.02}
-              strokeColor="#000000"
+              outlineWidth={0.05}
+              outlineColor="#000000"
             >
               {percentage}%
             </Text>
             
-            {/* Shadow for percentage text */}
-            <Text
-              position={[xPosition + 0.1, 0.08, 6.1]}
-              fontSize={2.0}
-              color="#1e293b"
-              anchorX="center"
-              anchorY="middle"
-              rotation={[-Math.PI / 2, 0, 0]}
-            >
-              {percentage}%
-            </Text>
+            {/* 3D Vote count */}
+            <Center position={[xPosition, 0.2, 7.5]}>
+              <Text3D
+                font="/fonts/Inter_Regular.json"
+                size={0.3}
+                height={0.05}
+                curveSegments={8}
+                bevelEnabled
+                bevelThickness={0.01}
+                bevelSize={0.01}
+                rotation={[-Math.PI / 2, 0, 0]}
+              >
+                {option.responses} votes
+                <meshStandardMaterial 
+                  color="#94a3b8"
+                  metalness={0.6}
+                  roughness={0.4}
+                />
+              </Text3D>
+            </Center>
             
-            {/* Vote count with better visibility */}
+            {/* Fallback vote count */}
             <Text
               position={[xPosition, 0.12, 7.5]}
-              fontSize={1.0}
+              fontSize={0.8}
               color="#94a3b8"
               anchorX="center"
               anchorY="middle"
               rotation={[-Math.PI / 2, 0, 0]}
-              strokeWidth={0.01}
-              strokeColor="#000000"
+              outlineWidth={0.02}
+              outlineColor="#000000"
             >
               {option.responses} votes
             </Text>
             
-            {/* Option text - much larger and more visible */}
+            {/* 3D Option text */}
+            <Center position={[xPosition, 0.2, 8.5]}>
+              <Text3D
+                font="/fonts/Inter_Regular.json"
+                size={0.35}
+                height={0.06}
+                curveSegments={8}
+                bevelEnabled
+                bevelThickness={0.015}
+                bevelSize={0.015}
+                rotation={[-Math.PI / 2, 0, 0]}
+              >
+                {option.text.length > 25 ? `${option.text.substring(0, 25)}...` : option.text}
+                <meshStandardMaterial 
+                  color="#e2e8f0"
+                  metalness={0.4}
+                  roughness={0.5}
+                />
+              </Text3D>
+            </Center>
+            
+            {/* Fallback option text */}
             <Text
-              position={[xPosition, 0.12, 9]}
-              fontSize={1.2}
+              position={[xPosition, 0.12, 8.5]}
+              fontSize={0.9}
               color="#e2e8f0"
               anchorX="center"
               anchorY="middle"
               rotation={[-Math.PI / 2, 0, 0]}
-              maxWidth={8}
-              strokeWidth={0.01}
-              strokeColor="#1e293b"
+              maxWidth={spacing * 0.8}
+              outlineWidth={0.02}
+              outlineColor="#1e293b"
             >
-              {option.text.length > 35 ? `${option.text.substring(0, 35)}...` : option.text}
+              {option.text.length > 30 ? `${option.text.substring(0, 30)}...` : option.text}
             </Text>
-            
-            {/* Background rectangle for better text contrast */}
-            <mesh position={[xPosition, 0.08, 8]} rotation={[-Math.PI / 2, 0, 0]}>
-              <planeGeometry args={[spacing * 0.8, 4]} />
-              <meshBasicMaterial 
-                color="#1e293b"
-                transparent
-                opacity={0.7}
-              />
-            </mesh>
           </group>
         );
       })}
@@ -594,7 +658,7 @@ export const Enhanced3DPollVisualization: React.FC<Enhanced3DPollVisualizationPr
       className={`w-full h-full bg-gradient-to-br from-slate-900/40 to-blue-900/20 rounded-xl border border-slate-700 overflow-hidden shadow-2xl relative ${className}`}
       style={{ 
         height: '100%', 
-        minHeight: '800px',
+        minHeight: '900px',
         width: '100%',
         minWidth: '100%',
         position: 'relative'
