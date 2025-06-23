@@ -197,8 +197,38 @@ const Enhanced3DBar: React.FC<{
           />
           
           {/* Subtle gradient overlay to blend with scene */}
-          <mesh position={[position[0], 3.0, position[2] - 2.4]}>
+          <mesh position={[position[0], 3.0, position[2] - 2.55]}>
             <planeGeometry args={[2.8, 4.0]} />
+            <meshBasicMaterial 
+              transparent
+              opacity={0.1}
+              color="#0f172a"
+            />
+          </mesh>
+          
+          {/* Top fade mask */}
+          <mesh position={[position[0], 4.8, position[2] - 2.6]}>
+            <planeGeometry args={[3.0, 1.0]} />
+            <meshBasicMaterial 
+              transparent
+              opacity={0.2}
+              color="#0f172a"
+            />
+          </mesh>
+          
+          {/* Bottom fade mask */}
+          <mesh position={[position[0], 1.2, position[2] - 2.6]}>
+            <planeGeometry args={[3.0, 1.0]} />
+            <meshBasicMaterial 
+              transparent
+              opacity={0.2}
+              color="#0f172a"
+            />
+          </mesh>
+
+          {/* Side fade masks for better blending */}
+          <mesh position={[position[0] - 1.6, 3.0, position[2] - 2.6]}>
+            <planeGeometry args={[0.6, 4.2]} />
             <meshBasicMaterial 
               transparent
               opacity={0.3}
@@ -206,41 +236,11 @@ const Enhanced3DBar: React.FC<{
             />
           </mesh>
           
-          {/* Top fade mask */}
-          <mesh position={[position[0], 4.8, position[2] - 2.3]}>
-            <planeGeometry args={[3.0, 1.0]} />
-            <meshBasicMaterial 
-              transparent
-              opacity={0.8}
-              color="#0f172a"
-            />
-          </mesh>
-          
-          {/* Bottom fade mask */}
-          <mesh position={[position[0], 1.2, position[2] - 2.3]}>
-            <planeGeometry args={[3.0, 1.0]} />
-            <meshBasicMaterial 
-              transparent
-              opacity={0.8}
-              color="#0f172a"
-            />
-          </mesh>
-
-          {/* Side fade masks for better blending */}
-          <mesh position={[position[0] - 1.6, 3.0, position[2] - 2.3]}>
+          <mesh position={[position[0] + 1.6, 3.0, position[2] - 2.6]}>
             <planeGeometry args={[0.6, 4.2]} />
             <meshBasicMaterial 
               transparent
-              opacity={0.9}
-              color="#0f172a"
-            />
-          </mesh>
-          
-          <mesh position={[position[0] + 1.6, 3.0, position[2] - 2.3]}>
-            <planeGeometry args={[0.6, 4.2]} />
-            <meshBasicMaterial 
-              transparent
-              opacity={0.9}
+              opacity={0.3}
               color="#0f172a"
             />
           </mesh>
