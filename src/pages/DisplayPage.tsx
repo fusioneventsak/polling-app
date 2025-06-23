@@ -1,4 +1,7 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useCallback, useRef }
+
+export { DisplayPage };
+export default DisplayPage; from 'react';
 import { useParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../lib/supabase';
@@ -308,7 +311,7 @@ const FixedPoll3DVisualization: React.FC<{
   );
 };
 
-export default function DisplayPage() {
+function DisplayPage() {
   const { pollId } = useParams();
   const [currentRoom, setCurrentRoom] = useState<Room | null>(null);
   const [loading, setLoading] = useState(true);
