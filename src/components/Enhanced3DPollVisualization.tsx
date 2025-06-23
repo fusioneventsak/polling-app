@@ -394,10 +394,10 @@ const StandingImagesDisplay: React.FC<{
             fallback={<group />}
           >
             <group>
-              {/* Standing image - on floor plane, forward of bars to avoid highlight covering */}
+              {/* Standing image - bottom edge sits on floor plane */}
               <StandingImagePlane
                 imageUrl={option.media_url}
-                position={[xPosition, 0.1, 3]}
+                position={[xPosition, 0.75, 3]}
                 fallbackText={`Option ${String.fromCharCode(65 + index)}`}
               />
             </group>
