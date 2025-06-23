@@ -19,33 +19,36 @@ interface Enhanced3DPollVisualizationProps {
   className?: string;
 }
 
-// Separate component for handling texture loading
+// Fixed component for handling texture loading with useTexture
 const OptionMediaPlane: React.FC<{
   imageUrl: string;
   position: [number, number, number];
 }> = ({ imageUrl, position }) => {
-  const [texture, setTexture] = useState<THREE.Texture | null>(null);
+  console.log('OptionMediaPlane: Attempting to load texture for URL:', imageUrl);
   
-  useEffect(() => {
-    if (imageUrl) {
-      const loader = new THREE.TextureLoader();
-      loader.load(
-        imageUrl,
-        (loadedTexture) => {
-          loadedTexture.flipY = false;
-          loadedTexture.wrapS = THREE.ClampToEdgeWrapping;
-          loadedTexture.wrapT = THREE.ClampToEdgeWrapping;
-          loadedTexture.minFilter = THREE.LinearFilter;
-          loadedTexture.magFilter = THREE.LinearFilter;
-          setTexture(loadedTexture);
-        },
-        undefined,
-        (error) => console.warn('Failed to load option media texture:', error)
-      );
-    }
-  }, [imageUrl]);
+  // Use useTexture hook directly with the imageUrl
+  const texture = useTexture(imageUrl, (loadedTexture) => {
+    console.log('OptionMediaPlane: Texture loaded successfully for:', imageUrl);
+    // Apply texture properties once loaded
+    loadedTexture.flipY = false;
+    loadedTexture.wrapS = THREE.ClampToEdgeWrapping;
+    loadedTexture.wrapT = THREE.ClampToEdgeWrapping;
+    loadedTexture.minFilter = THREE.LinearFilter;
+    loadedTexture.magFilter = THREE.LinearFilter;
+  });
 
-  return texture ? <primitive object={texture} attach="map" /> : null;
+  console.log('OptionMediaPlane: Texture object:', texture ? 'loaded' : 'loading');
+
+  if (!texture) {
+    console.log('OptionMediaPlane: No texture available yet for:', imageUrl);
+    return null;
+  }
+
+  return (
+    <meshBasicMaterial transparent opacity={0.85}>
+      <primitive object={texture} attach="map" />
+    </meshBasicMaterial>
+  );
 };
 
 // 3D Bar Component with Enhanced Image Display
@@ -76,9 +79,10 @@ const Enhanced3DBar: React.FC<{
 }) => {
   const meshRef = useRef<THREE.Mesh>(null);
   const glowRef = useRef<THREE.Mesh>(null);
-  const backgroundImageRef = useRef<THREE.Mesh>(null);
   const imagePlaneRef = useRef<THREE.Mesh>(null);
   const [animatedHeight, setAnimatedHeight] = useState(0.2);
+  
+  console.log(`Enhanced3DBar ${index}: imageUrl =`, imageUrl);
   
   // Animate the bar height and image position
   useFrame((state) => {
@@ -141,9 +145,7 @@ const Enhanced3DBar: React.FC<{
             {/* Main background image plane */}
             <mesh position={[position[0], 3.0, position[2] - 3.0]}>
               <planeGeometry args={[2.8, 4.0]} />
-              <meshBasicMaterial transparent opacity={0.85}>
-                <OptionMediaPlane imageUrl={imageUrl} position={position} />
-              </meshBasicMaterial>
+              <OptionMediaPlane imageUrl={imageUrl} position={position} />
             </mesh>
             
             {/* Vertical gradient mask overlay */}
@@ -216,7 +218,7 @@ const Enhanced3DBar: React.FC<{
         </mesh>
       )}
       
-      {/* 3D Text Labels with better positioning - NO FONT REFERENCES */}
+      {/* 3D Text Labels with better positioning */}
       <Float speed={0.5} rotationIntensity={0.05} floatIntensity={0.1}>
         {/* Response count */}
         <Text
@@ -311,6 +313,13 @@ const Enhanced3DScene: React.FC<{
   const maxResponses = Math.max(...options.map(opt => opt.responses), 1);
   const maxHeight = 4;
   
+  console.log('Enhanced3DScene: Rendering with options:', options.map(opt => ({
+    id: opt.id,
+    text: opt.text,
+    media_url: opt.media_url,
+    responses: opt.responses
+  })));
+  
   return (
     <>
       {/* Enhanced lighting setup */}
@@ -399,6 +408,8 @@ const Enhanced3DScene: React.FC<{
           ? '#10b981' 
           : `hsl(${200 + hue}, ${saturation}%, ${lightness}%)`;
         
+        console.log(`Enhanced3DScene: Creating bar ${index} with imageUrl:`, option.media_url);
+        
         return (
           <Enhanced3DBar
             key={option.id}
@@ -417,7 +428,7 @@ const Enhanced3DScene: React.FC<{
         );
       })}
       
-      {/* ENHANCED FLOATING TITLE - Much Higher and Bigger - NO FONT REFERENCES */}
+      {/* ENHANCED FLOATING TITLE - Much Higher and Bigger */}
       <Float speed={0.3} rotationIntensity={0.01} floatIntensity={0.05}>
         {/* Main title with thick 3D effect */}
         <Text
@@ -494,7 +505,18 @@ export const Enhanced3DPollVisualization: React.FC<Enhanced3DPollVisualizationPr
   isVotingLocked,
   className = '' 
 }) => {
-  console.log('Enhanced3DPollVisualization props:', { options, totalResponses, themeColors });
+  console.log('Enhanced3DPollVisualization: Received props:', { 
+    optionsCount: options.length,
+    totalResponses, 
+    themeColors,
+    activityTitle,
+    optionsWithMedia: options.filter(opt => opt.media_url).length
+  });
+
+  // Log each option's media URL for debugging
+  options.forEach((option, index) => {
+    console.log(`Enhanced3DPollVisualization: Option ${index} (${option.text}) media_url:`, option.media_url);
+  });
 
   if (!options || options.length === 0) {
     return (
