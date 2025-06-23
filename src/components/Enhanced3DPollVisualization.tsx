@@ -1,7 +1,7 @@
 import React, { useRef, useMemo, useEffect, useState, Suspense } from 'react';
-import { Canvas, useFrame, useLoader, useThree } from '@react-three/fiber';
-import { Text, OrbitControls, Environment, Float, Html, useTexture } from '@react-three/drei';
-import { motion, AnimatePresence } from 'framer-motion';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
+import { Text, OrbitControls, Float } from '@react-three/drei';
+import { motion } from 'framer-motion';
 import * as THREE from 'three';
 import type { ActivityOption } from '../types';
 
@@ -177,7 +177,7 @@ const Enhanced3DBar: React.FC<{
         </Float>
       )}
       
-      {/* 3D Text Labels with better positioning */}
+      {/* 3D Text Labels with better positioning - NO FONT REFERENCES */}
       <Float speed={0.5} rotationIntensity={0.05} floatIntensity={0.1}>
         {/* Percentage display - large and prominent */}
         <Text
@@ -186,9 +186,6 @@ const Enhanced3DBar: React.FC<{
           color="#ffffff"
           anchorX="center"
           anchorY="middle"
-          font="/fonts/Inter-Bold.woff"
-          outlineWidth={0.02}
-          outlineColor="#000000"
         >
           {percentage}%
         </Text>
@@ -200,7 +197,6 @@ const Enhanced3DBar: React.FC<{
           color="#94a3b8"
           anchorX="center"
           anchorY="middle"
-          font="/fonts/Inter-Medium.woff"
         >
           {responses} {responses === 1 ? 'vote' : 'votes'}
         </Text>
@@ -213,7 +209,6 @@ const Enhanced3DBar: React.FC<{
           anchorX="center"
           anchorY="middle"
           maxWidth={3}
-          font="/fonts/Inter-Regular.woff"
         >
           {label.length > 30 ? `${label.substring(0, 30)}...` : label}
         </Text>
@@ -226,7 +221,6 @@ const Enhanced3DBar: React.FC<{
             color="#10b981"
             anchorX="center"
             anchorY="middle"
-            font="/fonts/Inter-Bold.woff"
           >
             ✓ CORRECT
           </Text>
@@ -239,9 +233,6 @@ const Enhanced3DBar: React.FC<{
           color={barColor}
           anchorX="center"
           anchorY="middle"
-          font="/fonts/Inter-Bold.woff"
-          outlineWidth={0.02}
-          outlineColor="#000000"
         >
           {String.fromCharCode(65 + index)}
         </Text>
@@ -255,7 +246,6 @@ const Enhanced3DBar: React.FC<{
         anchorX="center"
         anchorY="middle"
         rotation={[-Math.PI / 6, 0, 0]}
-        font="/fonts/Inter-Regular.woff"
       >
         Option {index + 1}
       </Text>
@@ -319,9 +309,6 @@ const Enhanced3DScene: React.FC<{
         color="#ffffff"
         castShadow
       />
-      
-      {/* Environment for reflections */}
-      <Environment preset="city" />
       
       {/* Enhanced ground plane with reflective material */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow>
@@ -402,7 +389,7 @@ const Enhanced3DScene: React.FC<{
         );
       })}
       
-      {/* Floating title */}
+      {/* Floating title - NO FONT REFERENCES */}
       <Float speed={0.5} rotationIntensity={0.02} floatIntensity={0.1}>
         <Text
           position={[0, 8, -5]}
@@ -410,9 +397,6 @@ const Enhanced3DScene: React.FC<{
           color="#ffffff"
           anchorX="center"
           anchorY="middle"
-          font="/fonts/Inter-Bold.woff"
-          outlineWidth={0.02}
-          outlineColor="#000000"
         >
           {totalResponses > 0 ? 'Live Poll Results' : (activityTitle || 'Poll Options')}
         </Text>
@@ -423,7 +407,6 @@ const Enhanced3DScene: React.FC<{
           color="#94a3b8"
           anchorX="center"
           anchorY="middle"
-          font="/fonts/Inter-Medium.woff"
         >
           {totalResponses > 0 ? `${totalResponses} total responses` : 'Waiting for responses...'}
         </Text>
@@ -552,9 +535,7 @@ export const Enhanced3DPollVisualization: React.FC<Enhanced3DPollVisualizationPr
           gl={{ 
             antialias: true, 
             alpha: true,
-            powerPreference: "high-performance",
-            toneMapping: THREE.ACESFilmicToneMapping,
-            toneMappingExposure: 1.2
+            powerPreference: "high-performance"
           }}
         >
           <Enhanced3DScene 

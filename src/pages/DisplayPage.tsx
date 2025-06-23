@@ -792,38 +792,38 @@ function DisplayPage() {
           className="h-full"
         >
           {/* Enhanced Header */}
-          <div className="p-6 border-b border-slate-700/50 bg-slate-800/30 backdrop-blur-sm">
+          <div className="p-3 border-b border-slate-700/50 bg-slate-800/30 backdrop-blur-sm">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
                 <div className="flex items-center gap-3">
                   {React.createElement(getActivityIcon(activeActivity.type), {
-                    className: "w-8 h-8 text-blue-400"
+                    className: "w-6 h-6 text-blue-400"
                   })}
                   <div>
-                    <h1 className="text-2xl font-bold text-white">{activeActivity.title}</h1>
-                    <p className="text-slate-400">{getActivityTypeLabel(activeActivity.type)}</p>
+                    <h1 className="text-xl font-bold text-white">{activeActivity.title}</h1>
+                    <p className="text-sm text-slate-400">{getActivityTypeLabel(activeActivity.type)}</p>
                   </div>
                 </div>
               </div>
               
-              <div className="flex items-center gap-6 text-slate-300">
+              <div className="flex items-center gap-4 text-slate-300 text-sm">
                 <div className="flex items-center gap-2">
-                  <Users className="w-5 h-5" />
+                  <Users className="w-4 h-4" />
                   <span>{currentRoom.participants} participants</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Clock className="w-5 h-5" />
+                  <Clock className="w-4 h-4" />
                   <span>{formatTime(currentTime)}</span>
                 </div>
                 <div className="text-slate-400">
-                  Room: <span className="font-mono font-bold text-blue-400">{currentRoom.code}</span>
+                  <span className="font-mono font-bold text-blue-400">{currentRoom.code}</span>
                 </div>
               </div>
             </div>
           </div>
 
           {/* Activity Results Visualization */}
-          <div className="flex-1 p-6">
+          <div className="flex-1 p-4">
             <Enhanced3DPollVisualization
               options={activeActivity.options || []}
               totalResponses={activeActivity.total_responses || 0}
