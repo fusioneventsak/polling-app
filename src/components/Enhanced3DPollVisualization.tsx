@@ -43,7 +43,7 @@ const OptionMediaPlane: React.FC<{
     if (texture) {
       console.log('OptionMediaPlane: Texture loaded successfully for:', imageUrl);
       // Apply texture properties for better rendering
-      texture.flipY = false; // Correct orientation for web images
+      texture.flipY = true; // Correct orientation for floor placement
       texture.wrapS = THREE.ClampToEdgeWrapping;
       texture.wrapT = THREE.ClampToEdgeWrapping;
       texture.minFilter = THREE.LinearFilter;
@@ -66,7 +66,7 @@ const OptionMediaPlane: React.FC<{
         map={texture} 
         transparent 
         opacity={0.8}
-        side={THREE.DoubleSide}
+        side={THREE.FrontSide}
         depthWrite={false}
       />
     </mesh>
@@ -93,6 +93,49 @@ const OptionMediaFallback: React.FC<{
       >
         📷 {text}
       </Text>
+    </mesh>
+  );
+};
+
+// Floor-positioned image component with correct orientation
+const FloorImagePlane: React.FC<{
+  imageUrl: string;
+  position: [number, number, number];
+  fallbackText: string;
+}> = ({ imageUrl, position, fallbackText }) => {
+  const [texture, setTexture] = useState<THREE.Texture | null>(null);
+  const [loadError, setLoadError] = useState(false);
+  
+  useEffect(() => {
+    if (imageUrl && imageUrl.trim() !== '') {
+      const loader = new THREE.TextureLoader();
+      loader.setCrossOrigin('anonymous');
+      loader.load(
+        imageUrl,
+        (loadedTexture) => {
+          loadedTexture.flipY = false; // Important for floor placement
+          loadedTexture.wrapS = THREE.ClampToEdgeWrapping;
+          loadedTexture.wrapT = THREE.ClampToEdgeWrapping;
+          setTexture(loadedTexture);
+          console.log('FloorImagePlane: Texture loaded for floor placement:', imageUrl);
+        },
+        undefined,
+        (error) => {
+          console.warn('FloorImagePlane: Failed to load texture:', error);
+          setLoadError(true);
+        }
+      );
+    }
+  }, [imageUrl]);
+
+  if (!texture || loadError || !imageUrl || imageUrl.trim() === '') {
+    return null; // Don't show fallback on floor, just skip
+  }
+
+  return (
+    <mesh position={position} rotation={[-Math.PI / 2, 0, 0]} renderOrder={1}>
+      <planeGeometry args={[2.5, 1.875]} />
+      <meshBasicMaterial map={texture} transparent opacity={0.9} />
     </mesh>
   );
 };
@@ -190,12 +233,11 @@ const Enhanced3DBar: React.FC<{
 }) => {
   const meshRef = useRef<THREE.Mesh>(null);
   const glowRef = useRef<THREE.Mesh>(null);
-  const imagePlaneRef = useRef<THREE.Group>(null);
   const [animatedHeight, setAnimatedHeight] = useState(0.2);
   
   console.log(`Enhanced3DBar ${index}: imageUrl =`, imageUrl);
   
-  // Animate the bar height and image position
+  // Animate the bar height
   useFrame((state) => {
     const targetHeight = Math.max(height, 0.2);
     
@@ -229,12 +271,6 @@ const Enhanced3DBar: React.FC<{
         glowRef.current.material.opacity = pulseIntensity;
       }
     }
-
-    // Subtle animation for background image
-    if (imagePlaneRef.current && imageUrl) {
-      // Very subtle floating motion
-      imagePlaneRef.current.position.y = 3.5 + Math.sin(state.clock.elapsedTime * 0.5 + delay) * 0.1;
-    } 
   });
 
   const barColor = useMemo(() => {
@@ -260,33 +296,21 @@ const Enhanced3DBar: React.FC<{
 
   return (
     <group>
-      {/* Option media image behind the bar - ENHANCED VERSION */}
+      {/* Option media image on the floor in front of the bar */}
       {hasValidImage && (
-        <group ref={imagePlaneRef}>
+        <group>
           {console.log(`Enhanced3DBar ${index}: Rendering image group for:`, imageUrl)}
           
-          {/* Main background image plane - positioned clearly behind the bar */}
-          <SafeOptionMediaPlane 
+          {/* Main image plane - positioned on the floor in front of the bar with correct orientation */}
+          <FloorImagePlane 
             imageUrl={imageUrl} 
-            position={[position[0], animatedHeight + 2.0, position[2] - 3.0]}
+            position={[position[0], 0.02, position[2] + 3.0]}
             fallbackText={`Option ${String.fromCharCode(65 + index)}`}
-            debug={true}
           />
           
-          {/* Debug indicator that image should be here */}
-          <Text
-            position={[position[0], animatedHeight + 3.5, position[2] - 2.8]}
-            fontSize={0.2}
-            color="#00ff00"
-            anchorX="center"
-            anchorY="middle"
-          >
-            🖼️ IMG: {imageUrl.split('/').pop()?.substring(0, 10)}...
-          </Text>
-          
-          {/* Subtle frame around image area */}
-          <mesh position={[position[0], animatedHeight + 2.0, position[2] - 2.95]}>
-            <planeGeometry args={[3.2, 2.4]} />
+          {/* Subtle frame around image area on the floor */}
+          <mesh position={[position[0], 0.01, position[2] + 3.0]} rotation={[-Math.PI / 2, 0, 0]}>
+            <planeGeometry args={[3.2, 2.45]} />
             <meshBasicMaterial 
               transparent
               opacity={0.3}
@@ -430,7 +454,7 @@ const Enhanced3DBar: React.FC<{
           anchorX="center"
           anchorY="middle"
         >
-          📷 HAS IMAGE
+          📷 FLOOR IMAGE
         </Text>
       )}
       
