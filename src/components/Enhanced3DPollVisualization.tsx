@@ -428,7 +428,7 @@ const Enhanced3DScene: React.FC<{
     // Animate to final position
     const animateCamera = () => {
       const targetX = 0;
-      const targetY = 8;
+      const targetY = 2; // Much lower to look at images head-on
       const targetZ = 15; // Closer than original 20
       
       const animationDuration = 2000; // 2 seconds
@@ -755,10 +755,10 @@ export const Enhanced3DPollVisualization: React.FC<Enhanced3DPollVisualizationPr
               enablePan={false}
               enableZoom={true}
               enableRotate={true}
-              minDistance={10}
-              maxDistance={30}
-              minPolarAngle={Math.PI / 8}
-              maxPolarAngle={Math.PI / 2}
+              minDistance={8}
+              maxDistance={25}
+              minPolarAngle={0}
+              maxPolarAngle={Math.PI / 2.5}
               autoRotate={false}
               rotateSpeed={0.5}
             />
