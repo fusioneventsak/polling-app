@@ -340,7 +340,7 @@ const StandingImagesDisplay: React.FC<{
           <group key={option.id}>
             <StandingImagePlane
               imageUrl={option.media_url}
-              position={[xPosition, 0, 1]}
+              position={[xPosition, 0, 4]}
               fallbackText={`Option ${String.fromCharCode(65 + index)}`}
               glowColor={glowColor}
             />
