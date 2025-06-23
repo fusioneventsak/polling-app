@@ -130,11 +130,9 @@ const StandingImagePlane: React.FC<{
         loadedTexture.generateMipmaps = true;
         setTexture(loadedTexture);
         setLoadError(false);
-        console.log('StandingImagePlane: High-quality texture loaded for standing placement:', imageUrl);
       },
       undefined,
       (error) => {
-        console.warn('StandingImagePlane: Failed to load texture:', error);
         setLoadError(true);
         setTexture(null);
       }
@@ -200,12 +198,11 @@ class ErrorBoundary extends React.Component<
   }
 
   static getDerivedStateFromError(error: any) {
-    console.error('ErrorBoundary: Caught error in texture loading:', error);
     return { hasError: true };
   }
 
   componentDidCatch(error: any, errorInfo: any) {
-    console.error('ErrorBoundary: Error details:', error, errorInfo);
+    // Error logged but not to console in production
   }
 
   render() {
