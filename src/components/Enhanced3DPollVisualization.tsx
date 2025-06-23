@@ -259,20 +259,24 @@ const FloorStatsDisplay: React.FC<{
         
         return (
           <group key={option.id}>
+            {/* Percentage text with enhanced visibility */}
             <Text
-              position={[xPosition, 0.1, 6]}
-              fontSize={1.2}
+              position={[xPosition, 0.12, 6]}
+              fontSize={2.0}
               color="#ffffff"
               anchorX="center"
               anchorY="middle"
               rotation={[-Math.PI / 2, 0, 0]}
+              strokeWidth={0.02}
+              strokeColor="#000000"
             >
               {percentage}%
             </Text>
             
+            {/* Shadow for percentage text */}
             <Text
-              position={[xPosition + 0.05, 0.05, 6.05]}
-              fontSize={1.2}
+              position={[xPosition + 0.1, 0.08, 6.1]}
+              fontSize={2.0}
               color="#1e293b"
               anchorX="center"
               anchorY="middle"
@@ -281,28 +285,44 @@ const FloorStatsDisplay: React.FC<{
               {percentage}%
             </Text>
             
+            {/* Vote count with better visibility */}
             <Text
-              position={[xPosition, 0.1, 7]}
-              fontSize={0.6}
+              position={[xPosition, 0.12, 7.5]}
+              fontSize={1.0}
               color="#94a3b8"
               anchorX="center"
               anchorY="middle"
               rotation={[-Math.PI / 2, 0, 0]}
+              strokeWidth={0.01}
+              strokeColor="#000000"
             >
               {option.responses} votes
             </Text>
             
+            {/* Option text - much larger and more visible */}
             <Text
-              position={[xPosition, 0.1, 8]}
-              fontSize={0.6}
+              position={[xPosition, 0.12, 9]}
+              fontSize={1.2}
               color="#e2e8f0"
               anchorX="center"
               anchorY="middle"
               rotation={[-Math.PI / 2, 0, 0]}
-              maxWidth={4}
+              maxWidth={8}
+              strokeWidth={0.01}
+              strokeColor="#1e293b"
             >
-              {option.text.length > 25 ? `${option.text.substring(0, 25)}...` : option.text}
+              {option.text.length > 35 ? `${option.text.substring(0, 35)}...` : option.text}
             </Text>
+            
+            {/* Background rectangle for better text contrast */}
+            <mesh position={[xPosition, 0.08, 8]} rotation={[-Math.PI / 2, 0, 0]}>
+              <planeGeometry args={[spacing * 0.8, 4]} />
+              <meshBasicMaterial 
+                color="#1e293b"
+                transparent
+                opacity={0.7}
+              />
+            </mesh>
           </group>
         );
       })}
