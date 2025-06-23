@@ -1,4 +1,4 @@
-import React, { useRef, useMemo, useEffect, useState, Suspense } from 'react';
+import React, { useRef, useMemo, useEffect, useState, Suspense, useCallback } from 'react';
 import { Canvas, useFrame, useThree, useLoader } from '@react-three/fiber';
 import { Text, OrbitControls, Float } from '@react-three/drei';
 import { motion } from 'framer-motion';
@@ -19,6 +19,22 @@ interface Enhanced3DPollVisualizationProps {
   className?: string;
 }
 
+// Helper function to calculate dynamic font size based on text length
+const calculateTitleFontSize = (text: string): number => {
+  const baseSize = 1.8;
+  const maxSize = 2.2;
+  const minSize = 1.2;
+  
+  if (text.length <= 20) return maxSize;
+  if (text.length <= 40) return baseSize;
+  if (text.length <= 60) return minSize * 1.2;
+  return minSize;
+};
+
+const calculateDescriptionFontSize = (text: string): number => {
+  return text.length <= 50 ? 0.8 : text.length <= 100 ? 0.6 : 0.5;
+};
+
 // Enhanced component for handling texture loading with better error handling
 const OptionMediaPlane: React.FC<{
   imageUrl: string;
@@ -26,7 +42,7 @@ const OptionMediaPlane: React.FC<{
 }> = ({ imageUrl, position }) => {
   const [loadError, setLoadError] = useState(false);
   
-  // Use useLoader hook for better texture loading
+  // Use useLoader hook for texture loading
   const texture = useLoader(
     THREE.TextureLoader, 
     imageUrl, 
@@ -43,7 +59,7 @@ const OptionMediaPlane: React.FC<{
     if (texture) {
       console.log('OptionMediaPlane: Texture loaded successfully for:', imageUrl);
       // Apply texture properties for better rendering
-      texture.flipY = true; // Correct orientation for floor placement
+      texture.flipY = true;
       texture.wrapS = THREE.ClampToEdgeWrapping;
       texture.wrapT = THREE.ClampToEdgeWrapping;
       texture.minFilter = THREE.LinearFilter;
@@ -61,11 +77,11 @@ const OptionMediaPlane: React.FC<{
   console.log('OptionMediaPlane: Rendering texture plane for:', imageUrl);
   return (
     <mesh position={position} renderOrder={1}>
-      <planeGeometry args={[3.0, 2.25]} />
+      <planeGeometry args={[2.5, 1.875]} />
       <meshBasicMaterial 
         map={texture} 
         transparent 
-        opacity={0.8}
+        opacity={0.9}
         side={THREE.FrontSide}
         depthWrite={false}
       />
@@ -73,32 +89,8 @@ const OptionMediaPlane: React.FC<{
   );
 };
 
-// Fallback component for when texture loading fails
-const OptionMediaFallback: React.FC<{
-  position: [number, number, number];
-  text: string;
-  showDebug?: boolean;
-}> = ({ position, text }) => {
-  return (
-    <mesh position={position} renderOrder={1}>
-      <planeGeometry args={[3.0, 2.25]} />
-      <meshBasicMaterial color="#475569" transparent opacity={0.5} />
-      <Text
-        position={[0, 0, 0.01]}
-        fontSize={0.25}
-        color="#ffffff"
-        anchorX="center"
-        anchorY="middle"
-        maxWidth={2.8}
-      >
-        📷 {text}
-      </Text>
-    </mesh>
-  );
-};
-
-// Floor-positioned image component with correct orientation
-const FloorImagePlane: React.FC<{
+// Standing image component (upright behind stats)
+const StandingImagePlane: React.FC<{
   imageUrl: string;
   position: [number, number, number];
   fallbackText: string;
@@ -113,15 +105,15 @@ const FloorImagePlane: React.FC<{
       loader.load(
         imageUrl,
         (loadedTexture) => {
-          loadedTexture.flipY = false; // Important for floor placement
+          loadedTexture.flipY = true; // Standard orientation for standing images
           loadedTexture.wrapS = THREE.ClampToEdgeWrapping;
           loadedTexture.wrapT = THREE.ClampToEdgeWrapping;
           setTexture(loadedTexture);
-          console.log('FloorImagePlane: Texture loaded for floor placement:', imageUrl);
+          console.log('StandingImagePlane: Texture loaded for standing placement:', imageUrl);
         },
         undefined,
         (error) => {
-          console.warn('FloorImagePlane: Failed to load texture:', error);
+          console.warn('StandingImagePlane: Failed to load texture:', error);
           setLoadError(true);
         }
       );
@@ -129,51 +121,14 @@ const FloorImagePlane: React.FC<{
   }, [imageUrl]);
 
   if (!texture || loadError || !imageUrl || imageUrl.trim() === '') {
-    return null; // Don't show fallback on floor, just skip
+    return null; // Don't show fallback, just skip
   }
 
   return (
-    <mesh position={position} rotation={[-Math.PI / 2, 0, 0]} renderOrder={1}>
-      <planeGeometry args={[2.5, 1.875]} />
+    <mesh position={position} renderOrder={2}>
+      <planeGeometry args={[2.0, 1.5]} />
       <meshBasicMaterial map={texture} transparent opacity={0.9} />
     </mesh>
-  );
-};
-
-// Wrapper component to handle texture loading errors
-const SafeOptionMediaPlane: React.FC<{
-  imageUrl?: string;
-  position: [number, number, number];
-  fallbackText: string;
-  debug?: boolean;
-}> = ({ imageUrl, position, fallbackText }) => {
-  const [hasError, setHasError] = useState(false);
-  
-  // Debug logging
-  useEffect(() => {
-    console.log('SafeOptionMediaPlane: Checking image URL:', {
-      imageUrl,
-      hasUrl: !!imageUrl,
-      isValidUrl: imageUrl && imageUrl.trim() !== '',
-      hasError
-    });
-  }, [imageUrl, hasError]);
-
-  if (!imageUrl || imageUrl.trim() === '' || hasError) {
-    console.log('SafeOptionMediaPlane: Using fallback for:', fallbackText, 'URL:', imageUrl);
-    return <OptionMediaFallback position={position} text={fallbackText} showDebug={true} />;
-  }
-
-  console.log('SafeOptionMediaPlane: Attempting to load image:', imageUrl);
-  return (
-    <Suspense fallback={<OptionMediaFallback position={position} text="Loading..." showDebug={true} />}>
-      <ErrorBoundary fallback={<OptionMediaFallback position={position} text={`Error: ${fallbackText}`} showDebug={true} />}>
-        <OptionMediaPlane 
-          imageUrl={imageUrl} 
-          position={position}
-        />
-      </ErrorBoundary>
-    </Suspense>
   );
 };
 
@@ -205,7 +160,7 @@ class ErrorBoundary extends React.Component<
   }
 }
 
-// 3D Bar Component with Enhanced Image Display
+// 3D Bar Component (background layer)
 const Enhanced3DBar: React.FC<{
   position: [number, number, number];
   height: number;
@@ -216,7 +171,6 @@ const Enhanced3DBar: React.FC<{
   isCorrect?: boolean;
   delay: number;
   maxHeight: number;
-  imageUrl?: string;
   index: number;
 }> = ({ 
   position, 
@@ -228,14 +182,12 @@ const Enhanced3DBar: React.FC<{
   isCorrect, 
   delay,
   maxHeight,
-  imageUrl,
   index
 }) => {
   const meshRef = useRef<THREE.Mesh>(null);
   const glowRef = useRef<THREE.Mesh>(null);
   const [animatedHeight, setAnimatedHeight] = useState(0.2);
   
-  console.log(`Enhanced3DBar ${index}: imageUrl =`, imageUrl);
   
   // Animate the bar height
   useFrame((state) => {
@@ -283,44 +235,8 @@ const Enhanced3DBar: React.FC<{
     return color;
   }, [color, isCorrect]);
 
-  const hasValidImage = imageUrl && imageUrl.trim() !== '';
-
-  // Debug logging for each bar
-  useEffect(() => {
-    console.log(`Enhanced3DBar ${index}: Image check:`, {
-      hasValidImage,
-      imageUrl,
-      label: label.substring(0, 20)
-    });
-  }, [imageUrl, hasValidImage, index, label]);
-
   return (
     <group>
-      {/* Option media image on the floor in front of the bar */}
-      {hasValidImage && (
-        <group>
-          {console.log(`Enhanced3DBar ${index}: Rendering image group for:`, imageUrl)}
-          
-          {/* Main image plane - positioned on the floor in front of the bar with correct orientation */}
-          <FloorImagePlane 
-            imageUrl={imageUrl} 
-            position={[position[0], 0.02, position[2] + 3.0]}
-            fallbackText={`Option ${String.fromCharCode(65 + index)}`}
-          />
-          
-          {/* Subtle frame around image area on the floor */}
-          <mesh position={[position[0], 0.01, position[2] + 3.0]} rotation={[-Math.PI / 2, 0, 0]}>
-            <planeGeometry args={[3.2, 2.45]} />
-            <meshBasicMaterial 
-              transparent
-              opacity={0.3}
-              color="#ffffff"
-              wireframe={true}
-            />
-          </mesh>
-        </group>
-      )}
-      
       {/* Base platform with enhanced design */}
       <mesh position={[position[0], 0.05, position[2]]}>
         <cylinderGeometry args={[1.2, 1.2, 0.1]} />
@@ -361,7 +277,7 @@ const Enhanced3DBar: React.FC<{
       
       {/* 3D Text Labels with better positioning */}
       <Float speed={0.5} rotationIntensity={0.05} floatIntensity={0.1}>
-        {/* Percentage - Large and prominent */}
+        {/* Percentage */}
         <Text
           position={[position[0], animatedHeight + 3.2, position[2]]}
           fontSize={0.6}
@@ -409,30 +325,6 @@ const Enhanced3DBar: React.FC<{
         )}
       </Float>
       
-      {/* 3D Percentage on the floor in front of the bar */}
-      <Text
-        position={[position[0], 0.1, position[2] + 2.0]}
-        fontSize={0.8}
-        color="#ffffff"
-        anchorX="center"
-        anchorY="middle"
-        rotation={[-Math.PI / 2, 0, 0]}
-      >
-        {percentage}%
-      </Text>
-      
-      {/* 3D Percentage shadow for depth effect */}
-      <Text
-        position={[position[0], 0.05, position[2] + 2.05]}
-        fontSize={0.8}
-        color="#1e293b"
-        anchorX="center"
-        anchorY="middle"
-        rotation={[-Math.PI / 2, 0, 0]}
-      >
-        {percentage}%
-      </Text>
-
       {/* Option letter indicator on the base */}
       <Text
         position={[position[0], 0.15, position[2] - 1.5]}
@@ -444,52 +336,139 @@ const Enhanced3DBar: React.FC<{
       >
         {String.fromCharCode(65 + index)}
       </Text>
-      
-      {/* Debug indicator for images */}
-      {hasValidImage && (
-        <Text
-          position={[position[0], 0.4, position[2] + 1.5]}
-          fontSize={0.15}
-          color="#22c55e"
-          anchorX="center"
-          anchorY="middle"
-        >
-          📷 FLOOR IMAGE
-        </Text>
-      )}
-      
-      {/* Debug indicator for no images */}
-      {!hasValidImage && (
-        <Text
-          position={[position[0], 0.4, position[2] + 1.5]}
-          fontSize={0.15}
-          color="#ef4444"
-          anchorX="center"
-          anchorY="middle"
-        >
-          ❌ NO IMAGE
-        </Text>
-      )}
     </group>
   );
 };
 
-// Main 3D Scene with Enhanced Title
+// Floor Stats Component (foreground layer)
+const FloorStatsDisplay: React.FC<{
+  options: ActivityOption[];
+  totalResponses: number;
+}> = ({ options, totalResponses }) => {
+  return (
+    <group>
+      {options.map((option, index) => {
+        const percentage = totalResponses > 0 ? Math.round((option.responses / totalResponses) * 100) : 0;
+        
+        // Calculate optimal spacing
+        const spacing = Math.min(5.0, 30 / Math.max(options.length, 1));
+        const totalWidth = (options.length - 1) * spacing;
+        const startX = -totalWidth / 2;
+        const xPosition = startX + index * spacing;
+        
+        return (
+          <group key={option.id}>
+            {/* Large percentage on the floor */}
+            <Text
+              position={[xPosition, 0.1, 8]}
+              fontSize={1.2}
+              color="#ffffff"
+              anchorX="center"
+              anchorY="middle"
+              rotation={[-Math.PI / 2, 0, 0]}
+            >
+              {percentage}%
+            </Text>
+            
+            {/* Percentage shadow for depth */}
+            <Text
+              position={[xPosition + 0.05, 0.05, 8.05]}
+              fontSize={1.2}
+              color="#1e293b"
+              anchorX="center"
+              anchorY="middle"
+              rotation={[-Math.PI / 2, 0, 0]}
+            >
+              {percentage}%
+            </Text>
+            
+            {/* Vote count on floor */}
+            <Text
+              position={[xPosition, 0.1, 9]}
+              fontSize={0.6}
+              color="#94a3b8"
+              anchorX="center"
+              anchorY="middle"
+              rotation={[-Math.PI / 2, 0, 0]}
+            >
+              {option.responses} votes
+            </Text>
+            
+            {/* Option letter */}
+            <Text
+              position={[xPosition, 0.1, 10]}
+              fontSize={0.8}
+              color="#64748b"
+              anchorX="center"
+              anchorY="middle"
+              rotation={[-Math.PI / 2, 0, 0]}
+            >
+              {String.fromCharCode(65 + index)}
+            </Text>
+          </group>
+        );
+      })}
+    </group>
+  );
+};
+
+// Standing Images Component (middle layer)
+const StandingImagesDisplay: React.FC<{
+  options: ActivityOption[];
+}> = ({ options }) => {
+  return (
+    <group>
+      {options.map((option, index) => {
+        if (!option.media_url || option.media_url.trim() === '') {
+          return null;
+        }
+        
+        // Calculate optimal spacing
+        const spacing = Math.min(5.0, 30 / Math.max(options.length, 1));
+        const totalWidth = (options.length - 1) * spacing;
+        const startX = -totalWidth / 2;
+        const xPosition = startX + index * spacing;
+        
+        return (
+          <group key={option.id}>
+            {/* Standing image */}
+            <StandingImagePlane
+              imageUrl={option.media_url}
+              position={[xPosition, 1.5, 4]}
+              fallbackText={`Option ${String.fromCharCode(65 + index)}`}
+            />
+            
+            {/* Image frame */}
+            <mesh position={[xPosition, 1.5, 3.99]}>
+              <planeGeometry args={[2.2, 1.7]} />
+              <meshBasicMaterial 
+                transparent
+                opacity={0.4}
+                color="#ffffff"
+                wireframe={true}
+              />
+            </mesh>
+          </group>
+        );
+      })}
+    </group>
+  );
+};
+
+// Main 3D Scene with Layered Layout
 const Enhanced3DScene: React.FC<{ 
   options: ActivityOption[]; 
   totalResponses: number; 
   themeColors: any;
   activityTitle?: string;
+  activityDescription?: string;
 }> = ({ options, totalResponses, themeColors, activityTitle }) => {
   const maxResponses = Math.max(...options.map(opt => opt.responses), 1);
   const maxHeight = 4;
   
-  console.log('Enhanced3DScene: Rendering with options:', options.map(opt => ({
-    id: opt.id,
-    text: opt.text,
-    media_url: opt.media_url,
-    responses: opt.responses
-  })));
+  // Calculate dynamic font sizes
+  const titleFontSize = activityTitle ? calculateTitleFontSize(activityTitle) : 1.8;
+  const descriptionFontSize = activityTitle ? calculateDescriptionFontSize(activityTitle) : 0.6;
   
   return (
     <>
@@ -520,7 +499,7 @@ const Enhanced3DScene: React.FC<{
       
       {/* Enhanced ground plane */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow>
-        <planeGeometry args={[80, 80]} />
+        <planeGeometry args={[100, 100]} />
         <meshStandardMaterial 
           color="#0f172a" 
           transparent 
@@ -532,7 +511,7 @@ const Enhanced3DScene: React.FC<{
       
       {/* Animated grid lines */}
       <gridHelper 
-        args={[80, 80, themeColors.accentColor, '#334155']} 
+        args={[100, 100, themeColors.accentColor, '#334155']} 
         position={[0, 0.01, 0]}
       />
       
@@ -541,9 +520,9 @@ const Enhanced3DScene: React.FC<{
         <Float key={i} speed={0.5 + Math.random()} rotationIntensity={0.1} floatIntensity={0.2}>
           <mesh 
             position={[
-              (Math.random() - 0.5) * 60,
+              (Math.random() - 0.5) * 80,
               Math.random() * 20 + 8,
-              (Math.random() - 0.5) * 60
+              (Math.random() - 0.5) * 80
             ]}
           >
             <sphereGeometry args={[0.08]} />
@@ -558,14 +537,20 @@ const Enhanced3DScene: React.FC<{
         </Float>
       ))}
       
-      {/* 3D Bars for each option */}
+      {/* LAYER 1: Floor Stats (Foreground) */}
+      <FloorStatsDisplay options={options} totalResponses={totalResponses} />
+      
+      {/* LAYER 2: Standing Images (Middle) */}
+      <StandingImagesDisplay options={options} />
+      
+      {/* LAYER 3: 3D Bars (Background) */}
       {options.map((option, index) => {
         const percentage = totalResponses > 0 ? Math.round((option.responses / totalResponses) * 100) : 0;
         const height = totalResponses > 0 
           ? Math.max((option.responses / maxResponses) * maxHeight, 0.2)
           : 0.8;
         
-        // Calculate optimal spacing to prevent overlap and show images properly
+        // Calculate optimal spacing
         const spacing = Math.min(5.0, 30 / Math.max(options.length, 1));
         const totalWidth = (options.length - 1) * spacing;
         const startX = -totalWidth / 2;
@@ -579,12 +564,10 @@ const Enhanced3DScene: React.FC<{
           ? '#10b981' 
           : `hsl(${200 + hue}, ${saturation}%, ${lightness}%)`;
         
-        console.log(`Enhanced3DScene: Creating bar ${index} with imageUrl:`, option.media_url);
-        
         return (
           <Enhanced3DBar
             key={option.id}
-            position={[startX + index * spacing, 0, 1]}
+            position={[startX + index * spacing, 0, -2]}
             height={height}
             color={barColor}
             label={option.text}
@@ -593,7 +576,6 @@ const Enhanced3DScene: React.FC<{
             isCorrect={option.is_correct}
             delay={index * 0.3}
             maxHeight={maxHeight}
-            imageUrl={option.media_url}
             index={index}
           />
         );
@@ -601,32 +583,34 @@ const Enhanced3DScene: React.FC<{
       
       {/* ENHANCED FLOATING TITLE - Much Higher and Bigger */}
       <Float speed={0.3} rotationIntensity={0.01} floatIntensity={0.05}>
-        {/* Main title with thick 3D effect */}
+        {/* Main title with dynamic sizing */}
         <Text
-          position={[0, 10, -12]}
-          fontSize={2.2}
+          position={[0, 12, -15]}
+          fontSize={titleFontSize}
           color="#ffffff"
           anchorX="center"
           anchorY="middle"
+          maxWidth={25}
         >
-          {totalResponses > 0 ? 'Live Poll Results' : (activityTitle || 'Poll Options')}
+          {activityTitle || 'Poll Options'}
         </Text>
         
         {/* Title shadow/depth effect */}
         <Text
-          position={[0.1, 9.9, -12.1]}
-          fontSize={2.2}
+          position={[0.1, 11.9, -15.1]}
+          fontSize={titleFontSize}
           color="#1e293b"
           anchorX="center"
           anchorY="middle"
+          maxWidth={25}
         >
-          {totalResponses > 0 ? 'Live Poll Results' : (activityTitle || 'Poll Options')}
+          {activityTitle || 'Poll Options'}
         </Text>
         
-        {/* Subtitle */}
+        {/* Status subtitle with proper spacing */}
         <Text
-          position={[0, 9.2, -12]}
-          fontSize={0.8}
+          position={[0, 12 - (titleFontSize * 0.8), -15]}
+          fontSize={descriptionFontSize}
           color="#94a3b8"
           anchorX="center"
           anchorY="middle"
@@ -634,19 +618,6 @@ const Enhanced3DScene: React.FC<{
           {totalResponses > 0 ? `${totalResponses} total responses` : 'Waiting for responses...'}
         </Text>
         
-        {/* Activity title if different from main title */}
-        {activityTitle && totalResponses > 0 && (
-          <Text
-            position={[0, 8.6, -12]}
-            fontSize={0.6}
-            color="#e2e8f0"
-            anchorX="center"
-            anchorY="middle"
-            maxWidth={15}
-          >
-            {activityTitle}
-          </Text>
-        )}
       </Float>
       
     </>
@@ -674,17 +645,12 @@ export const Enhanced3DPollVisualization: React.FC<Enhanced3DPollVisualizationPr
   isVotingLocked,
   className = '' 
 }) => {
-  console.log('Enhanced3DPollVisualization: Received props:', { 
+  console.log('Enhanced3DPollVisualization: New layered layout with props:', { 
     optionsCount: options.length,
     totalResponses, 
     themeColors,
     activityTitle,
     optionsWithMedia: options.filter(opt => opt.media_url && opt.media_url.trim() !== '').length
-  });
-
-  // Log each option's media URL for debugging
-  options.forEach((option, index) => {
-    console.log(`Enhanced3DPollVisualization: Option ${index} (${option.text}) media_url:`, option.media_url);
   });
 
   if (!options || options.length === 0) {
@@ -715,7 +681,7 @@ export const Enhanced3DPollVisualization: React.FC<Enhanced3DPollVisualizationPr
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.8 }}
       className={`w-full bg-gradient-to-br from-slate-900/40 to-blue-900/20 rounded-xl border border-slate-700 overflow-hidden shadow-2xl relative ${className}`}
-      style={{ height: '100%', minHeight: '700px' }}
+      style={{ height: '100%', minHeight: '800px' }}
     >
       {/* Activity media display */}
       {activityMedia && (
@@ -744,6 +710,9 @@ export const Enhanced3DPollVisualization: React.FC<Enhanced3DPollVisualizationPr
           <div className="text-slate-300 text-xs">
             {options.filter(opt => opt.media_url && opt.media_url.trim() !== '').length} with media
           </div>
+          <div className="text-slate-300 text-xs mt-1">
+            📊 Stats • 🖼️ Images • 📈 Bars
+          </div>
           {isVotingLocked && (
             <div className="mt-2 px-2 py-1 bg-red-600/20 border border-red-600/30 rounded text-red-400 text-xs">
               🔒 Voting Locked
@@ -766,7 +735,7 @@ export const Enhanced3DPollVisualization: React.FC<Enhanced3DPollVisualizationPr
             }}
             className="w-3 h-3 bg-green-400 rounded-full"
           />
-          <span className="text-green-400 text-sm font-medium">LIVE 3D</span>
+          <span className="text-green-400 text-sm font-medium">LAYERED 3D</span>
         </div>
       </div>
 
@@ -774,7 +743,7 @@ export const Enhanced3DPollVisualization: React.FC<Enhanced3DPollVisualizationPr
       <Suspense fallback={<LoadingFallback />}>
         <Canvas
           camera={{ 
-            position: [0, 6, 18], 
+            position: [0, 8, 20], 
             fov: 75,
             near: 0.1,
             far: 1000
@@ -802,8 +771,8 @@ export const Enhanced3DPollVisualization: React.FC<Enhanced3DPollVisualizationPr
             enablePan={false}
             enableZoom={true}
             enableRotate={true}
-            minDistance={10}
-            maxDistance={30}
+            minDistance={12}
+            maxDistance={35}
             minPolarAngle={Math.PI / 8}
             maxPolarAngle={Math.PI / 2}
             autoRotate={false}
