@@ -139,8 +139,9 @@ const Enhanced3DBar: React.FC<{
   return (
     <group>
       {/* Option media image behind the bar with vertical masking */}
-      {imageUrl && (
+      {imageUrl && imageUrl.trim() !== '' && (
         <Suspense fallback={null}>
+          {console.log(`Enhanced3DBar ${index}: Rendering image plane for URL:`, imageUrl)}
           <group ref={imagePlaneRef}>
             {/* Main background image plane */}
             <mesh position={[position[0], 3.0, position[2] - 3.0]}>

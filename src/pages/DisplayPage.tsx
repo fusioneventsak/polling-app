@@ -385,14 +385,23 @@ function DisplayPage() {
           *,
           activities!activities_room_id_fkey(
             *,
-            options:activity_options(*)
+            options:activity_options(
+              id,
+              text,
+              media_url,
+              is_correct,
+              responses,
+              option_order,
+              created_at,
+              activity_id
+            )
           )
         `)
         .eq('code', pollId)
         .eq('is_active', true)
-        .single();
+        .maybeSingle();
 
-      if (error) {
+      if (error && error.code !== 'PGRST116') {
         console.error('DisplayPage: Error loading room:', error);
         setCurrentRoom(null);
         return;
@@ -404,16 +413,35 @@ function DisplayPage() {
         return;
       }
 
+      // Transform and validate the data structure
+      const transformedRoom = {
+        ...roomData,
+        activities: roomData.activities?.map((activity: any) => ({
+          ...activity,
+          options: activity.options?.map((option: any) => ({
+            id: option.id,
+            text: option.text,
+            media_url: option.media_url, // Ensure this field is preserved
+            is_correct: option.is_correct || false,
+            responses: option.responses || 0,
+            option_order: option.option_order || 0,
+            created_at: option.created_at,
+            activity_id: option.activity_id
+          })).sort((a: any, b: any) => a.option_order - b.option_order) || []
+        })).sort((a: any, b: any) => a.activity_order - b.activity_order) || []
+      };
+
       console.log('DisplayPage: Room loaded successfully:', {
-        id: roomData.id,
-        name: roomData.name,
-        code: roomData.code,
-        activitiesCount: roomData.activities?.length || 0,
-        currentActivityId: roomData.current_activity_id,
-        participants: roomData.participants
+        id: transformedRoom.id,
+        name: transformedRoom.name,
+        code: transformedRoom.code,
+        activitiesCount: transformedRoom.activities?.length || 0,
+        currentActivityId: transformedRoom.current_activity_id,
+        participants: transformedRoom.participants,
+        optionsWithMedia: transformedRoom.activities?.flatMap(a => a.options || []).filter(opt => opt.media_url).length || 0
       });
 
-      setCurrentRoom(roomData);
+      setCurrentRoom(transformedRoom);
     } catch (error) {
       console.error('DisplayPage: Error in loadRoom:', error);
     } finally {
