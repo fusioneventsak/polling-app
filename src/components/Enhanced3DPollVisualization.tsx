@@ -690,14 +690,6 @@ export const Enhanced3DPollVisualization: React.FC<Enhanced3DPollVisualizationPr
   isVotingLocked,
   className = '' 
 }) => {
-  console.log('Enhanced3DPollVisualization: Fixed layered layout with props:', { 
-    optionsCount: options.length,
-    totalResponses, 
-    themeColors,
-    activityTitle,
-    optionsWithMedia: options.filter(opt => opt.media_url && opt.media_url.trim() !== '').length
-  });
-
   if (!options || options.length === 0) {
     return (
       <motion.div
@@ -745,50 +737,15 @@ export const Enhanced3DPollVisualization: React.FC<Enhanced3DPollVisualizationPr
         </div>
       )}
 
-      {/* Enhanced overlay info */}
-      <div className="absolute top-4 right-4 bg-black/60 backdrop-blur-md rounded-lg p-4 border border-white/20 z-10">
-        <div className="text-white text-sm">
-          <motion.div 
-            key={totalResponses}
-            initial={{ scale: 1.2, color: '#22c55e' }}
-            animate={{ scale: 1, color: '#ffffff' }}
-            transition={{ duration: 0.5 }}
-            className="font-bold text-lg"
-          >
-            {totalResponses} Total Responses
-          </motion.div>
-          <div className="text-slate-300 text-xs">{options.length} Options Available</div>
-          <div className="text-slate-300 text-xs">
-            {options.filter(opt => opt.media_url && opt.media_url.trim() !== '').length} with media
+      {/* Voting locked indicator */}
+      {isVotingLocked && (
+        <div className="absolute top-4 right-4 bg-red-900/40 backdrop-blur-sm rounded-lg p-3 border border-red-600/30 z-10">
+          <div className="flex items-center gap-2">
+            <div className="w-2 h-2 bg-red-400 rounded-full"></div>
+            <span className="text-red-400 text-xs font-medium">VOTING LOCKED</span>
           </div>
-          <div className="text-slate-300 text-xs mt-1">
-            📊 Stats • 🖼️ Images • 📈 Bars
-          </div>
-          {isVotingLocked && (
-            <div className="mt-2 px-2 py-1 bg-red-600/20 border border-red-600/30 rounded text-red-400 text-xs">
-              🔒 Voting Locked
-            </div>
-          )}
         </div>
-      </div>
-      
-      {/* Enhanced status indicator */}
-      <div className="absolute bottom-4 right-4 bg-black/60 backdrop-blur-md rounded-lg p-3 border border-white/20 z-10">
-        <div className="flex items-center gap-2">
-          <motion.div
-            animate={{ 
-              scale: [1, 1.3, 1],
-              opacity: [1, 0.6, 1]
-            }}
-            transition={{ 
-              duration: 2, 
-              repeat: Infinity 
-            }}
-            className="w-3 h-3 bg-green-400 rounded-full"
-          />
-          <span className="text-green-400 text-sm font-medium">FIXED 3D</span>
-        </div>
-      </div>
+      )}
 
       {/* 3D Canvas with error boundary */}
       <ErrorBoundary fallback={<LoadingFallback />}>
