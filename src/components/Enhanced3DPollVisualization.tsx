@@ -19,7 +19,7 @@ interface Enhanced3DPollVisualizationProps {
   className?: string;
 }
 
-// 3D Bar Component with Image Display
+// 3D Bar Component with Enhanced Image Display
 const Enhanced3DBar: React.FC<{
   position: [number, number, number];
   height: number;
@@ -47,6 +47,7 @@ const Enhanced3DBar: React.FC<{
 }) => {
   const meshRef = useRef<THREE.Mesh>(null);
   const glowRef = useRef<THREE.Mesh>(null);
+  const imageRef = useRef<THREE.Mesh>(null);
   const [animatedHeight, setAnimatedHeight] = useState(0.2);
   const [texture, setTexture] = useState<THREE.Texture | null>(null);
   
@@ -70,7 +71,7 @@ const Enhanced3DBar: React.FC<{
     }
   }, [imageUrl]);
   
-  // Animate the bar height
+  // Animate the bar height and image position
   useFrame((state) => {
     const targetHeight = Math.max(height, 0.2);
     
@@ -104,6 +105,12 @@ const Enhanced3DBar: React.FC<{
         glowRef.current.material.opacity = pulseIntensity;
       }
     }
+
+    // Animate image floating
+    if (imageRef.current && texture) {
+      imageRef.current.position.y = animatedHeight + 2.5 + Math.sin(state.clock.elapsedTime + delay) * 0.1;
+      imageRef.current.rotation.y = Math.sin(state.clock.elapsedTime * 0.5 + delay) * 0.1;
+    }
   });
 
   const barColor = useMemo(() => {
@@ -118,7 +125,7 @@ const Enhanced3DBar: React.FC<{
 
   return (
     <group>
-      {/* Base platform with subtle glow */}
+      {/* Base platform with enhanced design */}
       <mesh position={[position[0], 0.05, position[2]]}>
         <cylinderGeometry args={[1.2, 1.2, 0.1]} />
         <meshStandardMaterial 
@@ -154,35 +161,47 @@ const Enhanced3DBar: React.FC<{
         </mesh>
       )}
       
-      {/* Option image display - floating above the bar */}
+      {/* Enhanced option image display - attached to the bar */}
       {texture && (
-        <Float speed={1} rotationIntensity={0.1} floatIntensity={0.2}>
-          <mesh position={[position[0], animatedHeight + 2.5, position[2]]}>
-            <planeGeometry args={[1.8, 1.4]} />
-            <meshStandardMaterial 
-              map={texture} 
-              transparent
-              side={THREE.DoubleSide}
-            />
-          </mesh>
-          {/* Image frame */}
-          <mesh position={[position[0], animatedHeight + 2.5, position[2] - 0.01]}>
-            <planeGeometry args={[2.0, 1.6]} />
+        <group ref={imageRef}>
+          {/* Image frame with better positioning */}
+          <mesh position={[position[0], animatedHeight + 2.5, position[2] - 0.02]}>
+            <planeGeometry args={[2.2, 1.8]} />
             <meshStandardMaterial 
               color="#ffffff"
               metalness={0.1}
               roughness={0.1}
             />
           </mesh>
-        </Float>
+          
+          {/* The actual image */}
+          <mesh position={[position[0], animatedHeight + 2.5, position[2]]}>
+            <planeGeometry args={[2.0, 1.6]} />
+            <meshStandardMaterial 
+              map={texture} 
+              transparent
+              side={THREE.DoubleSide}
+            />
+          </mesh>
+          
+          {/* Image glow effect */}
+          <mesh position={[position[0], animatedHeight + 2.5, position[2] - 0.01]}>
+            <planeGeometry args={[2.4, 2.0]} />
+            <meshBasicMaterial 
+              color={barColor}
+              transparent
+              opacity={0.1}
+            />
+          </mesh>
+        </group>
       )}
       
       {/* 3D Text Labels with better positioning - NO FONT REFERENCES */}
       <Float speed={0.5} rotationIntensity={0.05} floatIntensity={0.1}>
         {/* Percentage display - large and prominent */}
         <Text
-          position={[position[0], animatedHeight + (texture ? 3.8 : 2.4), position[2]]}
-          fontSize={0.8}
+          position={[position[0], animatedHeight + (texture ? 4.2 : 2.8), position[2]]}
+          fontSize={0.9}
           color="#ffffff"
           anchorX="center"
           anchorY="middle"
@@ -192,8 +211,8 @@ const Enhanced3DBar: React.FC<{
         
         {/* Response count */}
         <Text
-          position={[position[0], animatedHeight + (texture ? 3.2 : 1.8), position[2]]}
-          fontSize={0.35}
+          position={[position[0], animatedHeight + (texture ? 3.6 : 2.2), position[2]]}
+          fontSize={0.4}
           color="#94a3b8"
           anchorX="center"
           anchorY="middle"
@@ -203,21 +222,21 @@ const Enhanced3DBar: React.FC<{
         
         {/* Option label */}
         <Text
-          position={[position[0], animatedHeight + (texture ? 2.8 : 1.4), position[2]]}
-          fontSize={0.4}
+          position={[position[0], animatedHeight + (texture ? 3.2 : 1.8), position[2]]}
+          fontSize={0.45}
           color="#e2e8f0"
           anchorX="center"
           anchorY="middle"
           maxWidth={2.5}
         >
-          {label.length > 25 ? `${label.substring(0, 25)}...` : label}
+          {label.length > 20 ? `${label.substring(0, 20)}...` : label}
         </Text>
         
         {/* Correct indicator */}
         {isCorrect && (
           <Text
-            position={[position[0], animatedHeight + (texture ? 2.4 : 1.0), position[2]]}
-            fontSize={0.3}
+            position={[position[0], animatedHeight + (texture ? 2.8 : 1.4), position[2]]}
+            fontSize={0.35}
             color="#10b981"
             anchorX="center"
             anchorY="middle"
@@ -228,8 +247,8 @@ const Enhanced3DBar: React.FC<{
         
         {/* Option letter indicator */}
         <Text
-          position={[position[0], animatedHeight + (texture ? 2.0 : 0.6), position[2]]}
-          fontSize={0.5}
+          position={[position[0], animatedHeight + (texture ? 2.4 : 1.0), position[2]]}
+          fontSize={0.6}
           color={barColor}
           anchorX="center"
           anchorY="middle"
@@ -241,7 +260,7 @@ const Enhanced3DBar: React.FC<{
       {/* Base label */}
       <Text
         position={[position[0], -0.4, position[2] + 1.2]}
-        fontSize={0.2}
+        fontSize={0.25}
         color="#64748b"
         anchorX="center"
         anchorY="middle"
@@ -253,25 +272,26 @@ const Enhanced3DBar: React.FC<{
   );
 };
 
-// Camera controller for smooth movement
+// Camera controller for optimal viewing
 const CameraController: React.FC<{ optionsCount: number }> = ({ optionsCount }) => {
   const { camera } = useThree();
   
   useFrame(() => {
-    // Fixed camera position facing the poll results head-on
-    const distance = Math.max(6, optionsCount * 0.8);
+    // Position camera to show title prominently and avoid bar overlap
+    const distance = Math.max(8, optionsCount * 1.0);
     
     camera.position.x = THREE.MathUtils.lerp(camera.position.x, 0, 0.02);
     camera.position.z = THREE.MathUtils.lerp(camera.position.z, distance, 0.02);
-    camera.position.y = THREE.MathUtils.lerp(camera.position.y, 3, 0.02);
+    camera.position.y = THREE.MathUtils.lerp(camera.position.y, 4, 0.02);
     
-    camera.lookAt(0, 1.5, 0);
+    // Look at a point that shows both title and bars well
+    camera.lookAt(0, 2, 0);
   });
   
   return null;
 };
 
-// Main 3D Scene
+// Main 3D Scene with Enhanced Title
 const Enhanced3DScene: React.FC<{ 
   options: ActivityOption[]; 
   totalResponses: number; 
@@ -284,33 +304,33 @@ const Enhanced3DScene: React.FC<{
   return (
     <>
       {/* Enhanced lighting setup */}
-      <ambientLight intensity={0.3} />
+      <ambientLight intensity={0.4} />
       <directionalLight 
-        position={[10, 15, 5]} 
-        intensity={1.5} 
+        position={[10, 20, 5]} 
+        intensity={1.8} 
         castShadow
         shadow-mapSize-width={2048}
         shadow-mapSize-height={2048}
         shadow-camera-far={50}
-        shadow-camera-left={-20}
-        shadow-camera-right={20}
-        shadow-camera-top={20}
-        shadow-camera-bottom={-20}
+        shadow-camera-left={-25}
+        shadow-camera-right={25}
+        shadow-camera-top={25}
+        shadow-camera-bottom={-25}
       />
-      <pointLight position={[-8, 8, 8]} intensity={0.8} color={themeColors.accentColor} />
-      <pointLight position={[8, 8, -8]} intensity={0.6} color={themeColors.secondaryColor} />
+      <pointLight position={[-10, 10, 10]} intensity={0.8} color={themeColors.accentColor} />
+      <pointLight position={[10, 10, -10]} intensity={0.6} color={themeColors.secondaryColor} />
       <spotLight 
-        position={[0, 15, 0]} 
-        intensity={1.0} 
-        angle={Math.PI / 4}
+        position={[0, 18, 0]} 
+        intensity={1.2} 
+        angle={Math.PI / 3}
         penumbra={0.3}
         color="#ffffff"
         castShadow
       />
       
-      {/* Enhanced ground plane with reflective material */}
+      {/* Enhanced ground plane */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow>
-        <planeGeometry args={[40, 40]} />
+        <planeGeometry args={[50, 50]} />
         <meshStandardMaterial 
           color="#0f172a" 
           transparent 
@@ -322,27 +342,27 @@ const Enhanced3DScene: React.FC<{
       
       {/* Animated grid lines */}
       <gridHelper 
-        args={[40, 40, themeColors.accentColor, '#334155']} 
+        args={[50, 50, themeColors.accentColor, '#334155']} 
         position={[0, 0.01, 0]}
       />
       
       {/* Floating particles for atmosphere */}
-      {Array.from({ length: 50 }).map((_, i) => (
+      {Array.from({ length: 60 }).map((_, i) => (
         <Float key={i} speed={0.5 + Math.random()} rotationIntensity={0.1} floatIntensity={0.2}>
           <mesh 
             position={[
-              (Math.random() - 0.5) * 35,
-              Math.random() * 15 + 5,
-              (Math.random() - 0.5) * 35
+              (Math.random() - 0.5) * 40,
+              Math.random() * 18 + 6,
+              (Math.random() - 0.5) * 40
             ]}
           >
-            <sphereGeometry args={[0.05]} />
+            <sphereGeometry args={[0.06]} />
             <meshStandardMaterial 
               color={i % 3 === 0 ? themeColors.accentColor : i % 3 === 1 ? themeColors.secondaryColor : themeColors.primaryColor}
               transparent
-              opacity={0.6}
+              opacity={0.7}
               emissive={i % 3 === 0 ? themeColors.accentColor : i % 3 === 1 ? themeColors.secondaryColor : themeColors.primaryColor}
-              emissiveIntensity={0.2}
+              emissiveIntensity={0.3}
             />
           </mesh>
         </Float>
@@ -355,8 +375,8 @@ const Enhanced3DScene: React.FC<{
           ? Math.max((option.responses / maxResponses) * maxHeight, 0.2)
           : 0.8;
         
-        // Calculate optimal spacing based on number of options
-        const spacing = Math.min(2.8, 16 / Math.max(options.length, 1));
+        // Calculate optimal spacing to prevent overlap
+        const spacing = Math.min(3.2, 20 / Math.max(options.length, 1));
         const totalWidth = (options.length - 1) * spacing;
         const startX = -totalWidth / 2;
         
@@ -387,11 +407,12 @@ const Enhanced3DScene: React.FC<{
         );
       })}
       
-      {/* Floating title - NO FONT REFERENCES */}
-      <Float speed={0.5} rotationIntensity={0.02} floatIntensity={0.1}>
+      {/* ENHANCED FLOATING TITLE - Much Higher and Bigger - NO FONT REFERENCES */}
+      <Float speed={0.3} rotationIntensity={0.01} floatIntensity={0.05}>
+        {/* Main title with thick 3D effect */}
         <Text
-          position={[0, 6, -8]}
-          fontSize={1.2}
+          position={[0, 9, -12]}
+          fontSize={2.0}
           color="#ffffff"
           anchorX="center"
           anchorY="middle"
@@ -399,15 +420,41 @@ const Enhanced3DScene: React.FC<{
           {totalResponses > 0 ? 'Live Poll Results' : (activityTitle || 'Poll Options')}
         </Text>
         
+        {/* Title shadow/depth effect */}
         <Text
-          position={[0, 5, -8]}
-          fontSize={0.5}
+          position={[0.1, 8.9, -12.1]}
+          fontSize={2.0}
+          color="#1e293b"
+          anchorX="center"
+          anchorY="middle"
+        >
+          {totalResponses > 0 ? 'Live Poll Results' : (activityTitle || 'Poll Options')}
+        </Text>
+        
+        {/* Subtitle */}
+        <Text
+          position={[0, 7.8, -12]}
+          fontSize={0.8}
           color="#94a3b8"
           anchorX="center"
           anchorY="middle"
         >
           {totalResponses > 0 ? `${totalResponses} total responses` : 'Waiting for responses...'}
         </Text>
+        
+        {/* Activity title if different from main title */}
+        {activityTitle && totalResponses > 0 && (
+          <Text
+            position={[0, 7.0, -12]}
+            fontSize={0.6}
+            color="#e2e8f0"
+            anchorX="center"
+            anchorY="middle"
+            maxWidth={15}
+          >
+            {activityTitle}
+          </Text>
+        )}
       </Float>
       
       {/* Camera controller */}
@@ -467,7 +514,7 @@ export const Enhanced3DPollVisualization: React.FC<Enhanced3DPollVisualizationPr
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.8 }}
       className={`w-full bg-gradient-to-br from-slate-900/40 to-blue-900/20 rounded-xl border border-slate-700 overflow-hidden shadow-2xl relative ${className}`}
-      style={{ height: '100%', minHeight: '600px' }}
+      style={{ height: '100%', minHeight: '700px' }}
     >
       {/* Activity media display */}
       {activityMedia && (
@@ -523,7 +570,7 @@ export const Enhanced3DPollVisualization: React.FC<Enhanced3DPollVisualizationPr
       <Suspense fallback={<LoadingFallback />}>
         <Canvas
           camera={{ 
-            position: [0, 3, 8], 
+            position: [0, 4, 10], 
             fov: 75,
             near: 0.1,
             far: 1000
@@ -550,12 +597,13 @@ export const Enhanced3DPollVisualization: React.FC<Enhanced3DPollVisualizationPr
           <OrbitControls 
             enablePan={false}
             enableZoom={true}
-            enableRotate={false}
-            minDistance={3}
-            maxDistance={15}
-            minPolarAngle={Math.PI / 6}
+            enableRotate={true}
+            minDistance={5}
+            maxDistance={20}
+            minPolarAngle={Math.PI / 8}
             maxPolarAngle={Math.PI / 2}
             autoRotate={false}
+            rotateSpeed={0.5}
           />
         </Canvas>
       </Suspense>
