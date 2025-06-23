@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase';
 import { roomService } from '../services/roomService';
 import { useTheme } from '../components/ThemeProvider';
 import { Users, BarChart, Clock, MessageSquare, HelpCircle, Cloud, Trophy, Target, Calendar, Activity as ActivityIcon, TrendingUp, CheckCircle, Lock, QrCode } from 'lucide-react';
+import { Enhanced3DPollVisualization } from '../components/Enhanced3DPollVisualization';
 import type { ActivityType, Room, Activity } from '../types';
 
 // QR Code Generator Component (inline to avoid import issues)
@@ -823,7 +824,7 @@ function DisplayPage() {
 
           {/* Activity Results Visualization */}
           <div className="flex-1 p-6">
-            <FixedPoll3DVisualization
+            <Enhanced3DPollVisualization
               options={activeActivity.options || []}
               totalResponses={activeActivity.total_responses || 0}
               themeColors={{
