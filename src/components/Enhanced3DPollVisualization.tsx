@@ -474,9 +474,9 @@ const Enhanced3DScene: React.FC<{
       const targetX = 0;
       const targetY = 4; // Higher to see floor stats
       
-      // Dynamic zoom based on number of options - adjusted for much larger elements
-      const baseDistance = 22; // Increased to accommodate much larger elements
-      const extraDistance = Math.max(0, (options.length - 2) * 4); // Increased spacing per option
+      // Dynamic zoom based on number of options - optimized for text readability
+      const baseDistance = 22; // Good for 1-3 options
+      const extraDistance = Math.max(0, (options.length - 2) * 2.5); // Reduced from 4 to 2.5 for closer view
       const targetZ = baseDistance + extraDistance;
       
       const animationDuration = 2000; // 2 seconds
