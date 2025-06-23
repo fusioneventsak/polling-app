@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { SocketProvider } from './contexts/SocketContext';
 import { ThemeProvider } from './components/ThemeProvider';
+import { ConnectionStatus } from './components/ConnectionStatus';
 import { HomePage } from './pages/HomePage';
 import { AdminPage } from './pages/AdminPage';
 import { GameJoinPage } from './pages/GameJoinPage';
@@ -12,6 +13,7 @@ function App() {
   return (
     <ThemeProvider>
       <SocketProvider>
+        <ConnectionStatus />
         <Router>
           <Routes>
             <Route path="/" element={<HomePage />} />

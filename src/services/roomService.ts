@@ -1,4 +1,4 @@
-import { supabase } from '../lib/supabase';
+import { supabase, retrySupabaseOperation, handleSupabaseError } from '../lib/supabase';
 import type { Room, Activity, ActivityOption } from '../types';
 
 export class RoomService {
@@ -8,7 +8,7 @@ export class RoomService {
       throw new Error('Supabase not initialized');
     }
 
-    try {
+    return retrySupabaseOperation(async () => {
       console.log('RoomService: Getting all rooms');
 
       const { data: rooms, error } = await supabase
@@ -23,16 +23,12 @@ export class RoomService {
         .order('created_at', { ascending: false });
 
       if (error) {
-        console.error('RoomService: Error getting all rooms:', error);
-        throw new Error('Failed to get rooms');
+        throw handleSupabaseError(error, 'getAllRooms');
       }
 
       console.log('RoomService: Retrieved', rooms?.length || 0, 'rooms');
       return rooms || [];
-    } catch (error) {
-      console.error('RoomService: Error in getAllRooms:', error);
-      throw error;
-    }
+    }, 'getAllRooms');
   }
 
   // Submit response to an activity
@@ -48,7 +44,7 @@ export class RoomService {
       participantId
     });
 
-    try {
+    return retrySupabaseOperation(async () => {
       // Check if participant has already responded to this activity
       const { data: existingResponse, error: checkError } = await supabase
         .from('participant_responses')
@@ -58,8 +54,7 @@ export class RoomService {
         .maybeSingle(); // Use maybeSingle to avoid 406 errors
 
       if (checkError && checkError.code !== 'PGRST116') { // PGRST116 = no rows found
-        console.error('RoomService: Error checking existing response:', checkError);
-        throw new Error('Failed to check existing response');
+        throw handleSupabaseError(checkError, 'checkExistingResponse');
       }
 
       if (existingResponse) {
@@ -80,8 +75,7 @@ export class RoomService {
         .single();
 
       if (insertError) {
-        console.error('RoomService: Error inserting response:', insertError);
-        throw new Error('Failed to submit response');
+        throw handleSupabaseError(insertError, 'insertResponse');
       }
 
       console.log('RoomService: Response submitted successfully:', response.id);
@@ -130,10 +124,7 @@ export class RoomService {
 
       console.log('RoomService: All counts updated successfully');
 
-    } catch (error) {
-      console.error('RoomService: Error in submitResponse:', error);
-      throw error;
-    }
+    }, 'submitResponse');
   }
 
   // Get room by code
@@ -142,7 +133,7 @@ export class RoomService {
       throw new Error('Supabase not initialized');
     }
 
-    try {
+    return retrySupabaseOperation(async () => {
       console.log('RoomService: Getting room by code:', code);
 
       const { data: room, error } = await supabase
@@ -159,8 +150,7 @@ export class RoomService {
         .maybeSingle(); // Use maybeSingle to avoid 406 errors
 
       if (error && error.code !== 'PGRST116') {
-        console.error('RoomService: Error getting room:', error);
-        throw new Error('Failed to get room');
+        throw handleSupabaseError(error, 'getRoomByCode');
       }
 
       if (!room) {
@@ -176,10 +166,7 @@ export class RoomService {
       });
 
       return room;
-    } catch (error) {
-      console.error('RoomService: Error in getRoomByCode:', error);
-      throw error;
-    }
+    }, 'getRoomByCode');
   }
 
   // Get room by ID
@@ -188,7 +175,7 @@ export class RoomService {
       throw new Error('Supabase not initialized');
     }
 
-    try {
+    return retrySupabaseOperation(async () => {
       console.log('RoomService: Getting room by ID:', id);
 
       const { data: room, error } = await supabase
@@ -204,8 +191,7 @@ export class RoomService {
         .maybeSingle(); // Use maybeSingle to avoid 406 errors
 
       if (error && error.code !== 'PGRST116') {
-        console.error('RoomService: Error getting room by ID:', error);
-        throw new Error('Failed to get room');
+        throw handleSupabaseError(error, 'getRoomById');
       }
 
       if (!room) {
@@ -214,10 +200,7 @@ export class RoomService {
       }
 
       return room;
-    } catch (error) {
-      console.error('RoomService: Error in getRoomById:', error);
-      throw error;
-    }
+    }, 'getRoomById');
   }
 
   // Update room
@@ -226,7 +209,7 @@ export class RoomService {
       throw new Error('Supabase not initialized');
     }
 
-    try {
+    return retrySupabaseOperation(async () => {
       console.log('RoomService: Updating room:', id, updates);
 
       const { data: room, error } = await supabase
@@ -237,16 +220,12 @@ export class RoomService {
         .single();
 
       if (error) {
-        console.error('RoomService: Error updating room:', error);
-        throw new Error('Failed to update room');
+        throw handleSupabaseError(error, 'updateRoom');
       }
 
       console.log('RoomService: Room updated successfully');
       return room;
-    } catch (error) {
-      console.error('RoomService: Error in updateRoom:', error);
-      throw error;
-    }
+    }, 'updateRoom');
   }
 
   // Create new room
@@ -259,7 +238,7 @@ export class RoomService {
       throw new Error('Supabase not initialized');
     }
 
-    try {
+    return retrySupabaseOperation(async () => {
       console.log('RoomService: Creating room:', roomData);
 
       const { data: room, error } = await supabase
@@ -274,16 +253,12 @@ export class RoomService {
         .single();
 
       if (error) {
-        console.error('RoomService: Error creating room:', error);
-        throw new Error('Failed to create room');
+        throw handleSupabaseError(error, 'createRoom');
       }
 
       console.log('RoomService: Room created successfully:', room.id);
       return room;
-    } catch (error) {
-      console.error('RoomService: Error in createRoom:', error);
-      throw error;
-    }
+    }, 'createRoom');
   }
 
   // Create activity in room
@@ -298,7 +273,7 @@ export class RoomService {
       throw new Error('Supabase not initialized');
     }
 
-    try {
+    return retrySupabaseOperation(async () => {
       console.log('RoomService: Creating activity:', activityData);
 
       const { data: activity, error } = await supabase
@@ -314,16 +289,12 @@ export class RoomService {
         .single();
 
       if (error) {
-        console.error('RoomService: Error creating activity:', error);
-        throw new Error('Failed to create activity');
+        throw handleSupabaseError(error, 'createActivity');
       }
 
       console.log('RoomService: Activity created successfully:', activity.id);
       return activity;
-    } catch (error) {
-      console.error('RoomService: Error in createActivity:', error);
-      throw error;
-    }
+    }, 'createActivity');
   }
 
   // Add option to activity
@@ -336,7 +307,7 @@ export class RoomService {
       throw new Error('Supabase not initialized');
     }
 
-    try {
+    return retrySupabaseOperation(async () => {
       console.log('RoomService: Adding activity option:', optionData);
 
       const { data: option, error } = await supabase
@@ -350,16 +321,12 @@ export class RoomService {
         .single();
 
       if (error) {
-        console.error('RoomService: Error adding option:', error);
-        throw new Error('Failed to add option');
+        throw handleSupabaseError(error, 'addActivityOption');
       }
 
       console.log('RoomService: Option added successfully:', option.id);
       return option;
-    } catch (error) {
-      console.error('RoomService: Error in addActivityOption:', error);
-      throw error;
-    }
+    }, 'addActivityOption');
   }
 
   // Update activity
@@ -368,7 +335,7 @@ export class RoomService {
       throw new Error('Supabase not initialized');
     }
 
-    try {
+    return retrySupabaseOperation(async () => {
       console.log('RoomService: Updating activity:', activityId, updates);
 
       const { data: activity, error } = await supabase
@@ -379,16 +346,12 @@ export class RoomService {
         .single();
 
       if (error) {
-        console.error('RoomService: Error updating activity:', error);
-        throw new Error('Failed to update activity');
+        throw handleSupabaseError(error, 'updateActivity');
       }
 
       console.log('RoomService: Activity updated successfully');
       return activity;
-    } catch (error) {
-      console.error('RoomService: Error in updateActivity:', error);
-      throw error;
-    }
+    }, 'updateActivity');
   }
 
   // Start activity (set as current and active)
@@ -397,7 +360,7 @@ export class RoomService {
       throw new Error('Supabase not initialized');
     }
 
-    try {
+    return retrySupabaseOperation(async () => {
       console.log('RoomService: Starting activity:', activityId);
 
       // First, deactivate all other activities in the room
@@ -407,8 +370,7 @@ export class RoomService {
         .eq('room_id', roomId);
 
       if (deactivateError) {
-        console.error('RoomService: Error deactivating other activities:', deactivateError);
-        throw new Error('Failed to deactivate other activities');
+        throw handleSupabaseError(deactivateError, 'deactivateActivities');
       }
 
       // Activate the target activity
@@ -418,8 +380,7 @@ export class RoomService {
         .eq('id', activityId);
 
       if (activateError) {
-        console.error('RoomService: Error activating activity:', activateError);
-        throw new Error('Failed to activate activity');
+        throw handleSupabaseError(activateError, 'activateActivity');
       }
 
       // Set as current activity in room
@@ -429,15 +390,11 @@ export class RoomService {
         .eq('id', roomId);
 
       if (roomUpdateError) {
-        console.error('RoomService: Error setting current activity:', roomUpdateError);
-        throw new Error('Failed to set current activity');
+        throw handleSupabaseError(roomUpdateError, 'setCurrentActivity');
       }
 
       console.log('RoomService: Activity started successfully');
-    } catch (error) {
-      console.error('RoomService: Error in startActivity:', error);
-      throw error;
-    }
+    }, 'startActivity');
   }
 
   // Stop activity
@@ -446,7 +403,7 @@ export class RoomService {
       throw new Error('Supabase not initialized');
     }
 
-    try {
+    return retrySupabaseOperation(async () => {
       console.log('RoomService: Stopping activity:', activityId);
 
       // Get the activity to find its room
@@ -457,8 +414,7 @@ export class RoomService {
         .single();
 
       if (getError) {
-        console.error('RoomService: Error getting activity:', getError);
-        throw new Error('Failed to get activity');
+        throw handleSupabaseError(getError, 'getActivity');
       }
 
       // Deactivate the activity
@@ -468,8 +424,7 @@ export class RoomService {
         .eq('id', activityId);
 
       if (deactivateError) {
-        console.error('RoomService: Error deactivating activity:', deactivateError);
-        throw new Error('Failed to deactivate activity');
+        throw handleSupabaseError(deactivateError, 'deactivateActivity');
       }
 
       // Clear current activity from room
@@ -479,15 +434,11 @@ export class RoomService {
         .eq('id', activity.room_id);
 
       if (roomUpdateError) {
-        console.error('RoomService: Error clearing current activity:', roomUpdateError);
-        throw new Error('Failed to clear current activity');
+        throw handleSupabaseError(roomUpdateError, 'clearCurrentActivity');
       }
 
       console.log('RoomService: Activity stopped successfully');
-    } catch (error) {
-      console.error('RoomService: Error in stopActivity:', error);
-      throw error;
-    }
+    }, 'stopActivity');
   }
 
   // Reset room responses (clear all responses for all activities in room)
@@ -496,7 +447,7 @@ export class RoomService {
       throw new Error('Supabase not initialized');
     }
 
-    try {
+    return retrySupabaseOperation(async () => {
       console.log('RoomService: Resetting room responses for room:', roomId);
 
       // Delete all participant responses for this room
@@ -506,8 +457,7 @@ export class RoomService {
         .eq('room_id', roomId);
 
       if (deleteResponsesError) {
-        console.error('RoomService: Error deleting responses:', deleteResponsesError);
-        throw new Error('Failed to delete responses');
+        throw handleSupabaseError(deleteResponsesError, 'deleteResponses');
       }
 
       // Reset all activity response counts to 0
@@ -517,8 +467,7 @@ export class RoomService {
         .eq('room_id', roomId);
 
       if (resetActivitiesError) {
-        console.error('RoomService: Error resetting activity counts:', resetActivitiesError);
-        throw new Error('Failed to reset activity counts');
+        throw handleSupabaseError(resetActivitiesError, 'resetActivityCounts');
       }
 
       // Reset all option response counts to 0
@@ -533,15 +482,11 @@ export class RoomService {
         );
 
       if (resetOptionsError) {
-        console.error('RoomService: Error resetting option counts:', resetOptionsError);
-        throw new Error('Failed to reset option counts');
+        throw handleSupabaseError(resetOptionsError, 'resetOptionCounts');
       }
 
       console.log('RoomService: Room responses reset successfully');
-    } catch (error) {
-      console.error('RoomService: Error in resetRoomResponses:', error);
-      throw error;
-    }
+    }, 'resetRoomResponses');
   }
 
   // Lock/unlock voting for an activity
@@ -550,7 +495,7 @@ export class RoomService {
       throw new Error('Supabase not initialized');
     }
 
-    try {
+    return retrySupabaseOperation(async () => {
       console.log('RoomService: Toggling activity voting:', activityId, 'locked:', locked);
 
       const { error } = await supabase
@@ -561,15 +506,11 @@ export class RoomService {
         .eq('id', activityId);
 
       if (error) {
-        console.error('RoomService: Error toggling voting:', error);
-        throw new Error('Failed to toggle voting');
+        throw handleSupabaseError(error, 'toggleActivityVoting');
       }
 
       console.log('RoomService: Activity voting toggled successfully');
-    } catch (error) {
-      console.error('RoomService: Error in toggleActivityVoting:', error);
-      throw error;
-    }
+    }, 'toggleActivityVoting');
   }
 
   // Delete room
@@ -578,7 +519,7 @@ export class RoomService {
       throw new Error('Supabase not initialized');
     }
 
-    try {
+    return retrySupabaseOperation(async () => {
       console.log('RoomService: Deleting room:', id);
 
       const { error } = await supabase
@@ -587,15 +528,11 @@ export class RoomService {
         .eq('id', id);
 
       if (error) {
-        console.error('RoomService: Error deleting room:', error);
-        throw new Error('Failed to delete room');
+        throw handleSupabaseError(error, 'deleteRoom');
       }
 
       console.log('RoomService: Room deleted successfully');
-    } catch (error) {
-      console.error('RoomService: Error in deleteRoom:', error);
-      throw error;
-    }
+    }, 'deleteRoom');
   }
 
   // Delete activity
@@ -604,7 +541,7 @@ export class RoomService {
       throw new Error('Supabase not initialized');
     }
 
-    try {
+    return retrySupabaseOperation(async () => {
       console.log('RoomService: Deleting activity:', id);
 
       const { error } = await supabase
@@ -613,15 +550,11 @@ export class RoomService {
         .eq('id', id);
 
       if (error) {
-        console.error('RoomService: Error deleting activity:', error);
-        throw new Error('Failed to delete activity');
+        throw handleSupabaseError(error, 'deleteActivity');
       }
 
       console.log('RoomService: Activity deleted successfully');
-    } catch (error) {
-      console.error('RoomService: Error in deleteActivity:', error);
-      throw error;
-    }
+    }, 'deleteActivity');
   }
 }
 
