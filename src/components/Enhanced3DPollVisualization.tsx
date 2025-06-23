@@ -41,35 +41,43 @@ const OptionMediaPlane: React.FC<{
   position: [number, number, number];
 }> = ({ imageUrl, position }) => {
   const [loadError, setLoadError] = useState(false);
+  const [texture, setTexture] = useState<THREE.Texture | null>(null);
   
-  // Use useLoader hook for texture loading
-  const texture = useLoader(
-    THREE.TextureLoader, 
-    imageUrl, 
-    (loader) => {
-      loader.setCrossOrigin('anonymous');
-    },
-    (error) => {
-      console.error('OptionMediaPlane: Failed to load texture:', imageUrl, error);
-      setLoadError(true);
-    }
-  );
-
+  // Only load texture if imageUrl is valid
   useEffect(() => {
-    if (texture) {
-      console.log('OptionMediaPlane: Texture loaded successfully for:', imageUrl);
-      // Apply texture properties for better rendering
-      texture.flipY = true;
-      texture.wrapS = THREE.ClampToEdgeWrapping;
-      texture.wrapT = THREE.ClampToEdgeWrapping;
-      texture.minFilter = THREE.LinearFilter;
-      texture.magFilter = THREE.LinearFilter;
-      texture.format = THREE.RGBAFormat;
-      texture.needsUpdate = true;
+    if (!imageUrl || imageUrl.trim() === '') {
+      setTexture(null);
+      return;
     }
-  }, [texture, imageUrl]);
 
-  if (!texture || loadError) {
+    const loader = new THREE.TextureLoader();
+    loader.setCrossOrigin('anonymous');
+    
+    loader.load(
+      imageUrl,
+      (loadedTexture) => {
+        // Apply texture properties for better rendering
+        loadedTexture.flipY = true;
+        loadedTexture.wrapS = THREE.ClampToEdgeWrapping;
+        loadedTexture.wrapT = THREE.ClampToEdgeWrapping;
+        loadedTexture.minFilter = THREE.LinearFilter;
+        loadedTexture.magFilter = THREE.LinearFilter;
+        loadedTexture.format = THREE.RGBAFormat;
+        loadedTexture.needsUpdate = true;
+        setTexture(loadedTexture);
+        console.log('OptionMediaPlane: Texture loaded successfully for:', imageUrl);
+      },
+      undefined,
+      (error) => {
+        console.error('OptionMediaPlane: Failed to load texture:', imageUrl, error);
+        setLoadError(true);
+        setTexture(null);
+      }
+    );
+  }, [imageUrl]);
+
+
+  if (!texture || loadError || !imageUrl || imageUrl.trim() === '') {
     console.log('OptionMediaPlane: No texture available for:', imageUrl);
     return null;
   }
