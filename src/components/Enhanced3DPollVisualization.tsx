@@ -416,8 +416,49 @@ const Enhanced3DScene: React.FC<{
   activityTitle?: string;
   activityDescription?: string;
 }> = ({ options, totalResponses, themeColors, activityTitle }) => {
+  const { camera } = useThree();
   const maxResponses = Math.max(...options.map(opt => opt.responses), 1);
   const maxHeight = 4;
+  
+  // Camera fly-in animation
+  useEffect(() => {
+    // Starting position (far away)
+    camera.position.set(0, 15, 40);
+    
+    // Animate to final position
+    const animateCamera = () => {
+      const targetX = 0;
+      const targetY = 8;
+      const targetZ = 15; // Closer than original 20
+      
+      const animationDuration = 2000; // 2 seconds
+      const startTime = Date.now();
+      const startPos = camera.position.clone();
+      
+      const animate = () => {
+        const elapsed = Date.now() - startTime;
+        const progress = Math.min(elapsed / animationDuration, 1);
+        
+        // Smooth easing function
+        const easeProgress = 1 - Math.pow(1 - progress, 3);
+        
+        camera.position.x = startPos.x + (targetX - startPos.x) * easeProgress;
+        camera.position.y = startPos.y + (targetY - startPos.y) * easeProgress;
+        camera.position.z = startPos.z + (targetZ - startPos.z) * easeProgress;
+        
+        if (progress < 1) {
+          requestAnimationFrame(animate);
+        }
+      };
+      
+      animate();
+    };
+    
+    // Start animation after a brief delay
+    const timer = setTimeout(animateCamera, 100);
+    
+    return () => clearTimeout(timer);
+  }, [camera]);
   
   // Calculate dynamic font sizes
   const titleFontSize = activityTitle ? calculateTitleFontSize(activityTitle) : 1.8;
@@ -686,7 +727,7 @@ export const Enhanced3DPollVisualization: React.FC<Enhanced3DPollVisualizationPr
         <Suspense fallback={<LoadingFallback />}>
           <Canvas
             camera={{ 
-              position: [0, 8, 20], 
+              position: [0, 15, 40], // Starting position for fly-in
               fov: 75,
               near: 0.1,
               far: 1000
@@ -714,8 +755,8 @@ export const Enhanced3DPollVisualization: React.FC<Enhanced3DPollVisualizationPr
               enablePan={false}
               enableZoom={true}
               enableRotate={true}
-              minDistance={12}
-              maxDistance={35}
+              minDistance={10}
+              maxDistance={30}
               minPolarAngle={Math.PI / 8}
               maxPolarAngle={Math.PI / 2}
               autoRotate={false}
