@@ -609,8 +609,10 @@ const Enhanced3DScene: React.FC<{
           ? Math.max((option.responses / maxResponses) * maxHeight, 0.2)
           : 0.8;
         
-        // Calculate optimal spacing
-        const spacing = Math.min(5.0, 30 / Math.max(options.length, 1));
+        // Calculate optimal spacing that scales with number of options - same algorithm as images
+        const minSpacing = 6.0; // Minimum spacing to prevent glow overlap
+        const maxSpacing = 12.0; // Maximum spacing for 1-2 options
+        const spacing = Math.max(minSpacing, Math.min(maxSpacing, 50 / Math.max(options.length, 1)));
         const totalWidth = (options.length - 1) * spacing;
         const startX = -totalWidth / 2;
         
