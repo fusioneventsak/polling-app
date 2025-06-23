@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../lib/supabase';
 import { roomService } from '../services/roomService';
 import { Users, Target, Clock, CheckCircle, ArrowRight, Loader2, AlertCircle, Home } from 'lucide-react';
-import { Card } from '../components/ui/Card';
+import { Card } from '../components/Card';
 import type { Room, ActivityType } from '../types';
 
 function GameJoinPage() {
