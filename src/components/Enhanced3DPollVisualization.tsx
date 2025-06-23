@@ -722,8 +722,14 @@ export const Enhanced3DPollVisualization: React.FC<Enhanced3DPollVisualizationPr
       initial={{ opacity: 0, scale: 0.9 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.8 }}
-      className={`w-full bg-gradient-to-br from-slate-900/40 to-blue-900/20 rounded-xl border border-slate-700 overflow-hidden shadow-2xl relative ${className}`}
-      style={{ height: '100%', minHeight: '800px' }}
+      className={`w-full h-full bg-gradient-to-br from-slate-900/40 to-blue-900/20 rounded-xl border border-slate-700 overflow-hidden shadow-2xl relative ${className}`}
+      style={{ 
+        height: '100%', 
+        minHeight: '800px',
+        width: '100%',
+        minWidth: '100%',
+        position: 'relative'
+      }}
     >
       {/* Activity media display */}
       {activityMedia && (
@@ -785,6 +791,7 @@ export const Enhanced3DPollVisualization: React.FC<Enhanced3DPollVisualizationPr
       <ErrorBoundary fallback={<LoadingFallback />}>
         <Suspense fallback={<LoadingFallback />}>
           <Canvas
+            key={`canvas-${options.length}-${totalResponses}`}
             camera={{ 
               position: [0, 15, 40], // Starting position for fly-in
               fov: 75,
@@ -794,7 +801,12 @@ export const Enhanced3DPollVisualization: React.FC<Enhanced3DPollVisualizationPr
             style={{ 
               background: 'transparent',
               width: '100%',
-              height: '100%'
+              height: '100%',
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0
             }}
             shadows
             gl={{ 
