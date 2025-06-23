@@ -1,7 +1,4 @@
-import React, { useEffect, useState, useCallback, useRef }
-
-export { DisplayPage };
-export default DisplayPage; from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../lib/supabase';
@@ -844,3 +841,5 @@ function DisplayPage() {
     </div>
   );
 }
+
+export { DisplayPage };
