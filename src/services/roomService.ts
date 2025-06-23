@@ -603,7 +603,7 @@ export class RoomService {
       // Try to use the database function if it exists
       try {
         const { error: resetError } = await supabase
-          .rpc('reset_room_vote_counts', { room_id: roomId });
+          .rpc('reset_room_vote_counts', { target_room_id: roomId });
 
         if (resetError) {
           console.warn('RoomService: Database function not available, using manual reset:', resetError);
@@ -679,10 +679,14 @@ export class RoomService {
           )
         `)
         .eq('id', roomId)
-        .single();
+        .maybeSingle();
 
-      if (fetchError) {
+      if (fetchError && fetchError.code !== 'PGRST116') {
         throw handleSupabaseError(fetchError, 'fetchResetRoom');
+      }
+
+      if (!room) {
+        throw new Error(`Room with ID ${roomId} not found after reset`);
       }
 
       console.log('RoomService: Room reset successfully');
