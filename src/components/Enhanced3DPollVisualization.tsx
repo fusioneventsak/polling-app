@@ -240,51 +240,32 @@ const Enhanced3DBar: React.FC<{
   );
 };
 
-// Helper function to calculate dynamic text size and layout
-const calculateDynamicTextProps = (text: string, spacing: number) => {
+// Helper function to calculate font size to fit text in container
+const calculateFitFontSize = (text: string, spacing: number) => {
   const availableWidth = spacing * 0.8;
   const textLength = text.length;
   
-  // Base font sizes - start larger and scale down as needed
-  let fontSize = 1.6;
-  let maxWidth = availableWidth;
-  let displayText = text;
+  // Base calculation: estimate character width relative to font size
+  // Rough estimate: each character is about 0.6x the font size in width
+  const charWidthRatio = 0.6;
   
-  // Adjust font size based on text length
-  if (textLength <= 15) {
-    fontSize = 1.6; // Large for short text
-  } else if (textLength <= 25) {
-    fontSize = 1.4; // Medium for moderate text
-  } else if (textLength <= 40) {
-    fontSize = 1.2; // Smaller for longer text
-  } else if (textLength <= 60) {
-    fontSize = 1.0; // Even smaller for very long text
-  } else {
-    fontSize = 0.9; // Minimum size for extremely long text
-  }
+  // Calculate the font size needed to fit the text
+  let fontSize = availableWidth / (textLength * charWidthRatio);
   
-  // Smart text truncation - prefer word boundaries
-  const maxChars = Math.floor(availableWidth / (fontSize * 0.6)); // Rough char estimate
-  if (textLength > maxChars) {
-    const words = text.split(' ');
-    let truncated = '';
-    
-    for (const word of words) {
-      const testText = truncated ? `${truncated} ${word}` : word;
-      if (testText.length <= maxChars - 3) { // Leave room for "..."
-        truncated = testText;
-      } else {
-        break;
-      }
-    }
-    
-    displayText = truncated ? `${truncated}...` : `${text.substring(0, maxChars - 3)}...`;
-  }
+  // Set reasonable bounds
+  const maxFontSize = 1.6; // Don't go bigger than this for short text
+  const minFontSize = 0.4; // Don't go smaller than this for readability
   
-  return { fontSize, maxWidth, displayText };
+  fontSize = Math.max(minFontSize, Math.min(maxFontSize, fontSize));
+  
+  return {
+    fontSize,
+    maxWidth: availableWidth,
+    displayText: text // Always show full text, no truncation
+  };
 };
 
-// Floor Stats Component with Dynamic Text
+// Floor Stats Component with Auto-Scaling Text
 const FloorStatsDisplay: React.FC<{
   options: ActivityOption[];
   totalResponses: number;
@@ -307,8 +288,8 @@ const FloorStatsDisplay: React.FC<{
           ? '#10b981' 
           : `hsl(${200 + hue}, 75%, 60%)`;
         
-        // Calculate dynamic text properties
-        const textProps = calculateDynamicTextProps(option.text, spacing);
+        // Calculate font size to fit entire text
+        const textProps = calculateFitFontSize(option.text, spacing);
         
         return (
           <group key={option.id}>
@@ -376,7 +357,7 @@ const FloorStatsDisplay: React.FC<{
               {option.responses} votes
             </Text>
             
-            {/* Dynamic option text - adapts to length */}
+            {/* Auto-scaling option text - fits entire text */}
             <Text
               position={[xPosition, 0.12, 9]}
               fontSize={textProps.fontSize}
@@ -385,10 +366,10 @@ const FloorStatsDisplay: React.FC<{
               anchorY="middle"
               rotation={[-Math.PI / 2, 0, 0]}
               maxWidth={textProps.maxWidth}
-              outlineWidth={0.04}
+              outlineWidth={Math.max(0.02, textProps.fontSize * 0.03)}
               outlineColor="#1e293b"
               textAlign="center"
-              lineHeight={1.1}
+              lineHeight={1.2}
             >
               {textProps.displayText}
             </Text>
@@ -404,7 +385,7 @@ const FloorStatsDisplay: React.FC<{
               maxWidth={textProps.maxWidth}
               fillOpacity={0.4}
               textAlign="center"
-              lineHeight={1.1}
+              lineHeight={1.2}
             >
               {textProps.displayText}
             </Text>
