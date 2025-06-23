@@ -118,10 +118,19 @@ const StandingImagePlane: React.FC<{
     loader.load(
       imageUrl,
       (loadedTexture) => {
+        // Enhanced texture properties for better quality
         loadedTexture.needsUpdate = true;
+        loadedTexture.flipY = true;
+        loadedTexture.wrapS = THREE.ClampToEdgeWrapping;
+        loadedTexture.wrapT = THREE.ClampToEdgeWrapping;
+        loadedTexture.minFilter = THREE.LinearFilter;
+        loadedTexture.magFilter = THREE.LinearFilter;
+        loadedTexture.anisotropy = 16; // Maximum anisotropic filtering for crisp images
+        loadedTexture.format = THREE.RGBAFormat;
+        loadedTexture.generateMipmaps = true;
         setTexture(loadedTexture);
         setLoadError(false);
-        console.log('StandingImagePlane: Texture loaded for standing placement:', imageUrl);
+        console.log('StandingImagePlane: High-quality texture loaded for standing placement:', imageUrl);
       },
       undefined,
       (error) => {
@@ -145,11 +154,15 @@ const StandingImagePlane: React.FC<{
 
   return (
     <group>
-      {/* Main image - no transparency for better pop */}
+      {/* Main image - enhanced for better quality */}
       <mesh position={position} rotation={[-Math.PI / 6, 0, 0]} renderOrder={2}>
         <planeGeometry args={[2.0, 1.5]} />
-        <meshBasicMaterial 
+        <meshStandardMaterial 
           map={texture}
+          transparent={false}
+          side={THREE.DoubleSide}
+          roughness={0.1}
+          metalness={0.1}
         />
       </mesh>
       
@@ -501,11 +514,11 @@ const Enhanced3DScene: React.FC<{
   
   return (
     <>
-      {/* Enhanced lighting setup */}
-      <ambientLight intensity={0.6} />
+      {/* Enhanced lighting setup for better bar visibility */}
+      <ambientLight intensity={0.8} />
       <directionalLight 
         position={[10, 20, 5]} 
-        intensity={2.0} 
+        intensity={3.0} 
         castShadow
         shadow-mapSize-width={2048}
         shadow-mapSize-height={2048}
@@ -515,11 +528,22 @@ const Enhanced3DScene: React.FC<{
         shadow-camera-top={25}
         shadow-camera-bottom={-25}
       />
-      <pointLight position={[-10, 10, 10]} intensity={0.8} color={themeColors.accentColor} />
-      <pointLight position={[10, 10, -10]} intensity={0.6} color={themeColors.secondaryColor} />
+      <directionalLight 
+        position={[-10, 15, 10]} 
+        intensity={2.5} 
+        color="#ffffff"
+      />
+      <directionalLight 
+        position={[0, 25, -10]} 
+        intensity={2.0} 
+        color="#ffffff"
+      />
+      <pointLight position={[-10, 10, 10]} intensity={1.5} color={themeColors.accentColor} />
+      <pointLight position={[10, 10, -10]} intensity={1.2} color={themeColors.secondaryColor} />
+      <pointLight position={[0, 15, 5]} intensity={1.8} color="#ffffff" />
       <spotLight 
         position={[0, 18, 0]} 
-        intensity={1.5} 
+        intensity={2.5} 
         angle={Math.PI / 3}
         penumbra={0.3}
         color="#ffffff"
@@ -777,7 +801,8 @@ export const Enhanced3DPollVisualization: React.FC<Enhanced3DPollVisualizationPr
               antialias: true, 
               alpha: true,
               powerPreference: "high-performance",
-              preserveDrawingBuffer: true
+              preserveDrawingBuffer: true,
+              pixelRatio: Math.min(window.devicePixelRatio, 2) // Higher resolution for better image quality
             }}
           >
             <Enhanced3DScene 
