@@ -206,7 +206,7 @@ const Enhanced3DBar: React.FC<{
   return (
     <group>
       <mesh position={[position[0], 0.05, position[2]]}>
-        <cylinderGeometry args={[2.5, 2.5, 0.25]} />
+        <cylinderGeometry args={[3.2, 3.2, 0.25]} />
         <meshStandardMaterial 
           color="#1e293b"
           metalness={0.8}
@@ -215,7 +215,7 @@ const Enhanced3DBar: React.FC<{
       </mesh>
       
       <mesh ref={meshRef} position={[position[0], 0.15, position[2]]} scale={[1, 0.2, 1]} castShadow>
-        <cylinderGeometry args={[1.8, 1.8, 1]} />
+        <cylinderGeometry args={[2.4, 2.4, 1]} />
         <meshStandardMaterial 
           color={barColor}
           metalness={0.9}
@@ -228,7 +228,7 @@ const Enhanced3DBar: React.FC<{
       
       {responses > 0 && (
         <mesh ref={glowRef} position={[position[0], 0.15, position[2]]} scale={[1.8, 0.2, 1.8]}>
-          <cylinderGeometry args={[1.6, 1.6, 1]} />
+          <cylinderGeometry args={[2.1, 2.1, 1]} />
           <meshBasicMaterial 
             color={glowColor}
             transparent
@@ -482,7 +482,7 @@ const Enhanced3DScene: React.FC<{
         return (
           <Enhanced3DBar
             key={option.id}
-            position={[startX + index * spacing, 0, -2]}
+            position={[startX + index * spacing, 0, -4]}
             height={height}
             color={barColor}
             label={option.text}
