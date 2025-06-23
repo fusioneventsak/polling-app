@@ -240,7 +240,51 @@ const Enhanced3DBar: React.FC<{
   );
 };
 
-// Floor Stats Component with Enhanced Text
+// Helper function to calculate dynamic text size and layout
+const calculateDynamicTextProps = (text: string, spacing: number) => {
+  const availableWidth = spacing * 0.8;
+  const textLength = text.length;
+  
+  // Base font sizes - start larger and scale down as needed
+  let fontSize = 1.6;
+  let maxWidth = availableWidth;
+  let displayText = text;
+  
+  // Adjust font size based on text length
+  if (textLength <= 15) {
+    fontSize = 1.6; // Large for short text
+  } else if (textLength <= 25) {
+    fontSize = 1.4; // Medium for moderate text
+  } else if (textLength <= 40) {
+    fontSize = 1.2; // Smaller for longer text
+  } else if (textLength <= 60) {
+    fontSize = 1.0; // Even smaller for very long text
+  } else {
+    fontSize = 0.9; // Minimum size for extremely long text
+  }
+  
+  // Smart text truncation - prefer word boundaries
+  const maxChars = Math.floor(availableWidth / (fontSize * 0.6)); // Rough char estimate
+  if (textLength > maxChars) {
+    const words = text.split(' ');
+    let truncated = '';
+    
+    for (const word of words) {
+      const testText = truncated ? `${truncated} ${word}` : word;
+      if (testText.length <= maxChars - 3) { // Leave room for "..."
+        truncated = testText;
+      } else {
+        break;
+      }
+    }
+    
+    displayText = truncated ? `${truncated}...` : `${text.substring(0, maxChars - 3)}...`;
+  }
+  
+  return { fontSize, maxWidth, displayText };
+};
+
+// Floor Stats Component with Dynamic Text
 const FloorStatsDisplay: React.FC<{
   options: ActivityOption[];
   totalResponses: number;
@@ -262,6 +306,9 @@ const FloorStatsDisplay: React.FC<{
         const barColor = option.is_correct 
           ? '#10b981' 
           : `hsl(${200 + hue}, 75%, 60%)`;
+        
+        // Calculate dynamic text properties
+        const textProps = calculateDynamicTextProps(option.text, spacing);
         
         return (
           <group key={option.id}>
@@ -329,35 +376,37 @@ const FloorStatsDisplay: React.FC<{
               {option.responses} votes
             </Text>
             
-            {/* Option text - much larger and more readable */}
+            {/* Dynamic option text - adapts to length */}
             <Text
               position={[xPosition, 0.12, 9]}
-              fontSize={1.3}
+              fontSize={textProps.fontSize}
               color="#ffffff"
               anchorX="center"
               anchorY="middle"
               rotation={[-Math.PI / 2, 0, 0]}
-              maxWidth={spacing * 0.7}
+              maxWidth={textProps.maxWidth}
               outlineWidth={0.04}
               outlineColor="#1e293b"
               textAlign="center"
+              lineHeight={1.1}
             >
-              {option.text.length > 28 ? `${option.text.substring(0, 28)}...` : option.text}
+              {textProps.displayText}
             </Text>
             
             {/* Option text shadow */}
             <Text
               position={[xPosition + 0.05, 0.08, 9.05]}
-              fontSize={1.3}
+              fontSize={textProps.fontSize}
               color="#000000"
               anchorX="center"
               anchorY="middle"
               rotation={[-Math.PI / 2, 0, 0]}
-              maxWidth={spacing * 0.7}
+              maxWidth={textProps.maxWidth}
               fillOpacity={0.4}
               textAlign="center"
+              lineHeight={1.1}
             >
-              {option.text.length > 28 ? `${option.text.substring(0, 28)}...` : option.text}
+              {textProps.displayText}
             </Text>
           </group>
         );
