@@ -154,9 +154,9 @@ const StandingImagePlane: React.FC<{
 
   return (
     <group>
-      {/* Main image - enhanced for better quality */}
+      {/* Main image - enhanced for better quality, 25% larger */}
       <mesh position={position} rotation={[-Math.PI / 6, 0, 0]} renderOrder={2}>
-        <planeGeometry args={[2.0, 1.5]} />
+        <planeGeometry args={[2.5, 1.875]} />
         <meshStandardMaterial 
           map={texture}
           transparent={false}
@@ -166,9 +166,9 @@ const StandingImagePlane: React.FC<{
         />
       </mesh>
       
-      {/* Glow border matching bar color */}
+      {/* Glow border matching bar color - 25% larger */}
       <mesh position={[position[0], position[1], position[2] - 0.01]} rotation={[-Math.PI / 6, 0, 0]} renderOrder={1}>
-        <planeGeometry args={[2.2, 1.7]} />
+        <planeGeometry args={[2.75, 2.125]} />
         <meshBasicMaterial 
           color={glowColor}
           transparent
@@ -176,9 +176,9 @@ const StandingImagePlane: React.FC<{
         />
       </mesh>
       
-      {/* Outer glow effect with lighter version of bar color */}
+      {/* Outer glow effect with lighter version of bar color - 25% larger */}
       <mesh position={[position[0], position[1], position[2] - 0.02]} rotation={[-Math.PI / 6, 0, 0]} renderOrder={0}>
-        <planeGeometry args={[2.4, 1.9]} />
+        <planeGeometry args={[3.0, 2.375]} />
         <meshBasicMaterial 
           color={glowColor}
           transparent
@@ -294,9 +294,9 @@ const Enhanced3DBar: React.FC<{
 
   return (
     <group>
-      {/* Base platform with enhanced design - larger */}
+      {/* Base platform with enhanced design - 25% larger */}
       <mesh position={[position[0], 0.05, position[2]]}>
-        <cylinderGeometry args={[1.5, 1.5, 0.15]} />
+        <cylinderGeometry args={[1.875, 1.875, 0.1875]} />
         <meshStandardMaterial 
           color="#1e293b"
           metalness={0.8}
@@ -304,9 +304,9 @@ const Enhanced3DBar: React.FC<{
         />
       </mesh>
       
-      {/* Main 3D bar with enhanced metallic materials - larger */}
+      {/* Main 3D bar with enhanced metallic materials - 25% larger */}
       <mesh ref={meshRef} position={[position[0], 0.1, position[2]]} scale={[1, 0.2, 1]} castShadow>
-        <cylinderGeometry args={[1.0, 1.0, 1]} />
+        <cylinderGeometry args={[1.25, 1.25, 1]} />
         <meshStandardMaterial 
           color={barColor}
           metalness={0.9}
@@ -317,10 +317,10 @@ const Enhanced3DBar: React.FC<{
         />
       </mesh>
       
-      {/* Glow effect for bars with responses - larger */}
+      {/* Glow effect for bars with responses - 25% larger */}
       {responses > 0 && (
-        <mesh ref={glowRef} position={[position[0], 0.1, position[2]]} scale={[1.6, 0.2, 1.6]}>
-          <cylinderGeometry args={[1.2, 1.2, 1]} />
+        <mesh ref={glowRef} position={[position[0], 0.1, position[2]]} scale={[2.0, 0.2, 2.0]}>
+          <cylinderGeometry args={[1.5, 1.5, 1]} />
           <meshBasicMaterial 
             color={glowColor}
             transparent
@@ -474,9 +474,9 @@ const Enhanced3DScene: React.FC<{
       const targetX = 0;
       const targetY = 4; // Higher to see floor stats
       
-      // Dynamic zoom based on number of options
-      const baseDistance = 15;
-      const extraDistance = Math.max(0, (options.length - 2) * 3); // Add 3 units per extra option beyond 2
+      // Dynamic zoom based on number of options - adjusted for larger elements
+      const baseDistance = 18; // Increased from 15 to accommodate larger elements
+      const extraDistance = Math.max(0, (options.length - 2) * 3.5); // Increased from 3 to 3.5 per extra option
       const targetZ = baseDistance + extraDistance;
       
       const animationDuration = 2000; // 2 seconds
@@ -815,8 +815,8 @@ export const Enhanced3DPollVisualization: React.FC<Enhanced3DPollVisualizationPr
               enablePan={false}
               enableZoom={true}
               enableRotate={true}
-              minDistance={12}
-              maxDistance={40}
+              minDistance={15}
+              maxDistance={50}
               minPolarAngle={Math.PI / 8}
               maxPolarAngle={Math.PI / 2.5}
               autoRotate={false}
