@@ -35,15 +35,14 @@ const calculateDescriptionFontSize = (text: string): number => {
   return text.length <= 50 ? 0.8 : text.length <= 100 ? 0.6 : 0.5;
 };
 
-// Enhanced component for handling texture loading with better error handling
+// Fixed texture loading component - simplified to avoid material uniform issues
 const OptionMediaPlane: React.FC<{
   imageUrl: string;
   position: [number, number, number];
 }> = ({ imageUrl, position }) => {
-  const [loadError, setLoadError] = useState(false);
   const [texture, setTexture] = useState<THREE.Texture | null>(null);
+  const [loadError, setLoadError] = useState(false);
   
-  // Only load texture if imageUrl is valid
   useEffect(() => {
     if (!imageUrl || imageUrl.trim() === '') {
       setTexture(null);
@@ -56,15 +55,10 @@ const OptionMediaPlane: React.FC<{
     loader.load(
       imageUrl,
       (loadedTexture) => {
-        // Apply texture properties for better rendering
-        loadedTexture.flipY = true;
-        loadedTexture.wrapS = THREE.ClampToEdgeWrapping;
-        loadedTexture.wrapT = THREE.ClampToEdgeWrapping;
-        loadedTexture.minFilter = THREE.LinearFilter;
-        loadedTexture.magFilter = THREE.LinearFilter;
-        loadedTexture.format = THREE.RGBAFormat;
+        // Minimal texture setup to prevent uniform errors
         loadedTexture.needsUpdate = true;
         setTexture(loadedTexture);
+        setLoadError(false);
         console.log('OptionMediaPlane: Texture loaded successfully for:', imageUrl);
       },
       undefined,
@@ -74,20 +68,25 @@ const OptionMediaPlane: React.FC<{
         setTexture(null);
       }
     );
+    
+    // Cleanup function
+    return () => {
+      if (texture) {
+        texture.dispose();
+      }
+    };
   }, [imageUrl]);
 
-
+  // Don't render if no valid texture
   if (!texture || loadError || !imageUrl || imageUrl.trim() === '') {
-    console.log('OptionMediaPlane: No texture available for:', imageUrl);
     return null;
   }
 
-  console.log('OptionMediaPlane: Rendering texture plane for:', imageUrl);
   return (
     <mesh position={position} renderOrder={1}>
       <planeGeometry args={[2.5, 1.875]} />
       <meshBasicMaterial 
-        map={texture || null} 
+        map={texture}
         transparent 
         opacity={0.9}
         side={THREE.FrontSide}
@@ -97,7 +96,7 @@ const OptionMediaPlane: React.FC<{
   );
 };
 
-// Standing image component (upright behind stats)
+// Simplified standing image component with better error handling
 const StandingImagePlane: React.FC<{
   imageUrl: string;
   position: [number, number, number];
@@ -107,41 +106,49 @@ const StandingImagePlane: React.FC<{
   const [loadError, setLoadError] = useState(false);
   
   useEffect(() => {
-    if (imageUrl && imageUrl.trim() !== '') {
-      const loader = new THREE.TextureLoader();
-      loader.setCrossOrigin('anonymous');
-      loader.load(
-        imageUrl,
-        (loadedTexture) => {
-          loadedTexture.flipY = true; // Standard orientation for standing images
-          loadedTexture.wrapS = THREE.ClampToEdgeWrapping;
-          loadedTexture.wrapT = THREE.ClampToEdgeWrapping;
-          setTexture(loadedTexture);
-          console.log('StandingImagePlane: Texture loaded for standing placement:', imageUrl);
-        },
-        undefined,
-        (error) => {
-          console.warn('StandingImagePlane: Failed to load texture:', error);
-          setLoadError(true);
-          setTexture(null);
-        }
-      );
+    if (!imageUrl || imageUrl.trim() === '') {
+      setTexture(null);
+      return;
     }
+
+    const loader = new THREE.TextureLoader();
+    loader.setCrossOrigin('anonymous');
+    
+    loader.load(
+      imageUrl,
+      (loadedTexture) => {
+        loadedTexture.needsUpdate = true;
+        setTexture(loadedTexture);
+        setLoadError(false);
+        console.log('StandingImagePlane: Texture loaded for standing placement:', imageUrl);
+      },
+      undefined,
+      (error) => {
+        console.warn('StandingImagePlane: Failed to load texture:', error);
+        setLoadError(true);
+        setTexture(null);
+      }
+    );
+    
+    // Cleanup
+    return () => {
+      if (texture) {
+        texture.dispose();
+      }
+    };
   }, [imageUrl]);
 
   if (!texture || loadError || !imageUrl || imageUrl.trim() === '') {
-    return null; // Don't show fallback, just skip
+    return null;
   }
 
   return (
     <mesh position={position} renderOrder={2}>
       <planeGeometry args={[2.0, 1.5]} />
       <meshBasicMaterial 
-        map={texture || null} 
+        map={texture}
         transparent 
         opacity={0.7}
-        emissive="#00ffff"
-        emissiveIntensity={0.1}
       />
     </mesh>
   );
@@ -203,7 +210,6 @@ const Enhanced3DBar: React.FC<{
   const glowRef = useRef<THREE.Mesh>(null);
   const [animatedHeight, setAnimatedHeight] = useState(0.2);
   
-  
   // Animate the bar height
   useFrame((state) => {
     const targetHeight = Math.max(height, 0.2);
@@ -220,7 +226,7 @@ const Enhanced3DBar: React.FC<{
       }
     }
     
-    // Animate glow effect
+    // Animate glow effect - simplified to avoid material issues
     if (glowRef.current && responses > 0) {
       const targetHeight = Math.max(height, 0.2);
       const currentHeight = glowRef.current.scale.y;
@@ -232,10 +238,11 @@ const Enhanced3DBar: React.FC<{
         glowRef.current.position.y = newHeight / 2;
       }
       
-      // Pulsing glow effect
+      // Pulsing glow effect - safe material access
       const pulseIntensity = 0.1 + Math.sin(state.clock.elapsedTime * 2 + delay) * 0.05;
-      if (glowRef.current.material instanceof THREE.MeshBasicMaterial) {
-        glowRef.current.material.opacity = pulseIntensity;
+      const material = glowRef.current.material as THREE.MeshBasicMaterial;
+      if (material && material.opacity !== undefined) {
+        material.opacity = pulseIntensity;
       }
     }
   });
@@ -259,8 +266,6 @@ const Enhanced3DBar: React.FC<{
           color="#1e293b"
           metalness={0.8}
           roughness={0.2}
-          emissive="#1e293b"
-          emissiveIntensity={0.1}
         />
       </mesh>
       
@@ -366,7 +371,7 @@ const FloorStatsDisplay: React.FC<{
   );
 };
 
-// Standing Images Component (middle layer)
+// Standing Images Component (middle layer) - Wrapped in error boundary
 const StandingImagesDisplay: React.FC<{
   options: ActivityOption[];
 }> = ({ options }) => {
@@ -384,42 +389,46 @@ const StandingImagesDisplay: React.FC<{
         const xPosition = startX + index * spacing;
         
         return (
-          <group key={option.id}>
-            {/* Standing holographic image - closer to stats and more transparent */}
-            <StandingImagePlane
-              imageUrl={option.media_url}
-              position={[xPosition, 1.5, 6]}
-              fallbackText={`Option ${String.fromCharCode(65 + index)}`}
-            />
-            
-            {/* Holographic frame effect */}
-            <mesh position={[xPosition, 1.5, 5.99]}>
-              <planeGeometry args={[2.2, 1.7]} />
-              <meshBasicMaterial 
-                transparent
-                opacity={0.3}
-                color="#00ffff"
-                wireframe={true}
+          <ErrorBoundary 
+            key={option.id}
+            fallback={<group />}
+          >
+            <group>
+              {/* Standing holographic image - closer to stats and more transparent */}
+              <StandingImagePlane
+                imageUrl={option.media_url}
+                position={[xPosition, 1.5, 6]}
+                fallbackText={`Option ${String.fromCharCode(65 + index)}`}
               />
-            </mesh>
-            
-            {/* Holographic glow effect */}
-            <mesh position={[xPosition, 1.5, 5.98]}>
-              <planeGeometry args={[2.4, 1.9]} />
-              <meshBasicMaterial 
-                transparent
-                opacity={0.1}
-                color="#00ffff"
-              />
-            </mesh>
-          </group>
+              
+              {/* Holographic frame effect */}
+              <mesh position={[xPosition, 1.5, 5.99]}>
+                <planeGeometry args={[2.2, 1.7]} />
+                <meshBasicMaterial 
+                  transparent
+                  opacity={0.3}
+                  color="#00ffff"
+                  wireframe={true}
+                />
+              </mesh>
+              
+              {/* Holographic glow effect */}
+              <mesh position={[xPosition, 1.5, 5.98]}>
+                <planeGeometry args={[2.4, 1.9]} />
+                <meshBasicMaterial 
+                  transparent
+                  opacity={0.1}
+                  color="#00ffff"
+                />
+              </mesh>
+            </group>
+          </ErrorBoundary>
         );
       })}
     </group>
   );
 };
 
-// Update StandingImagePlane to be more holographic
 // Main 3D Scene with Layered Layout
 const Enhanced3DScene: React.FC<{ 
   options: ActivityOption[]; 
@@ -505,8 +514,10 @@ const Enhanced3DScene: React.FC<{
       {/* LAYER 1: Floor Stats (Foreground) */}
       <FloorStatsDisplay options={options} totalResponses={totalResponses} />
       
-      {/* LAYER 2: Standing Images (Middle) */}
-      <StandingImagesDisplay options={options} />
+      {/* LAYER 2: Standing Images (Middle) - Wrapped in error boundary */}
+      <ErrorBoundary fallback={<group />}>
+        <StandingImagesDisplay options={options} />
+      </ErrorBoundary>
       
       {/* LAYER 3: 3D Bars (Background) */}
       {options.map((option, index) => {
@@ -582,9 +593,7 @@ const Enhanced3DScene: React.FC<{
         >
           {totalResponses > 0 ? `${totalResponses} total responses` : 'Waiting for responses...'}
         </Text>
-        
       </Float>
-      
     </>
   );
 };
@@ -610,7 +619,7 @@ export const Enhanced3DPollVisualization: React.FC<Enhanced3DPollVisualizationPr
   isVotingLocked,
   className = '' 
 }) => {
-  console.log('Enhanced3DPollVisualization: New layered layout with props:', { 
+  console.log('Enhanced3DPollVisualization: Fixed layered layout with props:', { 
     optionsCount: options.length,
     totalResponses, 
     themeColors,
@@ -700,51 +709,53 @@ export const Enhanced3DPollVisualization: React.FC<Enhanced3DPollVisualizationPr
             }}
             className="w-3 h-3 bg-green-400 rounded-full"
           />
-          <span className="text-green-400 text-sm font-medium">LAYERED 3D</span>
+          <span className="text-green-400 text-sm font-medium">FIXED 3D</span>
         </div>
       </div>
 
-      {/* 3D Canvas */}
-      <Suspense fallback={<LoadingFallback />}>
-        <Canvas
-          camera={{ 
-            position: [0, 8, 20], 
-            fov: 75,
-            near: 0.1,
-            far: 1000
-          }}
-          style={{ 
-            background: 'transparent',
-            width: '100%',
-            height: '100%'
-          }}
-          shadows
-          gl={{ 
-            antialias: true, 
-            alpha: true,
-            powerPreference: "high-performance",
-            preserveDrawingBuffer: true
-          }}
-        >
-          <Enhanced3DScene 
-            options={options} 
-            totalResponses={totalResponses} 
-            themeColors={themeColors}
-            activityTitle={activityTitle}
-          />
-          <OrbitControls 
-            enablePan={false}
-            enableZoom={true}
-            enableRotate={true}
-            minDistance={12}
-            maxDistance={35}
-            minPolarAngle={Math.PI / 8}
-            maxPolarAngle={Math.PI / 2}
-            autoRotate={false}
-            rotateSpeed={0.5}
-          />
-        </Canvas>
-      </Suspense>
+      {/* 3D Canvas with error boundary */}
+      <ErrorBoundary fallback={<LoadingFallback />}>
+        <Suspense fallback={<LoadingFallback />}>
+          <Canvas
+            camera={{ 
+              position: [0, 8, 20], 
+              fov: 75,
+              near: 0.1,
+              far: 1000
+            }}
+            style={{ 
+              background: 'transparent',
+              width: '100%',
+              height: '100%'
+            }}
+            shadows
+            gl={{ 
+              antialias: true, 
+              alpha: true,
+              powerPreference: "high-performance",
+              preserveDrawingBuffer: true
+            }}
+          >
+            <Enhanced3DScene 
+              options={options} 
+              totalResponses={totalResponses} 
+              themeColors={themeColors}
+              activityTitle={activityTitle}
+            />
+            <OrbitControls 
+              enablePan={false}
+              enableZoom={true}
+              enableRotate={true}
+              minDistance={12}
+              maxDistance={35}
+              minPolarAngle={Math.PI / 8}
+              maxPolarAngle={Math.PI / 2}
+              autoRotate={false}
+              rotateSpeed={0.5}
+            />
+          </Canvas>
+        </Suspense>
+      </ErrorBoundary>
     </motion.div>
   );
 };
