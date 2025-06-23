@@ -83,10 +83,16 @@ const StandingImagePlane: React.FC<{
     return null;
   }
 
+  // Calculate position so bottom of image sits on floor (y=0)
+  const imageHeight = 3.0;
+  const imageWidth = 4.0;
+  const imageY = imageHeight / 2; // Position so bottom touches floor
+
   return (
     <group>
-      <mesh position={[position[0], position[1] + 0.3, position[2]]} rotation={[-Math.PI / 6, 0, 0]} renderOrder={10}>
-        <planeGeometry args={[7.5, 5.625]} />
+      {/* Main image plane - positioned so bottom sits on floor */}
+      <mesh position={[position[0], imageY, position[2]]} rotation={[0, 0, 0]} renderOrder={10}>
+        <planeGeometry args={[imageWidth, imageHeight]} />
         <meshStandardMaterial 
           map={texture}
           transparent={false}
@@ -97,22 +103,24 @@ const StandingImagePlane: React.FC<{
         />
       </mesh>
       
-      <mesh position={[position[0], position[1] + 0.29, position[2] - 0.01]} rotation={[-Math.PI / 6, 0, 0]} renderOrder={9}>
-        <planeGeometry args={[8.0, 6.0]} />
+      {/* Subtle glow behind image */}
+      <mesh position={[position[0], imageY, position[2] - 0.01]} rotation={[0, 0, 0]} renderOrder={9}>
+        <planeGeometry args={[imageWidth + 0.2, imageHeight + 0.2]} />
         <meshBasicMaterial 
           color={glowColor}
           transparent
-          opacity={0.4}
+          opacity={0.3}
           depthWrite={false}
         />
       </mesh>
       
-      <mesh position={[position[0], position[1] + 0.28, position[2] - 0.02]} rotation={[-Math.PI / 6, 0, 0]} renderOrder={8}>
-        <planeGeometry args={[8.5, 6.375]} />
+      {/* Outer glow */}
+      <mesh position={[position[0], imageY, position[2] - 0.02]} rotation={[0, 0, 0]} renderOrder={8}>
+        <planeGeometry args={[imageWidth + 0.4, imageHeight + 0.4]} />
         <meshBasicMaterial 
           color={glowColor}
           transparent
-          opacity={0.15}
+          opacity={0.1}
           depthWrite={false}
         />
       </mesh>
