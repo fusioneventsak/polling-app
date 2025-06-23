@@ -569,60 +569,81 @@ const Enhanced3DScene: React.FC<{
         position={[0, 0.01, 0]}
       />
       
-      {/* Realistic asteroid field for atmosphere */}
-      {Array.from({ length: 80 }).map((_, i) => {
-        // Create varied asteroid sizes and distances
-        const size = 0.05 + Math.random() * 0.15; // Varied asteroid sizes
-        const distance = 60 + Math.random() * 40; // Far away asteroids
-        const angle = Math.random() * Math.PI * 2;
-        const height = (Math.random() - 0.5) * 60;
+      {/* High-resolution space environment */}
+      {React.useMemo(() => {
+        // Create a large sphere for space environment
+        const loader = new THREE.TextureLoader();
         
-        // Position asteroids in distant ring around scene
-        const x = Math.cos(angle) * distance;
-        const z = Math.sin(angle) * distance;
-        
-        // Create irregular asteroid shape using icosahedron
-        const rotationX = Math.random() * Math.PI * 2;
-        const rotationY = Math.random() * Math.PI * 2;
-        const rotationZ = Math.random() * Math.PI * 2;
-        
-        // Asteroid color variations (rocky grays and browns)
-        const colorVariants = [
-          '#4a4a4a', // Dark gray
-          '#5c5c5c', // Medium gray  
-          '#6b5b4f', // Brown-gray
-          '#3a3a3a', // Darker gray
-          '#4d4d4d', // Light gray
-          '#5a4a3a'  // Brown
+        // High-quality space skybox options (you can replace with any of these):
+        // Option 1: NASA Hubble Deep Field images
+        const spaceTextures = [
+          'https://images.unsplash.com/photo-1446776653964-20c1d3a81b06?w=2048&q=80', // Deep space
+          'https://images.unsplash.com/photo-1419242902214-272b3f66ee7a?w=2048&q=80', // Milky Way
+          'https://images.unsplash.com/photo-1502134249126-9f3755a50d78?w=2048&q=80', // Nebula
+          'https://images.unsplash.com/photo-1502134249126-9f3755a50d78?w=4096&q=90'  // Ultra high-res nebula
         ];
-        const asteroidColor = colorVariants[i % colorVariants.length];
+        
+        // Option 2: NASA texture URLs (more realistic)
+        const nasaTextures = [
+          'https://www.solarsystemscope.com/textures/download/2k_stars_milky_way.jpg',
+          'https://www.solarsystemscope.com/textures/download/8k_stars_milky_way.jpg'
+        ];
+        
+        // Create sphere geometry for skybox
+        const sphereGeometry = new THREE.SphereGeometry(200, 64, 32);
+        const sphereMaterial = new THREE.MeshBasicMaterial({
+          side: THREE.BackSide, // Render inside of sphere
+          transparent: true,
+          opacity: 0.8
+        });
+        
+        // Load high-resolution space texture
+        loader.load(
+          'https://images.unsplash.com/photo-1502134249126-9f3755a50d78?w=4096&q=90',
+          (texture) => {
+            texture.mapping = THREE.EquirectangularReflectionMapping;
+            texture.colorSpace = THREE.SRGBColorSpace;
+            sphereMaterial.map = texture;
+            sphereMaterial.needsUpdate = true;
+          },
+          undefined,
+          (error) => {
+            console.warn('Space texture failed to load, using fallback');
+            // Fallback to procedural starfield
+            sphereMaterial.color = new THREE.Color('#0a0a2e');
+          }
+        );
         
         return (
-          <Float 
-            key={i} 
-            speed={0.2 + Math.random() * 0.3} 
-            rotationIntensity={0.05 + Math.random() * 0.1} 
-            floatIntensity={0.1 + Math.random() * 0.2}
-          >
-            <mesh 
-              position={[x, height, z]}
-              rotation={[rotationX, rotationY, rotationZ]}
-              scale={[
-                size * (0.8 + Math.random() * 0.4), // Irregular X scale
-                size * (0.8 + Math.random() * 0.4), // Irregular Y scale  
-                size * (0.8 + Math.random() * 0.4)  // Irregular Z scale
-              ]}
-            >
-              <icosahedronGeometry args={[1, 0]} />
-              <meshStandardMaterial 
-                color={asteroidColor}
-                transparent
-                opacity={0.6 + Math.random() * 0.3}
-                roughness={0.8 + Math.random() * 0.2}
-                metalness={0.1}
-              />
-            </mesh>
-          </Float>
+          <mesh>
+            <primitive object={sphereGeometry} />
+            <primitive object={sphereMaterial} />
+          </mesh>
+        );
+      }, [])}
+      
+      {/* Additional procedural starfield as backup */}
+      {Array.from({ length: 500 }).map((_, i) => {
+        const distance = 150 + Math.random() * 50;
+        const angle1 = Math.random() * Math.PI * 2;
+        const angle2 = Math.random() * Math.PI;
+        
+        const x = Math.sin(angle2) * Math.cos(angle1) * distance;
+        const y = Math.cos(angle2) * distance;
+        const z = Math.sin(angle2) * Math.sin(angle1) * distance;
+        
+        const starSize = 0.02 + Math.random() * 0.05;
+        const brightness = 0.3 + Math.random() * 0.7;
+        
+        return (
+          <mesh key={i} position={[x, y, z]}>
+            <sphereGeometry args={[starSize]} />
+            <meshBasicMaterial 
+              color="#ffffff"
+              transparent
+              opacity={brightness}
+            />
+          </mesh>
         );
       })}
       
