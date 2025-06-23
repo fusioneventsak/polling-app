@@ -47,7 +47,7 @@ const Enhanced3DBar: React.FC<{
 }) => {
   const meshRef = useRef<THREE.Mesh>(null);
   const glowRef = useRef<THREE.Mesh>(null);
-  const imageRef = useRef<THREE.Mesh>(null);
+  const backgroundImageRef = useRef<THREE.Mesh>(null);
   const [animatedHeight, setAnimatedHeight] = useState(0.2);
   const [texture, setTexture] = useState<THREE.Texture | null>(null);
   
@@ -61,6 +61,9 @@ const Enhanced3DBar: React.FC<{
           loadedTexture.flipY = false;
           loadedTexture.wrapS = THREE.ClampToEdgeWrapping;
           loadedTexture.wrapT = THREE.ClampToEdgeWrapping;
+          // Set texture filtering for better quality
+          loadedTexture.minFilter = THREE.LinearFilter;
+          loadedTexture.magFilter = THREE.LinearFilter;
           setTexture(loadedTexture);
         },
         undefined,
@@ -106,10 +109,10 @@ const Enhanced3DBar: React.FC<{
       }
     }
 
-    // Animate image floating
-    if (imageRef.current && texture) {
-      imageRef.current.position.y = animatedHeight + 2.5 + Math.sin(state.clock.elapsedTime + delay) * 0.1;
-      imageRef.current.rotation.y = Math.sin(state.clock.elapsedTime * 0.5 + delay) * 0.1;
+    // Subtle animation for background image
+    if (backgroundImageRef.current && texture) {
+      // Very subtle floating motion
+      backgroundImageRef.current.position.y = 2.5 + Math.sin(state.clock.elapsedTime * 0.5 + delay) * 0.05;
     }
   });
 
@@ -125,6 +128,66 @@ const Enhanced3DBar: React.FC<{
 
   return (
     <group>
+      {/* Background image behind the bar - with vertical mask */}
+      {texture && (
+        <group ref={backgroundImageRef}>
+          {/* Main background image with consistent vertical sizing */}
+          <mesh position={[position[0], 2.5, position[2] - 2.5]}>
+            <planeGeometry args={[2.4, 3.2]} />
+            <meshStandardMaterial 
+              map={texture} 
+              transparent
+              opacity={0.8}
+              side={THREE.DoubleSide}
+            />
+          </mesh>
+          
+          {/* Vertical gradient mask overlay to create consistent height effect */}
+          <mesh position={[position[0], 2.5, position[2] - 2.4]}>
+            <planeGeometry args={[2.4, 3.2]} />
+            <meshBasicMaterial 
+              transparent
+              opacity={0.3}
+              color="#0f172a"
+              side={THREE.DoubleSide}
+            />
+          </mesh>
+          
+          {/* Top fade mask for consistent vertical cropping */}
+          <mesh position={[position[0], 3.8, position[2] - 2.3]}>
+            <planeGeometry args={[2.6, 0.8]} />
+            <meshBasicMaterial 
+              transparent
+              opacity={0.8}
+              color="#0f172a"
+              side={THREE.DoubleSide}
+            />
+          </mesh>
+          
+          {/* Bottom fade mask */}
+          <mesh position={[position[0], 1.2, position[2] - 2.3]}>
+            <planeGeometry args={[2.6, 0.8]} />
+            <meshBasicMaterial 
+              transparent
+              opacity={0.8}
+              color="#0f172a"
+              side={THREE.DoubleSide}
+            />
+          </mesh>
+          
+          {/* Subtle frame around the image */}
+          <mesh position={[position[0], 2.5, position[2] - 2.6]}>
+            <planeGeometry args={[2.6, 3.4]} />
+            <meshStandardMaterial 
+              color="#1e293b"
+              transparent
+              opacity={0.6}
+              side={THREE.DoubleSide}
+            />
+          </mesh>
+        </group>
+      )}
+      
       {/* Base platform with enhanced design */}
       <mesh position={[position[0], 0.05, position[2]]}>
         <cylinderGeometry args={[1.2, 1.2, 0.1]} />
@@ -146,6 +209,8 @@ const Enhanced3DBar: React.FC<{
           roughness={0.3}
           emissive={barColor}
           emissiveIntensity={responses > 0 ? 0.2 : 0.05}
+          transparent
+          opacity={0.9}
         />
       </mesh>
       
@@ -161,46 +226,11 @@ const Enhanced3DBar: React.FC<{
         </mesh>
       )}
       
-      {/* Enhanced option image display - attached to the bar */}
-      {texture && (
-        <group ref={imageRef}>
-          {/* Image frame with better positioning */}
-          <mesh position={[position[0], animatedHeight + 2.5, position[2] - 0.02]}>
-            <planeGeometry args={[2.2, 1.8]} />
-            <meshStandardMaterial 
-              color="#ffffff"
-              metalness={0.1}
-              roughness={0.1}
-            />
-          </mesh>
-          
-          {/* The actual image */}
-          <mesh position={[position[0], animatedHeight + 2.5, position[2]]}>
-            <planeGeometry args={[2.0, 1.6]} />
-            <meshStandardMaterial 
-              map={texture} 
-              transparent
-              side={THREE.DoubleSide}
-            />
-          </mesh>
-          
-          {/* Image glow effect */}
-          <mesh position={[position[0], animatedHeight + 2.5, position[2] - 0.01]}>
-            <planeGeometry args={[2.4, 2.0]} />
-            <meshBasicMaterial 
-              color={barColor}
-              transparent
-              opacity={0.1}
-            />
-          </mesh>
-        </group>
-      )}
-      
       {/* 3D Text Labels with better positioning - NO FONT REFERENCES */}
       <Float speed={0.5} rotationIntensity={0.05} floatIntensity={0.1}>
         {/* Response count */}
         <Text
-          position={[position[0], animatedHeight + (texture ? 3.6 : 2.2), position[2]]}
+          position={[position[0], animatedHeight + 2.2, position[2]]}
           fontSize={0.4}
           color="#94a3b8"
           anchorX="center"
@@ -211,7 +241,7 @@ const Enhanced3DBar: React.FC<{
         
         {/* Option label */}
         <Text
-          position={[position[0], animatedHeight + (texture ? 3.2 : 1.8), position[2]]}
+          position={[position[0], animatedHeight + 1.8, position[2]]}
           fontSize={0.45}
           color="#e2e8f0"
           anchorX="center"
@@ -224,7 +254,7 @@ const Enhanced3DBar: React.FC<{
         {/* Correct indicator */}
         {isCorrect && (
           <Text
-            position={[position[0], animatedHeight + (texture ? 2.8 : 1.4), position[2]]}
+            position={[position[0], animatedHeight + 1.4, position[2]]}
             fontSize={0.35}
             color="#10b981"
             anchorX="center"
