@@ -121,7 +121,6 @@ export const ActivityEditor: React.FC<ActivityEditorProps> = ({
           }))
         };
         
-        const newActivity = await roomService.createActivity(activityData);
         const newActivity = await roomService.createActivity(roomId, activityData);
         console.log('Activity created successfully');
         onSave(newActivity);
