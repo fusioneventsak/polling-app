@@ -601,7 +601,7 @@ export const Enhanced3DPollVisualization: React.FC<Enhanced3DPollVisualizationPr
 
       <Suspense fallback={<LoadingFallback />}>
         <Canvas
-          key={`canvas-${options.length}-${totalResponses}`}
+          key={`canvas-${options.length}`}
           camera={{ 
             position: [0, 15, 40],
             fov: 75,
