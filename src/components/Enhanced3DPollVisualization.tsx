@@ -83,15 +83,18 @@ const StandingImagePlane: React.FC<{
     return null;
   }
 
-  // Calculate position so bottom of image sits on floor (y=0)
+  // Calculate position and rotation for tilted image
   const imageHeight = 3.0;
   const imageWidth = 4.0;
-  const imageY = imageHeight / 2; // Position so bottom touches floor
+  const tiltAngle = Math.PI / 12; // 15 degrees tilt toward camera
+  
+  // Adjust Y position to account for tilt - bottom edge should touch floor
+  const imageY = (imageHeight / 2) * Math.cos(tiltAngle) + 0.1;
 
   return (
     <group>
-      {/* Main image plane - positioned so bottom sits on floor */}
-      <mesh position={[position[0], imageY, position[2]]} rotation={[0, 0, 0]} renderOrder={10}>
+      {/* Main image plane - tilted toward camera with bottom on floor */}
+      <mesh position={[position[0], imageY, position[2]]} rotation={[-tiltAngle, 0, 0]} renderOrder={10}>
         <planeGeometry args={[imageWidth, imageHeight]} />
         <meshStandardMaterial 
           map={texture}
@@ -104,7 +107,7 @@ const StandingImagePlane: React.FC<{
       </mesh>
       
       {/* Subtle glow behind image */}
-      <mesh position={[position[0], imageY, position[2] - 0.01]} rotation={[0, 0, 0]} renderOrder={9}>
+      <mesh position={[position[0], imageY, position[2] - 0.01]} rotation={[-tiltAngle, 0, 0]} renderOrder={9}>
         <planeGeometry args={[imageWidth + 0.2, imageHeight + 0.2]} />
         <meshBasicMaterial 
           color={glowColor}
@@ -115,7 +118,7 @@ const StandingImagePlane: React.FC<{
       </mesh>
       
       {/* Outer glow */}
-      <mesh position={[position[0], imageY, position[2] - 0.02]} rotation={[0, 0, 0]} renderOrder={8}>
+      <mesh position={[position[0], imageY, position[2] - 0.02]} rotation={[-tiltAngle, 0, 0]} renderOrder={8}>
         <planeGeometry args={[imageWidth + 0.4, imageHeight + 0.4]} />
         <meshBasicMaterial 
           color={glowColor}
@@ -337,7 +340,7 @@ const StandingImagesDisplay: React.FC<{
           <group key={option.id}>
             <StandingImagePlane
               imageUrl={option.media_url}
-              position={[xPosition, 1.0, 3]}
+              position={[xPosition, 0, 1]}
               fallbackText={`Option ${String.fromCharCode(65 + index)}`}
               glowColor={glowColor}
             />
