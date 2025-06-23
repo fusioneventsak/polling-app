@@ -101,7 +101,8 @@ const StandingImagePlane: React.FC<{
   imageUrl: string;
   position: [number, number, number];
   fallbackText: string;
-}> = ({ imageUrl, position, fallbackText }) => {
+  glowColor: string; // Add glow color prop to match bar color
+}> = ({ imageUrl, position, fallbackText, glowColor }) => {
   const [texture, setTexture] = useState<THREE.Texture | null>(null);
   const [loadError, setLoadError] = useState(false);
   
@@ -152,21 +153,21 @@ const StandingImagePlane: React.FC<{
         />
       </mesh>
       
-      {/* Simple glow border effect - avoiding material conflicts */}
+      {/* Glow border matching bar color */}
       <mesh position={[position[0], position[1], position[2] - 0.01]} rotation={[-Math.PI / 6, 0, 0]} renderOrder={1}>
         <planeGeometry args={[2.2, 1.7]} />
         <meshBasicMaterial 
-          color="#00ffff"
+          color={glowColor}
           transparent
-          opacity={0.4}
+          opacity={0.5}
         />
       </mesh>
       
-      {/* Outer glow effect - simplified */}
+      {/* Outer glow effect with lighter version of bar color */}
       <mesh position={[position[0], position[1], position[2] - 0.02]} rotation={[-Math.PI / 6, 0, 0]} renderOrder={0}>
         <planeGeometry args={[2.4, 1.9]} />
         <meshBasicMaterial 
-          color="#0088ff"
+          color={glowColor}
           transparent
           opacity={0.2}
         />
@@ -403,11 +404,20 @@ const StandingImagesDisplay: React.FC<{
           return null;
         }
         
-        // Calculate optimal spacing
-        const spacing = Math.min(5.0, 30 / Math.max(options.length, 1));
+        // Calculate optimal spacing that scales with number of options
+        const spacing = Math.min(5.0, Math.max(3.0, 25 / Math.max(options.length, 1)));
         const totalWidth = (options.length - 1) * spacing;
         const startX = -totalWidth / 2;
         const xPosition = startX + index * spacing;
+        
+        // Calculate bar color to match the glow - same logic as bars
+        const hue = (index / Math.max(options.length - 1, 1)) * 300;
+        const saturation = 75;
+        const lightness = 60;
+        
+        const glowColor = option.is_correct 
+          ? '#10b981' 
+          : `hsl(${200 + hue}, ${saturation}%, ${lightness}%)`;
         
         return (
           <ErrorBoundary 
@@ -415,11 +425,12 @@ const StandingImagesDisplay: React.FC<{
             fallback={<group />}
           >
             <group>
-              {/* Standing image - tilted up towards camera */}
+              {/* Standing image - tilted up towards camera with matching glow color */}
               <StandingImagePlane
                 imageUrl={option.media_url}
                 position={[xPosition, 0.75, 3]}
                 fallbackText={`Option ${String.fromCharCode(65 + index)}`}
+                glowColor={glowColor}
               />
             </group>
           </ErrorBoundary>
