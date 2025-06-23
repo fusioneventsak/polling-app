@@ -478,9 +478,9 @@ const Enhanced3DScene: React.FC<{
       const targetX = 0;
       const targetY = 4; // Higher to see floor stats
       
-      // Dynamic zoom based on number of options - adjusted for better spacing visibility
-      const baseDistance = 20; // Base distance for good overview
-      const extraDistance = Math.max(0, (options.length - 2) * 2.8); // Adjusted for new spacing
+      // Dynamic zoom based on number of options - adjusted for doubled image size
+      const baseDistance = 25; // Increased base distance for larger images
+      const extraDistance = Math.max(0, (options.length - 2) * 3.5); // Increased spacing for larger images
       const targetZ = baseDistance + extraDistance;
       
       const animationDuration = 2000; // 2 seconds
@@ -833,8 +833,8 @@ export const Enhanced3DPollVisualization: React.FC<Enhanced3DPollVisualizationPr
               enablePan={false}
               enableZoom={true}
               enableRotate={true}
-              minDistance={18}
-              maxDistance={60}
+              minDistance={20}
+              maxDistance={70}
               minPolarAngle={Math.PI / 8}
               maxPolarAngle={Math.PI / 2.5}
               autoRotate={false}
