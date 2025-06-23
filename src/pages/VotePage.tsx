@@ -25,32 +25,59 @@ function VotePage() {
     if (!pollId) return;
     
     try {
-      // Check if participant has already voted using localStorage and database
+      // Check if participant has already voted using localStorage first (faster)
       const votedActivities = JSON.parse(localStorage.getItem('votedActivities') || '[]');
       const hasVotedLocally = votedActivities.includes(pollId);
       
-      // Also check database for this participant
+      if (hasVotedLocally) {
+        console.log('VotePage: Found local vote record');
+        setHasVoted(true);
+        return;
+      }
+
+      // Only check database if no local record and supabase is available
       if (supabase) {
-        const { data: existingResponse } = await supabase
-          .from('participant_responses')
-          .select('id')
-          .eq('activity_id', pollId)
-          .eq('participant_id', participantId)
-          .single();
-        
-        const hasVotedInDB = !!existingResponse;
-        setHasVoted(hasVotedLocally || hasVotedInDB);
-        
-        console.log('VotePage: Voting status check:', {
-          hasVotedLocally,
-          hasVotedInDB,
-          finalStatus: hasVotedLocally || hasVotedInDB
-        });
+        try {
+          const { data: existingResponse, error } = await supabase
+            .from('participant_responses')
+            .select('id')
+            .eq('activity_id', pollId)
+            .eq('participant_id', participantId)
+            .maybeSingle(); // Use maybeSingle instead of single to avoid 406 errors
+
+          if (error && error.code !== 'PGRST116') {
+            console.warn('VotePage: Error checking database voting status:', error);
+            // Don't throw, just use localStorage value
+            setHasVoted(hasVotedLocally);
+            return;
+          }
+
+          const hasVotedInDB = !!existingResponse;
+          setHasVoted(hasVotedInDB);
+          
+          // Sync localStorage with database
+          if (hasVotedInDB && !hasVotedLocally) {
+            const updatedVotedActivities = [...votedActivities, pollId];
+            localStorage.setItem('votedActivities', JSON.stringify(updatedVotedActivities));
+          }
+          
+          console.log('VotePage: Voting status check:', {
+            hasVotedLocally,
+            hasVotedInDB,
+            finalStatus: hasVotedInDB
+          });
+        } catch (dbError) {
+          console.warn('VotePage: Database check failed, using localStorage only:', dbError);
+          setHasVoted(hasVotedLocally);
+        }
       } else {
         setHasVoted(hasVotedLocally);
       }
     } catch (error) {
       console.error('VotePage: Error checking voting status:', error);
+      // Fallback to localStorage only
+      const votedActivities = JSON.parse(localStorage.getItem('votedActivities') || '[]');
+      setHasVoted(votedActivities.includes(pollId));
     }
   }, [pollId, participantId]);
 
@@ -68,7 +95,7 @@ function VotePage() {
           options:activity_options(*)
         `)
         .eq('id', pollId)
-        .single();
+        .maybeSingle(); // Use maybeSingle to avoid 406 errors
 
       if (error) {
         console.error('VotePage: Error loading activity:', error);
@@ -82,6 +109,17 @@ function VotePage() {
         return;
       }
 
+      // Check if activity is still active
+      if (!activityData.is_active) {
+        console.log('VotePage: Activity is no longer active, redirecting');
+        if (roomCode) {
+          navigate(`/game?joined=${roomCode}`);
+        } else {
+          navigate('/game');
+        }
+        return;
+      }
+
       // Transform the data to match our Activity type
       const transformedActivity: Activity = {
         ...activityData,
@@ -89,7 +127,11 @@ function VotePage() {
           id: opt.id,
           text: opt.text,
           media_url: opt.media_url,
-          responses: opt.responses || 0
+          responses: opt.responses || 0,
+          is_correct: opt.is_correct || false,
+          option_order: opt.option_order || 0,
+          created_at: opt.created_at,
+          activity_id: opt.activity_id
         })) || []
       };
 
@@ -108,12 +150,15 @@ function VotePage() {
     } finally {
       setLoading(false);
     }
-  }, [pollId]);
+  }, [pollId, navigate, roomCode]);
 
   // Load activity on mount
   useEffect(() => {
-    loadActivity();
-    checkVotingStatus();
+    const initializeActivity = async () => {
+      await loadActivity();
+      await checkVotingStatus();
+    };
+    initializeActivity();
   }, [loadActivity, checkVotingStatus]);
 
   // Set up real-time subscriptions
@@ -274,7 +319,7 @@ function VotePage() {
       
       setHasVoted(true);
       
-      // Store vote in localStorage
+      // Store vote in localStorage immediately
       const votedActivities = JSON.parse(localStorage.getItem('votedActivities') || '[]');
       if (!votedActivities.includes(activity.id)) {
         votedActivities.push(activity.id);
@@ -291,7 +336,8 @@ function VotePage() {
       setSelectedOption(null);
       
       // Show error to user
-      alert('Failed to submit vote. Please try again.');
+      const errorMessage = error instanceof Error ? error.message : 'Failed to submit vote. Please try again.';
+      alert(errorMessage);
     } finally {
       setVoting(false);
     }

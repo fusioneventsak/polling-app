@@ -55,7 +55,7 @@ export class RoomService {
         .select('id')
         .eq('activity_id', activityId)
         .eq('participant_id', participantId)
-        .single();
+        .maybeSingle(); // Use maybeSingle to avoid 406 errors
 
       if (checkError && checkError.code !== 'PGRST116') { // PGRST116 = no rows found
         console.error('RoomService: Error checking existing response:', checkError);
@@ -74,8 +74,7 @@ export class RoomService {
           room_id: roomId,
           activity_id: activityId,
           option_id: optionId,
-          participant_id: participantId,
-          response_data: null // For simple polls, this can be null
+          participant_id: participantId
         })
         .select()
         .single();
@@ -87,22 +86,46 @@ export class RoomService {
 
       console.log('RoomService: Response submitted successfully:', response.id);
 
-      // Update the option response count atomically
-      const { error: optionUpdateError } = await supabase
-        .rpc('increment_option_responses', { option_id: optionId });
+      // Update the option response count atomically (if function exists)
+      try {
+        const { error: optionUpdateError } = await supabase
+          .rpc('increment_option_responses', { option_id: optionId });
 
-      if (optionUpdateError) {
-        console.error('RoomService: Error updating option count:', optionUpdateError);
-        // Don't throw here as the response was already recorded
+        if (optionUpdateError) {
+          console.warn('RoomService: Error updating option count (function may not exist):', optionUpdateError);
+          // Fallback to manual update
+          await supabase
+            .from('activity_options')
+            .update({ responses: supabase.sql`responses + 1` })
+            .eq('id', optionId);
+        }
+      } catch (rpcError) {
+        console.warn('RoomService: RPC function not available, using manual update');
+        await supabase
+          .from('activity_options')
+          .update({ responses: supabase.sql`responses + 1` })
+          .eq('id', optionId);
       }
 
-      // Update the activity total response count atomically
-      const { error: activityUpdateError } = await supabase
-        .rpc('increment_activity_responses', { activity_id: activityId });
+      // Update the activity total response count atomically (if function exists)
+      try {
+        const { error: activityUpdateError } = await supabase
+          .rpc('increment_activity_responses', { activity_id: activityId });
 
-      if (activityUpdateError) {
-        console.error('RoomService: Error updating activity count:', activityUpdateError);
-        // Don't throw here as the response was already recorded
+        if (activityUpdateError) {
+          console.warn('RoomService: Error updating activity count (function may not exist):', activityUpdateError);
+          // Fallback to manual update
+          await supabase
+            .from('activities')
+            .update({ total_responses: supabase.sql`total_responses + 1` })
+            .eq('id', activityId);
+        }
+      } catch (rpcError) {
+        console.warn('RoomService: RPC function not available, using manual update');
+        await supabase
+          .from('activities')
+          .update({ total_responses: supabase.sql`total_responses + 1` })
+          .eq('id', activityId);
       }
 
       console.log('RoomService: All counts updated successfully');
@@ -133,15 +156,16 @@ export class RoomService {
         `)
         .eq('code', code)
         .eq('is_active', true)
-        .single();
+        .maybeSingle(); // Use maybeSingle to avoid 406 errors
 
-      if (error) {
-        if (error.code === 'PGRST116') { // No rows found
-          console.log('RoomService: Room not found for code:', code);
-          return null;
-        }
+      if (error && error.code !== 'PGRST116') {
         console.error('RoomService: Error getting room:', error);
         throw new Error('Failed to get room');
+      }
+
+      if (!room) {
+        console.log('RoomService: Room not found for code:', code);
+        return null;
       }
 
       console.log('RoomService: Room found:', {
@@ -177,15 +201,16 @@ export class RoomService {
           )
         `)
         .eq('id', id)
-        .single();
+        .maybeSingle(); // Use maybeSingle to avoid 406 errors
 
-      if (error) {
-        if (error.code === 'PGRST116') {
-          console.log('RoomService: Room not found for ID:', id);
-          return null;
-        }
+      if (error && error.code !== 'PGRST116') {
         console.error('RoomService: Error getting room by ID:', error);
         throw new Error('Failed to get room');
+      }
+
+      if (!room) {
+        console.log('RoomService: Room not found for ID:', id);
+        return null;
       }
 
       return room;
