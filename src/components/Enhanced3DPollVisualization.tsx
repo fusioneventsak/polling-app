@@ -482,7 +482,7 @@ const Enhanced3DScene: React.FC<{
         return (
           <Enhanced3DBar
             key={option.id}
-            position={[startX + index * spacing, 0, -4]}
+            position={[startX + index * spacing, 0, -8]}
             height={height}
             color={barColor}
             label={option.text}
