@@ -538,7 +538,7 @@ const Enhanced3DScene: React.FC<{
       
       {/* ENHANCED FLOATING TITLE - Much Higher and Bigger */}
       <Float speed={0.3} rotationIntensity={0.01} floatIntensity={0.05}>
-        {/* Main title with dynamic sizing */}
+        {/* Main title with dynamic sizing - centered */}
         <Text
           position={[0, 12, -15]}
           fontSize={titleFontSize}
@@ -550,7 +550,7 @@ const Enhanced3DScene: React.FC<{
           {activityTitle || 'Poll Options'}
         </Text>
         
-        {/* Title shadow/depth effect */}
+        {/* Title shadow/depth effect - centered */}
         <Text
           position={[0.1, 11.9, -15.1]}
           fontSize={titleFontSize}
@@ -560,17 +560,6 @@ const Enhanced3DScene: React.FC<{
           maxWidth={25}
         >
           {activityTitle || 'Poll Options'}
-        </Text>
-        
-        {/* Status subtitle with proper spacing */}
-        <Text
-          position={[0, 12 - (titleFontSize * 0.8), -15]}
-          fontSize={descriptionFontSize}
-          color="#94a3b8"
-          anchorX="center"
-          anchorY="middle"
-        >
-          {totalResponses > 0 ? `${totalResponses} total responses` : 'Waiting for responses...'}
         </Text>
       </Float>
     </>
