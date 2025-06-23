@@ -1,25 +1,25 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { supabase } from '../lib/supabase';
+import { ArrowLeft, Check, Users, Loader2, Lock } from 'lucide-react';
 import { roomService } from '../services/roomService';
-import { ArrowLeft, Users, CheckCircle, Clock, Loader2, Lock } from 'lucide-react';
+import { supabase } from '../lib/supabase';
+import { useTheme } from '../components/ThemeProvider';
 import type { Activity } from '../types';
 
-function VotePage() {
-  const { pollId } = useParams();
+export const VotePage: React.FC = () => {
+  const { pollId } = useParams<{ pollId: string }>();
   const navigate = useNavigate();
   const [activity, setActivity] = useState<Activity | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [voting, setVoting] = useState(false);
+  const [roomCode, setRoomCode] = useState<string | null>(null);
   const [hasVoted, setHasVoted] = useState(false);
+  const [voting, setVoting] = useState(false);
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
-  const [participantId] = useState(() => `participant_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`);
-  const subscriptionRef = useRef<any>(null);
-
-  // Get room code from URL params or localStorage
-  const roomCode = new URLSearchParams(window.location.search).get('room') || 
-                   localStorage.getItem('currentRoomCode');
+  const [loading, setLoading] = useState(true);
+  const [participantId] = useState(() => 
+    `participant_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+  );
+  const { applyTheme, resetTheme } = useTheme();
 
   const checkVotingStatus = useCallback(async () => {
     if (!pollId) return;
@@ -38,7 +38,7 @@ function VotePage() {
       // Only check database if no local record and supabase is available
       if (supabase) {
         try {
-          const { data: existingResponse, error } = await supabase
+          const { data: response, error } = await supabase
             .from('participant_responses')
             .select('id')
             .eq('activity_id', pollId)
@@ -52,7 +52,7 @@ function VotePage() {
             return;
           }
 
-          const hasVotedInDB = !!existingResponse;
+          const hasVotedInDB = !!response;
           setHasVoted(hasVotedInDB);
           
           // Sync localStorage with database
@@ -61,11 +61,12 @@ function VotePage() {
             localStorage.setItem('votedActivities', JSON.stringify(updatedVotedActivities));
           }
           
-          console.log('VotePage: Voting status check:', {
+          console.log('VotePage: Vote status check:', {
             hasVotedLocally,
             hasVotedInDB,
-            finalStatus: hasVotedInDB
+            final: hasVotedInDB
           });
+          
         } catch (dbError) {
           console.warn('VotePage: Database check failed, using localStorage only:', dbError);
           setHasVoted(hasVotedLocally);
@@ -112,8 +113,8 @@ function VotePage() {
       // Check if activity is still active
       if (!activityData.is_active) {
         console.log('VotePage: Activity is no longer active, redirecting');
-        if (roomCode) {
-          navigate(`/game?joined=${roomCode}`);
+        if (activityData.room?.code) {
+          navigate(`/game?joined=${activityData.room.code}`);
         } else {
           navigate('/game');
         }
@@ -145,12 +146,13 @@ function VotePage() {
       });
 
       setActivity(transformedActivity);
+      setRoomCode(activityData.room?.code || null);
     } catch (error) {
       console.error('VotePage: Error in loadActivity:', error);
     } finally {
       setLoading(false);
     }
-  }, [pollId, navigate, roomCode]);
+  }, [pollId, navigate]);
 
   // Load activity on mount
   useEffect(() => {
@@ -161,55 +163,24 @@ function VotePage() {
     initializeActivity();
   }, [loadActivity, checkVotingStatus]);
 
+  // Apply room theme when activity loads
+  useEffect(() => {
+    if (activity?.room?.settings) {
+      applyTheme(activity.room.settings);
+    } else {
+      resetTheme();
+    }
+    
+    return () => {
+      resetTheme();
+    };
+  }, [activity?.room?.settings, applyTheme, resetTheme]);
+
   // Set up real-time subscriptions
   useEffect(() => {
-    if (!pollId || !supabase) return;
+    if (!pollId || !supabase || !activity) return;
 
     console.log('VotePage: Setting up real-time subscriptions for activity:', pollId);
-
-    // Clean up existing subscription
-    if (subscriptionRef.current) {
-      subscriptionRef.current.unsubscribe();
-    }
-    // Subscribe to room changes to detect resets
-    channel.on('postgres_changes', 
-      { 
-        event: '*', 
-        schema: 'public', 
-        table: 'rooms',
-        filter: `id=eq.${activity.room_id}`
-      },
-      async (payload) => {
-        console.log('VotePage: Room change received:', {
-          eventType: payload.eventType,
-          roomId: payload.new?.id || payload.old?.id,
-          oldParticipants: payload.old?.participants,
-          newParticipants: payload.new?.participants
-        });
-        
-        // Detect room reset (participants count reset to 0)
-        if (payload.eventType === 'UPDATE' && 
-            payload.old?.participants > 0 && 
-            payload.new?.participants === 0) {
-          console.log('VotePage: Room reset detected - clearing all localStorage votes');
-          
-          // Clear all localStorage votes for this room's activities
-          const votedActivities = JSON.parse(localStorage.getItem('votedActivities') || '[]');
-          const roomActivityIds = activity.room?.activities?.map(a => a.id) || [pollId];
-          const filteredVotes = votedActivities.filter((id: string) => !roomActivityIds.includes(id));
-          localStorage.setItem('votedActivities', JSON.stringify(filteredVotes));
-          
-          // Reset voting status for current activity
-          setHasVoted(false);
-          setSelectedOption(null);
-          
-          console.log('VotePage: Cleared localStorage votes after room reset');
-        }
-        
-        await loadActivity(true);
-      }
-    );
-
 
     const channel = supabase
       .channel(`vote-page-${pollId}`)
@@ -282,8 +253,48 @@ function VotePage() {
         }
       );
 
+    // Subscribe to room changes to detect resets
+    if (activity.room_id) {
+      channel.on('postgres_changes', 
+        { 
+          event: '*', 
+          schema: 'public', 
+          table: 'rooms',
+          filter: `id=eq.${activity.room_id}`
+        },
+        async (payload) => {
+          console.log('VotePage: Room change received:', {
+            eventType: payload.eventType,
+            roomId: payload.new?.id || payload.old?.id,
+            oldParticipants: payload.old?.participants,
+            newParticipants: payload.new?.participants
+          });
+          
+          // Detect room reset (participants count reset to 0)
+          if (payload.eventType === 'UPDATE' && 
+              payload.old?.participants > 0 && 
+              payload.new?.participants === 0) {
+            console.log('VotePage: Room reset detected - clearing all localStorage votes');
+            
+            // Clear all localStorage votes for this room's activities
+            const votedActivities = JSON.parse(localStorage.getItem('votedActivities') || '[]');
+            const roomActivityIds = activity.room?.activities?.map(a => a.id) || [pollId];
+            const filteredVotes = votedActivities.filter((id: string) => !roomActivityIds.includes(id));
+            localStorage.setItem('votedActivities', JSON.stringify(filteredVotes));
+            
+            // Reset voting status for current activity
+            setHasVoted(false);
+            setSelectedOption(null);
+            
+            console.log('VotePage: Cleared localStorage votes after room reset');
+          }
+          
+          await loadActivity(true);
+        }
+      );
+    }
+
     // Subscribe to the channel
-    subscriptionRef.current = channel;
     channel.subscribe((status, err) => {
       console.log('VotePage: Subscription status:', status);
       if (err) {
@@ -296,10 +307,7 @@ function VotePage() {
 
     return () => {
       console.log('VotePage: Cleaning up subscriptions');
-      if (subscriptionRef.current) {
-        subscriptionRef.current.unsubscribe();
-        subscriptionRef.current = null;
-      }
+      channel.unsubscribe();
     };
   }, [pollId, navigate, roomCode, activity?.room_id, loadActivity, checkVotingStatus]);
 
@@ -472,141 +480,104 @@ function VotePage() {
               <h2 className="text-xl font-bold text-red-400">Voting Locked</h2>
             </div>
             <p className="text-red-300">
-              The presenter has locked voting for this activity.
+              The presenter has locked voting for this activity. No more responses can be submitted.
             </p>
           </motion.div>
         )}
 
-        {/* Vote Success Message */}
-        {hasVoted && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="mb-8 p-6 bg-green-900/20 border border-green-600/30 rounded-lg text-center"
-          >
-            <div className="flex items-center justify-center gap-3 mb-4">
-              <CheckCircle className="w-8 h-8 text-green-400" />
-              <h2 className="text-2xl font-bold text-green-400">Vote Recorded!</h2>
-            </div>
-            <p className="text-green-300 mb-4">
-              Thank you for participating. Your response has been recorded.
-            </p>
-            {selectedOption && (
-              <div className="inline-block px-4 py-2 bg-green-800/30 border border-green-600/50 rounded-lg">
-                <span className="text-green-200 text-sm">
-                  Your choice: {activity.options?.find(opt => opt.id === selectedOption)?.text}
-                </span>
+        {/* Voting Options */}
+        <AnimatePresence mode="wait">
+          {hasVoted ? (
+            <motion.div
+              key="voted"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="text-center"
+            >
+              <div 
+                className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6"
+                style={{ backgroundColor: `${themeColors.accent}20` }}
+              >
+                <Check className="w-10 h-10" style={{ color: themeColors.accent }} />
               </div>
-            )}
-          </motion.div>
-        )}
-
-        {/* Options */}
-        {!hasVoted && !isVotingLocked && (
-          <div className="grid gap-4 md:gap-6">
-            <AnimatePresence>
-              {activity.options?.map((option, index) => (
-                <motion.button
-                  key={option.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.1 }}
-                  onClick={() => handleVote(option.id)}
-                  disabled={voting}
-                  className={`
-                    relative p-6 md:p-8 rounded-xl border-2 transition-all duration-300 text-left
-                    ${voting && selectedOption === option.id
-                      ? 'border-blue-500 bg-blue-900/30 scale-[0.98]'
-                      : 'border-slate-600 hover:border-blue-400 bg-slate-800/50 hover:bg-slate-700/50 hover:scale-[1.02]'
-                    }
-                    ${voting ? 'cursor-not-allowed' : 'cursor-pointer'}
-                  `}
-                  style={{
-                    boxShadow: voting && selectedOption === option.id
-                      ? `0 0 30px ${themeColors.accent}40`
-                      : undefined
-                  }}
-                >
-                  {voting && selectedOption === option.id && (
-                    <div className="absolute inset-0 bg-gradient-to-r from-blue-500/20 to-purple-500/20 rounded-xl animate-pulse" />
-                  )}
-                  
-                  <div className="relative z-10">
+              
+              <h2 className="text-2xl font-bold text-white mb-4">
+                Thank you for voting!
+              </h2>
+              
+              <p className="text-slate-300 mb-8">
+                Your response has been recorded. Results will be shown when the presenter ends this activity.
+              </p>
+              
+              <button
+                onClick={() => {
+                  if (roomCode) {
+                    navigate(`/game?joined=${roomCode}`);
+                  } else {
+                    navigate('/game');
+                  }
+                }}
+                className="px-6 py-3 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors"
+              >
+                Return to Room
+              </button>
+            </motion.div>
+          ) : (
+            <motion.div
+              key="voting"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="space-y-4"
+            >
+              <div className="grid gap-4 max-w-2xl mx-auto">
+                {activity.options?.map((option, index) => (
+                  <motion.button
+                    key={option.id}
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: index * 0.1 }}
+                    onClick={() => handleVote(option.id)}
+                    disabled={voting || isVotingLocked}
+                    className={`p-6 rounded-lg border-2 transition-all duration-200 ${
+                      selectedOption === option.id
+                        ? 'border-blue-500 bg-blue-500/10 scale-[0.98]'
+                        : isVotingLocked
+                        ? 'border-slate-600 bg-slate-800/50 opacity-50 cursor-not-allowed'
+                        : 'border-slate-600 bg-slate-800/50 hover:border-slate-500 hover:bg-slate-800/70 hover:scale-[1.02] cursor-pointer'
+                    } ${voting ? 'pointer-events-none' : ''}`}
+                  >
                     <div className="flex items-center gap-4">
-                      <div 
-                        className="w-8 h-8 rounded-full border-2 flex items-center justify-center text-sm font-bold flex-shrink-0"
-                        style={{ 
-                          borderColor: themeColors.accent,
-                          color: themeColors.accent 
-                        }}
-                      >
-                        {String.fromCharCode(65 + index)}
-                      </div>
+                      {option.media_url && (
+                        <img
+                          src={option.media_url}
+                          alt={`Option ${index + 1}`}
+                          className="w-16 h-16 rounded-lg object-cover"
+                        />
+                      )}
                       
-                      <div className="flex-1">
-                        <p className="text-lg md:text-xl font-semibold text-white mb-2">
+                      <div className="flex-1 text-left">
+                        <p className="text-lg font-semibold text-white">
                           {option.text}
                         </p>
-                        
-                        {option.media_url && (
-                          <img
-                            src={option.media_url}
-                            alt="Option media"
-                            className="max-w-xs rounded-lg shadow-md"
-                          />
-                        )}
                       </div>
                       
                       {voting && selectedOption === option.id && (
-                        <div className="flex-shrink-0">
-                          <Loader2 className="w-6 h-6 animate-spin text-blue-400" />
-                        </div>
+                        <Loader2 className="w-6 h-6 animate-spin text-blue-400" />
                       )}
                     </div>
-                  </div>
-                </motion.button>
-              ))}
-            </AnimatePresence>
-          </div>
-        )}
-
-        {/* Real-time Counter */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.5 }}
-          className="mt-12 text-center"
-        >
-          <div className="inline-flex items-center gap-3 px-6 py-3 bg-slate-800/50 border border-slate-600/50 rounded-full">
-            <Users className="w-5 h-5 text-slate-400" />
-            <span className="text-slate-300">
-              {activity.total_responses || 0} total responses
-            </span>
-            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-          </div>
-        </motion.div>
-
-        {/* Display Page Link */}
-        {roomCode && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.7 }}
-            className="mt-8 text-center"
-          >
-            <p className="text-slate-400 mb-4">
-              View live results at:
-            </p>
-            <div className="inline-block px-4 py-2 bg-slate-800/50 border border-slate-600/50 rounded-lg">
-              <code className="text-blue-400 text-sm">
-                {window.location.origin}/display/{roomCode}
-              </code>
-            </div>
-          </motion.div>
-        )}
+                  </motion.button>
+                ))}
+              </div>
+              
+              {isVotingLocked && (
+                <p className="text-center text-red-400 text-sm mt-4">
+                  Voting has been locked by the presenter
+                </p>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );
-}
-
-export { VotePage };
+};
