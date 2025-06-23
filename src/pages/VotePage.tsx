@@ -1,4 +1,7 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useCallback, useRef }
+
+export { VotePage };
+export default VotePage; from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../lib/supabase';
@@ -6,7 +9,7 @@ import { roomService } from '../services/roomService';
 import { ArrowLeft, Users, CheckCircle, Clock, Loader2, Lock } from 'lucide-react';
 import type { Activity } from '../types';
 
-export default function VotePage() {
+function VotePage() {
   const { pollId } = useParams();
   const navigate = useNavigate();
   const [activity, setActivity] = useState<Activity | null>(null);
