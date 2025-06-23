@@ -13,6 +13,9 @@ interface Poll3DVisualizationProps {
     secondaryColor: string;
     accentColor: string;
   };
+  activityTitle?: string;
+  activityMedia?: string;
+  isVotingLocked?: boolean;
   className?: string;
 }
 
@@ -163,7 +166,7 @@ const AnimatedBar: React.FC<BarProps> = ({
         />
       )}
       
-      {/* Percentage text - NO FONT REFERENCE */}
+      {/* Percentage text */}
       <Text
         position={[position[0], animatedHeight + (imageUrl ? 2.2 : 1.5), position[2]]}
         fontSize={0.35}
@@ -174,7 +177,7 @@ const AnimatedBar: React.FC<BarProps> = ({
         {percentage}%
       </Text>
       
-      {/* Response count - NO FONT REFERENCE */}
+      {/* Response count */}
       <Text
         position={[position[0], animatedHeight + (imageUrl ? 1.9 : 1.2), position[2]]}
         fontSize={0.15}
@@ -185,7 +188,7 @@ const AnimatedBar: React.FC<BarProps> = ({
         {responses} {responses === 1 ? 'vote' : 'votes'}
       </Text>
       
-      {/* Option label - NO FONT REFERENCE */}
+      {/* Option label */}
       <Text
         position={[position[0], animatedHeight + (imageUrl ? 1.6 : 0.9), position[2]]}
         fontSize={0.18}
@@ -197,7 +200,7 @@ const AnimatedBar: React.FC<BarProps> = ({
         {label.length > 25 ? `${label.substring(0, 25)}...` : label}
       </Text>
       
-      {/* Correct indicator - NO FONT REFERENCE */}
+      {/* Correct indicator */}
       {isCorrect && (
         <Text
           position={[position[0], animatedHeight + (imageUrl ? 1.3 : 0.6), position[2]]}
@@ -209,26 +212,22 @@ const AnimatedBar: React.FC<BarProps> = ({
           ✓ CORRECT
         </Text>
       )}
-      
-      {/* Base label - NO FONT REFERENCE */}
-      <Text
-        position={[position[0], -0.2, position[2] + 0.8]}
-        fontSize={0.12}
-        color="#64748b"
-        anchorX="center"
-        anchorY="middle"
-        maxWidth={1.5}
-      >
-        Option {Math.floor((position[0] + 10) / 2.5) + 1}
-      </Text>
     </group>
   );
 };
 
-const Scene: React.FC<{ options: ActivityOption[]; totalResponses: number; themeColors: any }> = ({ 
+const Scene: React.FC<{ 
+  options: ActivityOption[]; 
+  totalResponses: number; 
+  themeColors: any;
+  activityTitle?: string;
+  activityMedia?: string;
+}> = ({ 
   options, 
   totalResponses, 
-  themeColors 
+  themeColors,
+  activityTitle,
+  activityMedia
 }) => {
   const maxResponses = Math.max(...options.map(opt => opt.responses), 1);
   const maxHeight = 4; // Maximum bar height
@@ -330,21 +329,45 @@ const Scene: React.FC<{ options: ActivityOption[]; totalResponses: number; theme
         );
       })}
       
-      {/* Floating title - NO FONT REFERENCE */}
+      {/* ENHANCED MAIN TITLE - Much Higher and More Prominent */}
+      {/* Activity media display */}
+      {activityMedia && (
+        <mesh position={[0, 10, -5]}>
+          <planeGeometry args={[3, 2]} />
+          <meshBasicMaterial transparent opacity={0.9}>
+            <primitive object={new THREE.TextureLoader().load(activityMedia)} attach="map" />
+          </meshBasicMaterial>
+        </mesh>
+      )}
+      
+      {/* Main title - Show actual activity title instead of "Live Poll Results" */}
       <Text
-        position={[0, 7, -3]}
-        fontSize={0.4}
+        position={[0, 8.5, -5]}
+        fontSize={1.2}
         color="#ffffff"
         anchorX="center"
         anchorY="middle"
+        maxWidth={20}
       >
-        {totalResponses > 0 ? 'Live Poll Results' : 'Poll Options'}
+        {activityTitle || 'Poll Question'}
       </Text>
       
-      {/* Total responses indicator - NO FONT REFERENCE */}
+      {/* Title shadow for 3D effect */}
       <Text
-        position={[0, 6.4, -3]}
-        fontSize={0.2}
+        position={[0.05, 8.45, -5.05]}
+        fontSize={1.2}
+        color="#1e293b"
+        anchorX="center"
+        anchorY="middle"
+        maxWidth={20}
+      >
+        {activityTitle || 'Poll Question'}
+      </Text>
+      
+      {/* Subtitle showing response count */}
+      <Text
+        position={[0, 7.8, -5]}
+        fontSize={0.4}
         color="#94a3b8"
         anchorX="center"
         anchorY="middle"
@@ -359,9 +382,12 @@ export const Poll3DVisualization: React.FC<Poll3DVisualizationProps> = ({
   options, 
   totalResponses, 
   themeColors,
+  activityTitle,
+  activityMedia,
+  isVotingLocked,
   className = '' 
 }) => {
-  console.log('Poll3DVisualization props:', { options, totalResponses, themeColors });
+  console.log('Poll3DVisualization props:', { options, totalResponses, themeColors, activityTitle });
 
   // Always render the 3D scene, even with no responses
   if (!options || options.length === 0) {
@@ -396,7 +422,7 @@ export const Poll3DVisualization: React.FC<Poll3DVisualizationProps> = ({
     >
       <Canvas
         camera={{ 
-          position: [0, 6, 10], 
+          position: [0, 6, 12], 
           fov: 60,
           near: 0.1,
           far: 1000
@@ -413,6 +439,8 @@ export const Poll3DVisualization: React.FC<Poll3DVisualizationProps> = ({
           options={options} 
           totalResponses={totalResponses} 
           themeColors={themeColors}
+          activityTitle={activityTitle}
+          activityMedia={activityMedia}
         />
       </Canvas>
       
@@ -424,8 +452,18 @@ export const Poll3DVisualization: React.FC<Poll3DVisualizationProps> = ({
         </div>
       </div>
       
+      {/* Voting locked indicator */}
+      {isVotingLocked && (
+        <div className="absolute top-4 right-4 bg-red-900/40 backdrop-blur-sm rounded-lg p-3 border border-red-600/30">
+          <div className="flex items-center gap-2">
+            <div className="w-2 h-2 bg-red-400 rounded-full"></div>
+            <span className="text-red-400 text-xs font-medium">VOTING LOCKED</span>
+          </div>
+        </div>
+      )}
+      
       {/* Status indicator */}
-      <div className="absolute top-4 right-4 bg-black/40 backdrop-blur-sm rounded-lg p-2 border border-white/10">
+      <div className="absolute bottom-4 right-4 bg-black/40 backdrop-blur-sm rounded-lg p-2 border border-white/10">
         <div className="flex items-center gap-2">
           <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
           <span className="text-green-400 text-xs font-medium">LIVE</span>
