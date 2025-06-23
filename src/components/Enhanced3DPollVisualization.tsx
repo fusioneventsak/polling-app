@@ -625,8 +625,6 @@ const Enhanced3DScene: React.FC<{
         )}
       </Float>
       
-      {/* Camera controller */}
-      <CameraController optionsCount={options.length} />
     </>
   );
 };
