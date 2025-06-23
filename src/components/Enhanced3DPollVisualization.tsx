@@ -86,7 +86,7 @@ const StandingImagePlane: React.FC<{
   return (
     <group>
       <mesh position={[position[0], position[1] + 0.3, position[2]]} rotation={[-Math.PI / 6, 0, 0]} renderOrder={10}>
-        <planeGeometry args={[15.0, 11.25]} />
+        <planeGeometry args={[7.5, 5.625]} />
         <meshStandardMaterial 
           map={texture}
           transparent={false}
@@ -98,7 +98,7 @@ const StandingImagePlane: React.FC<{
       </mesh>
       
       <mesh position={[position[0], position[1] + 0.29, position[2] - 0.01]} rotation={[-Math.PI / 6, 0, 0]} renderOrder={9}>
-        <planeGeometry args={[16.0, 12.0]} />
+        <planeGeometry args={[8.0, 6.0]} />
         <meshBasicMaterial 
           color={glowColor}
           transparent
@@ -108,7 +108,7 @@ const StandingImagePlane: React.FC<{
       </mesh>
       
       <mesh position={[position[0], position[1] + 0.28, position[2] - 0.02]} rotation={[-Math.PI / 6, 0, 0]} renderOrder={8}>
-        <planeGeometry args={[17.0, 12.75]} />
+        <planeGeometry args={[8.5, 6.375]} />
         <meshBasicMaterial 
           color={glowColor}
           transparent
