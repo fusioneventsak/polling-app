@@ -569,27 +569,62 @@ const Enhanced3DScene: React.FC<{
         position={[0, 0.01, 0]}
       />
       
-      {/* Floating particles for atmosphere */}
-      {Array.from({ length: 60 }).map((_, i) => (
-        <Float key={i} speed={0.5 + Math.random()} rotationIntensity={0.1} floatIntensity={0.2}>
-          <mesh 
-            position={[
-              (Math.random() - 0.5) * 80,
-              Math.random() * 20 + 8,
-              (Math.random() - 0.5) * 80
-            ]}
+      {/* Realistic asteroid field for atmosphere */}
+      {Array.from({ length: 80 }).map((_, i) => {
+        // Create varied asteroid sizes and distances
+        const size = 0.05 + Math.random() * 0.15; // Varied asteroid sizes
+        const distance = 60 + Math.random() * 40; // Far away asteroids
+        const angle = Math.random() * Math.PI * 2;
+        const height = (Math.random() - 0.5) * 60;
+        
+        // Position asteroids in distant ring around scene
+        const x = Math.cos(angle) * distance;
+        const z = Math.sin(angle) * distance;
+        
+        // Create irregular asteroid shape using icosahedron
+        const rotationX = Math.random() * Math.PI * 2;
+        const rotationY = Math.random() * Math.PI * 2;
+        const rotationZ = Math.random() * Math.PI * 2;
+        
+        // Asteroid color variations (rocky grays and browns)
+        const colorVariants = [
+          '#4a4a4a', // Dark gray
+          '#5c5c5c', // Medium gray  
+          '#6b5b4f', // Brown-gray
+          '#3a3a3a', // Darker gray
+          '#4d4d4d', // Light gray
+          '#5a4a3a'  // Brown
+        ];
+        const asteroidColor = colorVariants[i % colorVariants.length];
+        
+        return (
+          <Float 
+            key={i} 
+            speed={0.2 + Math.random() * 0.3} 
+            rotationIntensity={0.05 + Math.random() * 0.1} 
+            floatIntensity={0.1 + Math.random() * 0.2}
           >
-            <sphereGeometry args={[0.08]} />
-            <meshStandardMaterial 
-              color={i % 3 === 0 ? themeColors.accentColor : i % 3 === 1 ? themeColors.secondaryColor : themeColors.primaryColor}
-              transparent
-              opacity={0.7}
-              emissive={i % 3 === 0 ? themeColors.accentColor : i % 3 === 1 ? themeColors.secondaryColor : themeColors.primaryColor}
-              emissiveIntensity={0.3}
-            />
-          </mesh>
-        </Float>
-      ))}
+            <mesh 
+              position={[x, height, z]}
+              rotation={[rotationX, rotationY, rotationZ]}
+              scale={[
+                size * (0.8 + Math.random() * 0.4), // Irregular X scale
+                size * (0.8 + Math.random() * 0.4), // Irregular Y scale  
+                size * (0.8 + Math.random() * 0.4)  // Irregular Z scale
+              ]}
+            >
+              <icosahedronGeometry args={[1, 0]} />
+              <meshStandardMaterial 
+                color={asteroidColor}
+                transparent
+                opacity={0.6 + Math.random() * 0.3}
+                roughness={0.8 + Math.random() * 0.2}
+                metalness={0.1}
+              />
+            </mesh>
+          </Float>
+        );
+      })}
       
       {/* LAYER 1: Floor Stats (Foreground) */}
       <FloorStatsDisplay options={options} totalResponses={totalResponses} />
