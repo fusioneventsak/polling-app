@@ -198,17 +198,6 @@ const Enhanced3DBar: React.FC<{
       
       {/* 3D Text Labels with better positioning - NO FONT REFERENCES */}
       <Float speed={0.5} rotationIntensity={0.05} floatIntensity={0.1}>
-        {/* Percentage display - large and prominent */}
-        <Text
-          position={[position[0], animatedHeight + (texture ? 4.2 : 2.8), position[2]]}
-          fontSize={0.9}
-          color="#ffffff"
-          anchorX="center"
-          anchorY="middle"
-        >
-          {percentage}%
-        </Text>
-        
         {/* Response count */}
         <Text
           position={[position[0], animatedHeight + (texture ? 3.6 : 2.2), position[2]]}
@@ -244,29 +233,30 @@ const Enhanced3DBar: React.FC<{
             ✓ CORRECT
           </Text>
         )}
-        
-        {/* Option letter indicator */}
-        <Text
-          position={[position[0], animatedHeight + (texture ? 2.4 : 1.0), position[2]]}
-          fontSize={0.6}
-          color={barColor}
-          anchorX="center"
-          anchorY="middle"
-        >
-          {String.fromCharCode(65 + index)}
-        </Text>
       </Float>
       
-      {/* Base label */}
+      {/* 3D Percentage on the floor in front of the bar */}
       <Text
-        position={[position[0], -0.4, position[2] + 1.2]}
-        fontSize={0.25}
-        color="#64748b"
+        position={[position[0], 0.1, position[2] + 2.0]}
+        fontSize={1.2}
+        color="#ffffff"
         anchorX="center"
         anchorY="middle"
-        rotation={[-Math.PI / 6, 0, 0]}
+        rotation={[-Math.PI / 2, 0, 0]}
       >
-        Option {index + 1}
+        {percentage}%
+      </Text>
+      
+      {/* 3D Percentage shadow for depth effect */}
+      <Text
+        position={[position[0], 0.05, position[2] + 2.05]}
+        fontSize={1.2}
+        color="#1e293b"
+        anchorX="center"
+        anchorY="middle"
+        rotation={[-Math.PI / 2, 0, 0]}
+      >
+        {percentage}%
       </Text>
     </group>
   );
