@@ -281,9 +281,9 @@ const Enhanced3DBar: React.FC<{
 
   return (
     <group>
-      {/* Base platform with enhanced design */}
+      {/* Base platform with enhanced design - larger */}
       <mesh position={[position[0], 0.05, position[2]]}>
-        <cylinderGeometry args={[1.2, 1.2, 0.1]} />
+        <cylinderGeometry args={[1.5, 1.5, 0.15]} />
         <meshStandardMaterial 
           color="#1e293b"
           metalness={0.8}
@@ -291,24 +291,23 @@ const Enhanced3DBar: React.FC<{
         />
       </mesh>
       
-      {/* Main 3D bar with enhanced materials */}
+      {/* Main 3D bar with enhanced metallic materials - larger */}
       <mesh ref={meshRef} position={[position[0], 0.1, position[2]]} scale={[1, 0.2, 1]} castShadow>
-        <cylinderGeometry args={[0.8, 0.8, 1]} />
+        <cylinderGeometry args={[1.0, 1.0, 1]} />
         <meshStandardMaterial 
           color={barColor}
-          metalness={0.4}
-          roughness={0.3}
-          emissive={barColor}
-          emissiveIntensity={responses > 0 ? 0.2 : 0.05}
+          metalness={0.9}
+          roughness={0.1}
+          envMapIntensity={1.5}
           transparent
-          opacity={0.9}
+          opacity={0.95}
         />
       </mesh>
       
-      {/* Glow effect for bars with responses */}
+      {/* Glow effect for bars with responses - larger */}
       {responses > 0 && (
-        <mesh ref={glowRef} position={[position[0], 0.1, position[2]]} scale={[1.4, 0.2, 1.4]}>
-          <cylinderGeometry args={[1.0, 1.0, 1]} />
+        <mesh ref={glowRef} position={[position[0], 0.1, position[2]]} scale={[1.6, 0.2, 1.6]}>
+          <cylinderGeometry args={[1.2, 1.2, 1]} />
           <meshBasicMaterial 
             color={glowColor}
             transparent
@@ -452,7 +451,7 @@ const Enhanced3DScene: React.FC<{
   const maxResponses = Math.max(...options.map(opt => opt.responses), 1);
   const maxHeight = 4;
   
-  // Camera fly-in animation
+  // Camera fly-in animation with dynamic zoom based on option count
   useEffect(() => {
     // Starting position (far away)
     camera.position.set(0, 15, 40);
@@ -461,7 +460,11 @@ const Enhanced3DScene: React.FC<{
     const animateCamera = () => {
       const targetX = 0;
       const targetY = 4; // Higher to see floor stats
-      const targetZ = 15; // Closer than original 20
+      
+      // Dynamic zoom based on number of options
+      const baseDistance = 15;
+      const extraDistance = Math.max(0, (options.length - 2) * 3); // Add 3 units per extra option beyond 2
+      const targetZ = baseDistance + extraDistance;
       
       const animationDuration = 2000; // 2 seconds
       const startTime = Date.now();
@@ -490,7 +493,7 @@ const Enhanced3DScene: React.FC<{
     const timer = setTimeout(animateCamera, 100);
     
     return () => clearTimeout(timer);
-  }, [camera]);
+  }, [camera, options.length]); // Add options.length as dependency
   
   // Calculate dynamic font sizes
   const titleFontSize = activityTitle ? calculateTitleFontSize(activityTitle) : 1.8;
@@ -787,8 +790,8 @@ export const Enhanced3DPollVisualization: React.FC<Enhanced3DPollVisualizationPr
               enablePan={false}
               enableZoom={true}
               enableRotate={true}
-              minDistance={8}
-              maxDistance={25}
+              minDistance={12}
+              maxDistance={40}
               minPolarAngle={Math.PI / 8}
               maxPolarAngle={Math.PI / 2.5}
               autoRotate={false}
