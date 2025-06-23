@@ -331,15 +331,35 @@ function DisplayPage() {
           id: currentActivity.id,
           title: currentActivity.title,
           optionsCount: currentActivity.options?.length || 0,
-          totalResponses: currentActivity.total_responses || 0
+          totalResponses: currentActivity.total_responses || 0,
+          optionsWithMedia: currentActivity.options?.filter(opt => opt.media_url && opt.media_url.trim() !== '').length || 0,
+          optionMediaUrls: currentActivity.options?.map(opt => ({
+            id: opt.id,
+            text: opt.text.substring(0, 20),
+            media_url: opt.media_url,
+            hasMedia: !!(opt.media_url && opt.media_url.trim() !== '')
+          })) || []
         });
         
         // Ensure options are properly formatted
-        currentActivity.options = currentActivity.options?.map(opt => ({
-          id: opt.id,
-          text: opt.text,
-          responses: opt.responses || 0
-        })) || [];
+        currentActivity.options = currentActivity.options?.map((opt, index) => {
+          console.log(`DisplayPage: Processing option ${index}:`, {
+            id: opt.id,
+            text: opt.text.substring(0, 30),
+            media_url: opt.media_url,
+            responses: opt.responses || 0
+          });
+          return {
+            id: opt.id,
+            text: opt.text,
+            media_url: opt.media_url, // Ensure this is preserved
+            responses: opt.responses || 0,
+            is_correct: opt.is_correct || false,
+            option_order: opt.option_order || index,
+            created_at: opt.created_at,
+            activity_id: opt.activity_id
+          };
+        }) || [];
         return currentActivity;
       } else {
         console.log('DisplayPage: Warning - current_activity_id points to non-existent activity:', currentRoom.current_activity_id);
@@ -852,6 +872,21 @@ function DisplayPage() {
 
           {/* Activity Results Visualization */}
           <div className="flex-1 p-4" style={{ height: 'calc(100vh - 120px)' }}>
+            {/* Debug info overlay */}
+            <div className="absolute top-20 left-4 bg-black/80 text-white p-2 rounded text-xs z-20 max-w-md">
+              <div>Activity: {activeActivity.title}</div>
+              <div>Options: {activeActivity.options?.length || 0}</div>
+              <div>With Media: {activeActivity.options?.filter(opt => opt.media_url && opt.media_url.trim() !== '').length || 0}</div>
+              <div className="mt-1 max-h-32 overflow-y-auto">
+                {activeActivity.options?.map((opt, i) => (
+                  <div key={opt.id} className="text-xs">
+                    {i + 1}: {opt.media_url ? '✅' : '❌'} {opt.text.substring(0, 20)}...
+                    {opt.media_url && <div className="text-blue-300 break-all">{opt.media_url.substring(0, 50)}...</div>}
+                  </div>
+                ))}
+              </div>
+            </div>
+            
             <Enhanced3DPollVisualization
               options={activeActivity.options || []}
               totalResponses={activeActivity.total_responses || 0}

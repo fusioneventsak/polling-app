@@ -24,10 +24,20 @@ const OptionMediaPlane: React.FC<{
   imageUrl: string;
   position: [number, number, number];
 }> = ({ imageUrl, position }) => {
+  const [loadError, setLoadError] = useState(false);
+  
   // Use useLoader hook for better texture loading
-  const texture = useLoader(THREE.TextureLoader, imageUrl, (loader) => {
-    loader.setCrossOrigin('anonymous');
-  });
+  const texture = useLoader(
+    THREE.TextureLoader, 
+    imageUrl, 
+    (loader) => {
+      loader.setCrossOrigin('anonymous');
+    },
+    (error) => {
+      console.error('OptionMediaPlane: Failed to load texture:', imageUrl, error);
+      setLoadError(true);
+    }
+  );
 
   useEffect(() => {
     if (texture) {
@@ -43,20 +53,21 @@ const OptionMediaPlane: React.FC<{
     }
   }, [texture, imageUrl]);
 
-  if (!texture) {
+  if (!texture || loadError) {
     console.log('OptionMediaPlane: No texture available for:', imageUrl);
     return null;
   }
 
   console.log('OptionMediaPlane: Rendering texture plane for:', imageUrl);
   return (
-    <mesh position={position}>
-      <planeGeometry args={[4.0, 3.0]} />
+    <mesh position={position} renderOrder={1}>
+      <planeGeometry args={[3.0, 2.25]} />
       <meshBasicMaterial 
         map={texture} 
         transparent 
-        opacity={0.95}
+        opacity={0.8}
         side={THREE.DoubleSide}
+        depthWrite={false}
       />
     </mesh>
   );
@@ -66,20 +77,21 @@ const OptionMediaPlane: React.FC<{
 const OptionMediaFallback: React.FC<{
   position: [number, number, number];
   text: string;
+  showDebug?: boolean;
 }> = ({ position, text }) => {
   return (
-    <mesh position={position}>
-      <planeGeometry args={[4.0, 3.0]} />
-      <meshBasicMaterial color="#475569" transparent opacity={0.3} />
+    <mesh position={position} renderOrder={1}>
+      <planeGeometry args={[3.0, 2.25]} />
+      <meshBasicMaterial color="#475569" transparent opacity={0.5} />
       <Text
         position={[0, 0, 0.01]}
-        fontSize={0.3}
+        fontSize={0.25}
         color="#ffffff"
         anchorX="center"
         anchorY="middle"
-        maxWidth={3.5}
+        maxWidth={2.8}
       >
-        {text}
+        📷 {text}
       </Text>
     </mesh>
   );
@@ -90,22 +102,65 @@ const SafeOptionMediaPlane: React.FC<{
   imageUrl?: string;
   position: [number, number, number];
   fallbackText: string;
+  debug?: boolean;
 }> = ({ imageUrl, position, fallbackText }) => {
   const [hasError, setHasError] = useState(false);
+  
+  // Debug logging
+  useEffect(() => {
+    console.log('SafeOptionMediaPlane: Checking image URL:', {
+      imageUrl,
+      hasUrl: !!imageUrl,
+      isValidUrl: imageUrl && imageUrl.trim() !== '',
+      hasError
+    });
+  }, [imageUrl, hasError]);
 
   if (!imageUrl || imageUrl.trim() === '' || hasError) {
-    return <OptionMediaFallback position={position} text={fallbackText} />;
+    console.log('SafeOptionMediaPlane: Using fallback for:', fallbackText, 'URL:', imageUrl);
+    return <OptionMediaFallback position={position} text={fallbackText} showDebug={true} />;
   }
 
+  console.log('SafeOptionMediaPlane: Attempting to load image:', imageUrl);
   return (
-    <Suspense fallback={<OptionMediaFallback position={position} text="Loading..." />}>
-      <OptionMediaPlane 
-        imageUrl={imageUrl} 
-        position={position}
-      />
+    <Suspense fallback={<OptionMediaFallback position={position} text="Loading..." showDebug={true} />}>
+      <ErrorBoundary fallback={<OptionMediaFallback position={position} text={`Error: ${fallbackText}`} showDebug={true} />}>
+        <OptionMediaPlane 
+          imageUrl={imageUrl} 
+          position={position}
+        />
+      </ErrorBoundary>
     </Suspense>
   );
 };
+
+// Error boundary for texture loading
+class ErrorBoundary extends React.Component<
+  { children: React.ReactNode; fallback: React.ReactNode },
+  { hasError: boolean }
+> {
+  constructor(props: any) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(error: any) {
+    console.error('ErrorBoundary: Caught error in texture loading:', error);
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: any, errorInfo: any) {
+    console.error('ErrorBoundary: Error details:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return this.props.fallback;
+    }
+
+    return this.props.children;
+  }
+}
 
 // 3D Bar Component with Enhanced Image Display
 const Enhanced3DBar: React.FC<{
@@ -194,27 +249,49 @@ const Enhanced3DBar: React.FC<{
 
   const hasValidImage = imageUrl && imageUrl.trim() !== '';
 
+  // Debug logging for each bar
+  useEffect(() => {
+    console.log(`Enhanced3DBar ${index}: Image check:`, {
+      hasValidImage,
+      imageUrl,
+      label: label.substring(0, 20)
+    });
+  }, [imageUrl, hasValidImage, index, label]);
+
   return (
     <group>
       {/* Option media image behind the bar - ENHANCED VERSION */}
       {hasValidImage && (
         <group ref={imagePlaneRef}>
-          {console.log(`Enhanced3DBar ${index}: Rendering image plane for URL:`, imageUrl)}
+          {console.log(`Enhanced3DBar ${index}: Rendering image group for:`, imageUrl)}
           
           {/* Main background image plane - positioned clearly behind the bar */}
           <SafeOptionMediaPlane 
             imageUrl={imageUrl} 
-            position={[position[0], animatedHeight + 1.5, position[2] - 4.0]}
+            position={[position[0], animatedHeight + 2.0, position[2] - 3.0]}
             fallbackText={`Option ${String.fromCharCode(65 + index)}`}
+            debug={true}
           />
           
-          {/* Very subtle gradient overlay to blend with scene */}
-          <mesh position={[position[0], animatedHeight + 1.5, position[2] - 3.9]}>
-            <planeGeometry args={[4.1, 3.1]} />
+          {/* Debug indicator that image should be here */}
+          <Text
+            position={[position[0], animatedHeight + 3.5, position[2] - 2.8]}
+            fontSize={0.2}
+            color="#00ff00"
+            anchorX="center"
+            anchorY="middle"
+          >
+            🖼️ IMG: {imageUrl.split('/').pop()?.substring(0, 10)}...
+          </Text>
+          
+          {/* Subtle frame around image area */}
+          <mesh position={[position[0], animatedHeight + 2.0, position[2] - 2.95]}>
+            <planeGeometry args={[3.2, 2.4]} />
             <meshBasicMaterial 
               transparent
-              opacity={0.1}
-              color="#0f172a"
+              opacity={0.3}
+              color="#ffffff"
+              wireframe={true}
             />
           </mesh>
         </group>
@@ -347,25 +424,41 @@ const Enhanced3DBar: React.FC<{
       {/* Debug indicator for images */}
       {hasValidImage && (
         <Text
-          position={[position[0], 0.3, position[2] + 1.0]}
-          fontSize={0.2}
+          position={[position[0], 0.4, position[2] + 1.5]}
+          fontSize={0.15}
           color="#22c55e"
           anchorX="center"
           anchorY="middle"
         >
-          📷 IMAGE LOADED
+          📷 HAS IMAGE
+        </Text>
+      )}
+      
+      {/* Debug indicator for no images */}
+      {!hasValidImage && (
+        <Text
+          position={[position[0], 0.4, position[2] + 1.5]}
+          fontSize={0.15}
+          color="#ef4444"
+          anchorX="center"
+          anchorY="middle"
+        >
+          ❌ NO IMAGE
         </Text>
       )}
     </group>
   );
-};
-
-// Camera controller for optimal viewing
-const CameraController: React.FC<{ optionsCount: number }> = ({ optionsCount }) => {
-  const { camera } = useThree();
-  
-  useFrame(() => {
-    // Position camera to show title prominently and avoid bar overlap
+    {/* Debug URL display */}
+    <Text
+      position={[position[0], 0.3, position[2] + 1.0]}
+      fontSize={0.15}
+      color={hasValidImage ? "#22c55e" : "#ef4444"}
+      anchorX="center"
+      anchorY="middle"
+      maxWidth={3}
+    >
+      {hasValidImage ? `✅ ${imageUrl?.substring(0, 30)}...` : '❌ No Image URL'}
+    </Text>
     const distance = Math.max(12, optionsCount * 1.5);
     
     camera.position.x = THREE.MathUtils.lerp(camera.position.x, 0, 0.02);
