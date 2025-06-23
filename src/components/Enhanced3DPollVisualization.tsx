@@ -318,7 +318,7 @@ const FloorStatsDisplay: React.FC<{
           <group key={option.id}>
             {/* Large percentage on the floor */}
             <Text
-              position={[xPosition, 0.1, 8]}
+              position={[xPosition, 0.1, 6]}
               fontSize={1.2}
               color="#ffffff"
               anchorX="center"
@@ -330,7 +330,7 @@ const FloorStatsDisplay: React.FC<{
             
             {/* Percentage shadow for depth */}
             <Text
-              position={[xPosition + 0.05, 0.05, 8.05]}
+              position={[xPosition + 0.05, 0.05, 6.05]}
               fontSize={1.2}
               color="#1e293b"
               anchorX="center"
@@ -342,7 +342,7 @@ const FloorStatsDisplay: React.FC<{
             
             {/* Vote count on floor */}
             <Text
-              position={[xPosition, 0.1, 9]}
+              position={[xPosition, 0.1, 7]}
               fontSize={0.6}
               color="#94a3b8"
               anchorX="center"
@@ -354,7 +354,7 @@ const FloorStatsDisplay: React.FC<{
             
             {/* Option text on floor */}
             <Text
-              position={[xPosition, 0.1, 10]}
+              position={[xPosition, 0.1, 8]}
               fontSize={0.4}
               color="#e2e8f0"
               anchorX="center"
@@ -394,10 +394,10 @@ const StandingImagesDisplay: React.FC<{
             fallback={<group />}
           >
             <group>
-              {/* Standing image - positioned closer to bars and higher up */}
+              {/* Standing image - on floor plane, forward of bars to avoid highlight covering */}
               <StandingImagePlane
                 imageUrl={option.media_url}
-                position={[xPosition, 2.5, -1]}
+                position={[xPosition, 0.1, 3]}
                 fallbackText={`Option ${String.fromCharCode(65 + index)}`}
               />
             </group>
