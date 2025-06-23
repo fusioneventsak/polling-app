@@ -294,9 +294,9 @@ const Enhanced3DBar: React.FC<{
 
   return (
     <group>
-      {/* Base platform with enhanced design - 25% larger */}
+      {/* Base platform with enhanced design - even bigger */}
       <mesh position={[position[0], 0.05, position[2]]}>
-        <cylinderGeometry args={[1.875, 1.875, 0.1875]} />
+        <cylinderGeometry args={[2.5, 2.5, 0.25]} />
         <meshStandardMaterial 
           color="#1e293b"
           metalness={0.8}
@@ -304,9 +304,9 @@ const Enhanced3DBar: React.FC<{
         />
       </mesh>
       
-      {/* Main 3D bar with enhanced metallic materials - 25% larger */}
-      <mesh ref={meshRef} position={[position[0], 0.1, position[2]]} scale={[1, 0.2, 1]} castShadow>
-        <cylinderGeometry args={[1.25, 1.25, 1]} />
+      {/* Main 3D bar with enhanced metallic materials - even bigger */}
+      <mesh ref={meshRef} position={[position[0], 0.15, position[2]]} scale={[1, 0.2, 1]} castShadow>
+        <cylinderGeometry args={[1.8, 1.8, 1]} />
         <meshStandardMaterial 
           color={barColor}
           metalness={0.9}
@@ -317,10 +317,10 @@ const Enhanced3DBar: React.FC<{
         />
       </mesh>
       
-      {/* Glow effect for bars with responses - 25% larger */}
+      {/* Glow effect for bars with responses - even bigger */}
       {responses > 0 && (
-        <mesh ref={glowRef} position={[position[0], 0.1, position[2]]} scale={[2.0, 0.2, 2.0]}>
-          <cylinderGeometry args={[1.5, 1.5, 1]} />
+        <mesh ref={glowRef} position={[position[0], 0.15, position[2]]} scale={[2.4, 0.2, 2.4]}>
+          <cylinderGeometry args={[2.0, 2.0, 1]} />
           <meshBasicMaterial 
             color={glowColor}
             transparent
@@ -437,10 +437,10 @@ const StandingImagesDisplay: React.FC<{
             fallback={<group />}
           >
             <group>
-              {/* Standing image - tilted up towards camera with matching glow color */}
+              {/* Standing image - much bigger and properly elevated above floor */}
               <StandingImagePlane
                 imageUrl={option.media_url}
-                position={[xPosition, 0.75, 3]}
+                position={[xPosition, 1.0, 3]}
                 fallbackText={`Option ${String.fromCharCode(65 + index)}`}
                 glowColor={glowColor}
               />
@@ -474,9 +474,9 @@ const Enhanced3DScene: React.FC<{
       const targetX = 0;
       const targetY = 4; // Higher to see floor stats
       
-      // Dynamic zoom based on number of options - adjusted for larger elements
-      const baseDistance = 18; // Increased from 15 to accommodate larger elements
-      const extraDistance = Math.max(0, (options.length - 2) * 3.5); // Increased from 3 to 3.5 per extra option
+      // Dynamic zoom based on number of options - adjusted for much larger elements
+      const baseDistance = 22; // Increased to accommodate much larger elements
+      const extraDistance = Math.max(0, (options.length - 2) * 4); // Increased spacing per option
       const targetZ = baseDistance + extraDistance;
       
       const animationDuration = 2000; // 2 seconds
@@ -815,8 +815,8 @@ export const Enhanced3DPollVisualization: React.FC<Enhanced3DPollVisualizationPr
               enablePan={false}
               enableZoom={true}
               enableRotate={true}
-              minDistance={15}
-              maxDistance={50}
+              minDistance={18}
+              maxDistance={60}
               minPolarAngle={Math.PI / 8}
               maxPolarAngle={Math.PI / 2.5}
               autoRotate={false}
