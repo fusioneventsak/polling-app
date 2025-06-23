@@ -1,5 +1,5 @@
-import React, { useRef, useMemo, useEffect, useState, Suspense, useCallback } from 'react';
-import { Canvas, useFrame, useThree, useLoader } from '@react-three/fiber';
+import React, { useRef, useMemo, useEffect, useState, Suspense } from 'react';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { Text, OrbitControls, Float } from '@react-three/drei';
 import { motion } from 'framer-motion';
 import * as THREE from 'three';
@@ -31,75 +31,12 @@ const calculateTitleFontSize = (text: string): number => {
   return minSize;
 };
 
-const calculateDescriptionFontSize = (text: string): number => {
-  return text.length <= 50 ? 0.8 : text.length <= 100 ? 0.6 : 0.5;
-};
-
-// Fixed texture loading component - simplified to avoid material uniform issues
-const OptionMediaPlane: React.FC<{
-  imageUrl: string;
-  position: [number, number, number];
-}> = ({ imageUrl, position }) => {
-  const [texture, setTexture] = useState<THREE.Texture | null>(null);
-  const [loadError, setLoadError] = useState(false);
-  
-  useEffect(() => {
-    if (!imageUrl || imageUrl.trim() === '') {
-      setTexture(null);
-      return;
-    }
-
-    const loader = new THREE.TextureLoader();
-    loader.setCrossOrigin('anonymous');
-    
-    loader.load(
-      imageUrl,
-      (loadedTexture) => {
-        // Minimal texture setup to prevent uniform errors
-        loadedTexture.needsUpdate = true;
-        setTexture(loadedTexture);
-        setLoadError(false);
-      },
-      undefined,
-      (error) => {
-        setLoadError(true);
-        setTexture(null);
-      }
-    );
-    
-    // Cleanup function
-    return () => {
-      if (texture) {
-        texture.dispose();
-      }
-    };
-  }, [imageUrl]);
-
-  // Don't render if no valid texture
-  if (!texture || loadError || !imageUrl || imageUrl.trim() === '') {
-    return null;
-  }
-
-  return (
-    <mesh position={position} renderOrder={1}>
-      <planeGeometry args={[2.5, 1.875]} />
-      <meshBasicMaterial 
-        map={texture}
-        transparent 
-        opacity={0.9}
-        side={THREE.FrontSide}
-        depthWrite={false}
-      />
-    </mesh>
-  );
-};
-
-// Simplified standing image component with better error handling
+// Simplified standing image component
 const StandingImagePlane: React.FC<{
   imageUrl: string;
   position: [number, number, number];
   fallbackText: string;
-  glowColor: string; // Add glow color prop to match bar color
+  glowColor: string;
 }> = ({ imageUrl, position, fallbackText, glowColor }) => {
   const [texture, setTexture] = useState<THREE.Texture | null>(null);
   const [loadError, setLoadError] = useState(false);
@@ -116,14 +53,13 @@ const StandingImagePlane: React.FC<{
     loader.load(
       imageUrl,
       (loadedTexture) => {
-        // Enhanced texture properties for better quality
         loadedTexture.needsUpdate = true;
         loadedTexture.flipY = true;
         loadedTexture.wrapS = THREE.ClampToEdgeWrapping;
         loadedTexture.wrapT = THREE.ClampToEdgeWrapping;
         loadedTexture.minFilter = THREE.LinearFilter;
         loadedTexture.magFilter = THREE.LinearFilter;
-        loadedTexture.anisotropy = 16; // Maximum anisotropic filtering for crisp images
+        loadedTexture.anisotropy = 16;
         loadedTexture.format = THREE.RGBAFormat;
         loadedTexture.generateMipmaps = true;
         setTexture(loadedTexture);
@@ -136,7 +72,6 @@ const StandingImagePlane: React.FC<{
       }
     );
     
-    // Cleanup
     return () => {
       if (texture) {
         texture.dispose();
@@ -150,69 +85,42 @@ const StandingImagePlane: React.FC<{
 
   return (
     <group>
-      {/* Main image - enhanced for better quality, 25% larger */}
-      <mesh position={position} rotation={[-Math.PI / 6, 0, 0]} renderOrder={2}>
-        <planeGeometry args={[2.5, 1.875]} />
+      <mesh position={[position[0], position[1] + 0.3, position[2]]} rotation={[-Math.PI / 6, 0, 0]} renderOrder={10}>
+        <planeGeometry args={[15.0, 11.25]} />
         <meshStandardMaterial 
           map={texture}
           transparent={false}
           side={THREE.DoubleSide}
           roughness={0.1}
           metalness={0.1}
+          depthWrite={true}
         />
       </mesh>
       
-      {/* Glow border matching bar color - 25% larger */}
-      <mesh position={[position[0], position[1], position[2] - 0.01]} rotation={[-Math.PI / 6, 0, 0]} renderOrder={1}>
-        <planeGeometry args={[2.75, 2.125]} />
+      <mesh position={[position[0], position[1] + 0.29, position[2] - 0.01]} rotation={[-Math.PI / 6, 0, 0]} renderOrder={9}>
+        <planeGeometry args={[16.0, 12.0]} />
         <meshBasicMaterial 
           color={glowColor}
           transparent
-          opacity={0.5}
+          opacity={0.4}
+          depthWrite={false}
         />
       </mesh>
       
-      {/* Outer glow effect with lighter version of bar color - 25% larger */}
-      <mesh position={[position[0], position[1], position[2] - 0.02]} rotation={[-Math.PI / 6, 0, 0]} renderOrder={0}>
-        <planeGeometry args={[3.0, 2.375]} />
+      <mesh position={[position[0], position[1] + 0.28, position[2] - 0.02]} rotation={[-Math.PI / 6, 0, 0]} renderOrder={8}>
+        <planeGeometry args={[17.0, 12.75]} />
         <meshBasicMaterial 
           color={glowColor}
           transparent
-          opacity={0.2}
+          opacity={0.15}
+          depthWrite={false}
         />
       </mesh>
     </group>
   );
 };
 
-// Error boundary for texture loading
-class ErrorBoundary extends React.Component<
-  { children: React.ReactNode; fallback: React.ReactNode },
-  { hasError: boolean }
-> {
-  constructor(props: any) {
-    super(props);
-    this.state = { hasError: false };
-  }
-
-  static getDerivedStateFromError(error: any) {
-    return { hasError: true };
-  }
-
-  componentDidCatch(error: any, errorInfo: any) {
-    // Error logged but not to console in production
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return this.props.fallback;
-    }
-
-    return this.props.children;
-  }
-}
-
-// 3D Bar Component (background layer)
+// 3D Bar Component
 const Enhanced3DBar: React.FC<{
   position: [number, number, number];
   height: number;
@@ -240,7 +148,6 @@ const Enhanced3DBar: React.FC<{
   const glowRef = useRef<THREE.Mesh>(null);
   const [animatedHeight, setAnimatedHeight] = useState(0.2);
   
-  // Animate the bar height
   useFrame((state) => {
     const targetHeight = Math.max(height, 0.2);
     
@@ -256,7 +163,6 @@ const Enhanced3DBar: React.FC<{
       }
     }
     
-    // Animate glow effect - simplified to avoid material issues
     if (glowRef.current && responses > 0) {
       const targetHeight = Math.max(height, 0.2);
       const currentHeight = glowRef.current.scale.y;
@@ -268,7 +174,6 @@ const Enhanced3DBar: React.FC<{
         glowRef.current.position.y = newHeight / 2;
       }
       
-      // Pulsing glow effect - safe material access
       const pulseIntensity = 0.1 + Math.sin(state.clock.elapsedTime * 2 + delay) * 0.05;
       const material = glowRef.current.material as THREE.MeshBasicMaterial;
       if (material && material.opacity !== undefined) {
@@ -289,7 +194,6 @@ const Enhanced3DBar: React.FC<{
 
   return (
     <group>
-      {/* Base platform with enhanced design - even bigger */}
       <mesh position={[position[0], 0.05, position[2]]}>
         <cylinderGeometry args={[2.5, 2.5, 0.25]} />
         <meshStandardMaterial 
@@ -299,7 +203,6 @@ const Enhanced3DBar: React.FC<{
         />
       </mesh>
       
-      {/* Main 3D bar with enhanced metallic materials - even bigger */}
       <mesh ref={meshRef} position={[position[0], 0.15, position[2]]} scale={[1, 0.2, 1]} castShadow>
         <cylinderGeometry args={[1.8, 1.8, 1]} />
         <meshStandardMaterial 
@@ -312,7 +215,6 @@ const Enhanced3DBar: React.FC<{
         />
       </mesh>
       
-      {/* Glow effect for bars with responses - smaller to prevent overlap */}
       {responses > 0 && (
         <mesh ref={glowRef} position={[position[0], 0.15, position[2]]} scale={[1.8, 0.2, 1.8]}>
           <cylinderGeometry args={[1.6, 1.6, 1]} />
@@ -327,7 +229,7 @@ const Enhanced3DBar: React.FC<{
   );
 };
 
-// Floor Stats Component (foreground layer)
+// Floor Stats Component
 const FloorStatsDisplay: React.FC<{
   options: ActivityOption[];
   totalResponses: number;
@@ -337,9 +239,8 @@ const FloorStatsDisplay: React.FC<{
       {options.map((option, index) => {
         const percentage = totalResponses > 0 ? Math.round((option.responses / totalResponses) * 100) : 0;
         
-        // Calculate optimal spacing that scales with number of options - improved algorithm
-        const minSpacing = 6.0; // Minimum spacing to prevent glow overlap
-        const maxSpacing = 12.0; // Maximum spacing for 1-2 options
+        const minSpacing = 6.0;
+        const maxSpacing = 12.0;
         const spacing = Math.max(minSpacing, Math.min(maxSpacing, 50 / Math.max(options.length, 1)));
         const totalWidth = (options.length - 1) * spacing;
         const startX = -totalWidth / 2;
@@ -347,7 +248,6 @@ const FloorStatsDisplay: React.FC<{
         
         return (
           <group key={option.id}>
-            {/* Large percentage on the floor */}
             <Text
               position={[xPosition, 0.1, 6]}
               fontSize={1.2}
@@ -359,7 +259,6 @@ const FloorStatsDisplay: React.FC<{
               {percentage}%
             </Text>
             
-            {/* Percentage shadow for depth */}
             <Text
               position={[xPosition + 0.05, 0.05, 6.05]}
               fontSize={1.2}
@@ -371,7 +270,6 @@ const FloorStatsDisplay: React.FC<{
               {percentage}%
             </Text>
             
-            {/* Vote count on floor */}
             <Text
               position={[xPosition, 0.1, 7]}
               fontSize={0.6}
@@ -383,7 +281,6 @@ const FloorStatsDisplay: React.FC<{
               {option.responses} votes
             </Text>
             
-            {/* Option text on floor */}
             <Text
               position={[xPosition, 0.1, 8]}
               fontSize={0.6}
@@ -402,7 +299,7 @@ const FloorStatsDisplay: React.FC<{
   );
 };
 
-// Standing Images Component (middle layer) - Wrapped in error boundary
+// Standing Images Component
 const StandingImagesDisplay: React.FC<{
   options: ActivityOption[];
 }> = ({ options }) => {
@@ -413,15 +310,13 @@ const StandingImagesDisplay: React.FC<{
           return null;
         }
         
-        // Calculate optimal spacing that scales with number of options - improved algorithm
-        const minSpacing = 6.0; // Minimum spacing to prevent glow overlap
-        const maxSpacing = 12.0; // Maximum spacing for 1-2 options
+        const minSpacing = 6.0;
+        const maxSpacing = 12.0;
         const spacing = Math.max(minSpacing, Math.min(maxSpacing, 50 / Math.max(options.length, 1)));
         const totalWidth = (options.length - 1) * spacing;
         const startX = -totalWidth / 2;
         const xPosition = startX + index * spacing;
         
-        // Calculate bar color to match the glow - same logic as bars
         const hue = (index / Math.max(options.length - 1, 1)) * 300;
         const saturation = 75;
         const lightness = 60;
@@ -431,54 +326,43 @@ const StandingImagesDisplay: React.FC<{
           : `hsl(${200 + hue}, ${saturation}%, ${lightness}%)`;
         
         return (
-          <ErrorBoundary 
-            key={option.id}
-            fallback={<group />}
-          >
-            <group>
-              {/* Standing image - much bigger and properly elevated above floor */}
-              <StandingImagePlane
-                imageUrl={option.media_url}
-                position={[xPosition, 1.0, 3]}
-                fallbackText={`Option ${String.fromCharCode(65 + index)}`}
-                glowColor={glowColor}
-              />
-            </group>
-          </ErrorBoundary>
+          <group key={option.id}>
+            <StandingImagePlane
+              imageUrl={option.media_url}
+              position={[xPosition, 1.0, 3]}
+              fallbackText={`Option ${String.fromCharCode(65 + index)}`}
+              glowColor={glowColor}
+            />
+          </group>
         );
       })}
     </group>
   );
 };
 
-// Main 3D Scene with Layered Layout
+// Main 3D Scene
 const Enhanced3DScene: React.FC<{ 
   options: ActivityOption[]; 
   totalResponses: number; 
   themeColors: any;
   activityTitle?: string;
-  activityDescription?: string;
 }> = ({ options, totalResponses, themeColors, activityTitle }) => {
   const { camera } = useThree();
   const maxResponses = Math.max(...options.map(opt => opt.responses), 1);
   const maxHeight = 4;
   
-  // Camera fly-in animation with dynamic zoom based on option count
   useEffect(() => {
-    // Starting position (far away)
     camera.position.set(0, 15, 40);
     
-    // Animate to final position
     const animateCamera = () => {
       const targetX = 0;
-      const targetY = 4; // Higher to see floor stats
+      const targetY = 4;
       
-      // Dynamic zoom for clear text and image visibility - much closer final position
-      const baseDistance = 18; // Much closer base distance for clear visibility
-      const extraDistance = Math.max(0, (options.length - 2) * 3.0); // Reasonable spacing increase
+      const baseDistance = 18;
+      const extraDistance = Math.max(0, (options.length - 2) * 2.5);
       const targetZ = baseDistance + extraDistance;
       
-      const animationDuration = 2000; // 2 seconds
+      const animationDuration = 2000;
       const startTime = Date.now();
       const startPos = camera.position.clone();
       
@@ -486,7 +370,6 @@ const Enhanced3DScene: React.FC<{
         const elapsed = Date.now() - startTime;
         const progress = Math.min(elapsed / animationDuration, 1);
         
-        // Smooth easing function
         const easeProgress = 1 - Math.pow(1 - progress, 3);
         
         camera.position.x = startPos.x + (targetX - startPos.x) * easeProgress;
@@ -501,19 +384,15 @@ const Enhanced3DScene: React.FC<{
       animate();
     };
     
-    // Start animation after a brief delay
     const timer = setTimeout(animateCamera, 100);
     
     return () => clearTimeout(timer);
-  }, [camera, options.length]); // Only run when camera or initial options.length changes
+  }, [camera, options.length]);
   
-  // Calculate dynamic font sizes
   const titleFontSize = activityTitle ? calculateTitleFontSize(activityTitle) : 1.8;
-  const descriptionFontSize = activityTitle ? calculateDescriptionFontSize(activityTitle) : 0.6;
   
   return (
     <>
-      {/* Enhanced lighting setup for better bar visibility */}
       <ambientLight intensity={0.8} />
       <directionalLight 
         position={[10, 20, 5]} 
@@ -549,7 +428,6 @@ const Enhanced3DScene: React.FC<{
         castShadow
       />
       
-      {/* Enhanced ground plane */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow>
         <planeGeometry args={[100, 100]} />
         <meshStandardMaterial 
@@ -561,207 +439,27 @@ const Enhanced3DScene: React.FC<{
         />
       </mesh>
       
-      {/* Animated grid lines */}
       <gridHelper 
         args={[100, 100, themeColors.accentColor, '#334155']} 
         position={[0, 0.01, 0]}
       />
       
-      {/* Animated 3D space objects with real textures */}
-      {Array.from({ length: 3 }).map((_, i) => {
-        const distance = 100 + i * 30;
-        const angle = (i * Math.PI * 2) / 3;
-        const x = Math.cos(angle) * distance;
-        const z = Math.sin(angle) * distance;
-        const y = (Math.random() - 0.5) * 40;
-        
-        return (
-          <Float key={`planet-${i}`} speed={0.3} rotationIntensity={0.2} floatIntensity={0.5}>
-            <mesh position={[x, y, z]}>
-              <sphereGeometry args={[8 + i * 3, 32, 32]} />
-              <meshStandardMaterial
-                color={i === 0 ? '#8B4513' : i === 1 ? '#4169E1' : '#DC143C'}
-                roughness={0.8}
-                metalness={0.1}
-                emissive={i === 0 ? '#331100' : i === 1 ? '#001144' : '#440011'}
-                emissiveIntensity={0.1}
-              />
-            </mesh>
-          </Float>
-        );
-      })}
-      
-      {/* Large animated asteroids */}
-      {Array.from({ length: 12 }).map((_, i) => {
-        const distance = 80 + Math.random() * 60;
-        const angle = (Math.random() * Math.PI * 2);
-        const height = (Math.random() - 0.5) * 80;
-        
-        const x = Math.cos(angle) * distance;
-        const z = Math.sin(angle) * distance;
-        
-        const size = 2 + Math.random() * 4;
-        const rotationSpeed = 0.1 + Math.random() * 0.3;
-        
-        return (
-          <Float key={`asteroid-${i}`} speed={rotationSpeed} rotationIntensity={0.5} floatIntensity={0.3}>
-            <mesh 
-              position={[x, height, z]}
-              rotation={[
-                Math.random() * Math.PI * 2,
-                Math.random() * Math.PI * 2,
-                Math.random() * Math.PI * 2
-              ]}
-            >
-              <dodecahedronGeometry args={[size, 1]} />
-              <meshStandardMaterial
-                color={['#4a4a4a', '#5c4a3a', '#3a3a3a', '#6b5b4f'][i % 4]}
-                roughness={0.9}
-                metalness={0.05}
-              />
-            </mesh>
-          </Float>
-        );
-      })}
-      
-      {/* Space debris field */}
-      {Array.from({ length: 25 }).map((_, i) => {
-        const distance = 60 + Math.random() * 80;
-        const angle = Math.random() * Math.PI * 2;
-        const height = (Math.random() - 0.5) * 100;
-        
-        const x = Math.cos(angle) * distance;
-        const z = Math.sin(angle) * distance;
-        
-        const debrisType = Math.floor(Math.random() * 3);
-        const scale = [1 + Math.random(), 1 + Math.random(), 1 + Math.random()];
-        
-        return (
-          <Float key={`debris-${i}`} speed={0.4 + Math.random() * 0.6} rotationIntensity={0.8} floatIntensity={0.4}>
-            <mesh 
-              position={[x, height, z]}
-              scale={scale}
-              rotation={[
-                Math.random() * Math.PI * 2,
-                Math.random() * Math.PI * 2,
-                Math.random() * Math.PI * 2
-              ]}
-            >
-              {debrisType === 0 ? (
-                <boxGeometry args={[0.5, 3, 0.8]} />
-              ) : debrisType === 1 ? (
-                <octahedronGeometry args={[1.5, 0]} />
-              ) : (
-                <tetrahedronGeometry args={[2, 0]} />
-              )}
-              <meshStandardMaterial
-                color={['#2c2c2c', '#404040', '#1a1a1a', '#4a4a4a'][i % 4]}
-                roughness={0.7}
-                metalness={0.3}
-                emissive={'#0a0a0a'}
-                emissiveIntensity={0.05}
-              />
-            </mesh>
-          </Float>
-        );
-      })}
-      
-      {/* Space stations */}
-      {Array.from({ length: 2 }).map((_, i) => {
-        const distance = 120 + i * 40;
-        const angle = i * Math.PI + Math.PI/4;
-        const x = Math.cos(angle) * distance;
-        const z = Math.sin(angle) * distance;
-        const y = (i - 0.5) * 60;
-        
-        return (
-          <Float key={`station-${i}`} speed={0.1} rotationIntensity={0.05} floatIntensity={0.2}>
-            <group position={[x, y, z]}>
-              <mesh>
-                <cylinderGeometry args={[4, 4, 8, 16]} />
-                <meshStandardMaterial
-                  color="#2a4a6b"
-                  roughness={0.3}
-                  metalness={0.7}
-                  emissive="#0a1a2b"
-                  emissiveIntensity={0.2}
-                />
-              </mesh>
-              <mesh rotation={[Math.PI/2, 0, 0]}>
-                <torusGeometry args={[12, 1, 8, 24]} />
-                <meshStandardMaterial
-                  color="#4a6a8b"
-                  roughness={0.4}
-                  metalness={0.6}
-                  emissive="#1a2a3b"
-                  emissiveIntensity={0.1}
-                />
-              </mesh>
-              <mesh position={[0, 6, 0]} rotation={[0, 0, Math.PI/4]}>
-                <boxGeometry args={[16, 0.2, 8]} />
-                <meshStandardMaterial
-                  color="#1a1a3a"
-                  roughness={0.1}
-                  metalness={0.9}
-                  emissive="#0a0a1a"
-                  emissiveIntensity={0.3}
-                />
-              </mesh>
-            </group>
-          </Float>
-        );
-      })}
-      
-      {/* Distant animated starfield with depth */}
-      {Array.from({ length: 200 }).map((_, i) => {
-        const distance = 180 + Math.random() * 50;
-        const angle1 = Math.random() * Math.PI * 2;
-        const angle2 = Math.random() * Math.PI;
-        
-        const x = Math.sin(angle2) * Math.cos(angle1) * distance;
-        const y = Math.cos(angle2) * distance;
-        const z = Math.sin(angle2) * Math.sin(angle1) * distance;
-        
-        const starSize = 0.1 + Math.random() * 0.3;
-        const brightness = 0.4 + Math.random() * 0.6;
-        const twinkleSpeed = 0.5 + Math.random() * 1.5;
-        
-        return (
-          <Float key={`star-${i}`} speed={twinkleSpeed} floatIntensity={0.1}>
-            <mesh position={[x, y, z]}>
-              <sphereGeometry args={[starSize]} />
-              <meshBasicMaterial 
-                color="#ffffff"
-                transparent
-                opacity={brightness}
-              />
-            </Float>
-          );
-      })}
-      
-      {/* LAYER 1: Floor Stats (Foreground) */}
       <FloorStatsDisplay options={options} totalResponses={totalResponses} />
       
-      {/* LAYER 2: Standing Images (Middle) - Wrapped in error boundary */}
-      <ErrorBoundary fallback={<group />}>
-        <StandingImagesDisplay options={options} />
-      </ErrorBoundary>
+      <StandingImagesDisplay options={options} />
       
-      {/* LAYER 3: 3D Bars (Background) */}
       {options.map((option, index) => {
         const percentage = totalResponses > 0 ? Math.round((option.responses / totalResponses) * 100) : 0;
         const height = totalResponses > 0 
           ? Math.max((option.responses / maxResponses) * maxHeight, 0.2)
           : 0.8;
         
-        // Calculate optimal spacing that scales with number of options - same algorithm as images
-        const minSpacing = 6.0; // Minimum spacing to prevent glow overlap
-        const maxSpacing = 12.0; // Maximum spacing for 1-2 options
+        const minSpacing = 6.0;
+        const maxSpacing = 12.0;
         const spacing = Math.max(minSpacing, Math.min(maxSpacing, 50 / Math.max(options.length, 1)));
         const totalWidth = (options.length - 1) * spacing;
         const startX = -totalWidth / 2;
         
-        // Enhanced color palette
         const hue = (index / Math.max(options.length - 1, 1)) * 300;
         const saturation = 75;
         const lightness = 60;
@@ -787,9 +485,7 @@ const Enhanced3DScene: React.FC<{
         );
       })}
       
-      {/* ENHANCED FLOATING TITLE - Much Higher and Bigger */}
       <Float speed={0.3} rotationIntensity={0.01} floatIntensity={0.05}>
-        {/* Main title with dynamic sizing - centered */}
         <Text
           position={[0, 12, -15]}
           fontSize={titleFontSize}
@@ -801,7 +497,6 @@ const Enhanced3DScene: React.FC<{
           {activityTitle || 'Poll Options'}
         </Text>
         
-        {/* Title shadow/depth effect - centered */}
         <Text
           position={[0.1, 11.9, -15.1]}
           fontSize={titleFontSize}
@@ -874,7 +569,6 @@ export const Enhanced3DPollVisualization: React.FC<Enhanced3DPollVisualizationPr
         position: 'relative'
       }}
     >
-      {/* Activity media display */}
       {activityMedia && (
         <div className="absolute top-4 left-4 z-10">
           <img
@@ -885,7 +579,6 @@ export const Enhanced3DPollVisualization: React.FC<Enhanced3DPollVisualizationPr
         </div>
       )}
 
-      {/* Voting locked indicator */}
       {isVotingLocked && (
         <div className="absolute top-4 right-4 bg-red-900/40 backdrop-blur-sm rounded-lg p-3 border border-red-600/30 z-10">
           <div className="flex items-center gap-2">
@@ -895,56 +588,53 @@ export const Enhanced3DPollVisualization: React.FC<Enhanced3DPollVisualizationPr
         </div>
       )}
 
-      {/* 3D Canvas with error boundary */}
-      <ErrorBoundary fallback={<LoadingFallback />}>
-        <Suspense fallback={<LoadingFallback />}>
-          <Canvas
-            key={`canvas-${options.length}-${totalResponses}`}
-            camera={{ 
-              position: [0, 15, 40], // Starting position for fly-in
-              fov: 75,
-              near: 0.1,
-              far: 1000
-            }}
-            style={{ 
-              background: 'transparent',
-              width: '100%',
-              height: '100%',
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0
-            }}
-            shadows
-            gl={{ 
-              antialias: true, 
-              alpha: true,
-              powerPreference: "high-performance",
-              preserveDrawingBuffer: true,
-              pixelRatio: Math.min(window.devicePixelRatio, 2) // Higher resolution for better image quality
-            }}
-          >
-            <Enhanced3DScene 
-              options={options} 
-              totalResponses={totalResponses} 
-              themeColors={themeColors}
-              activityTitle={activityTitle}
-            />
-            <OrbitControls 
-              enablePan={false}
-              enableZoom={true}
-              enableRotate={true}
-              minDistance={12}
-              maxDistance={45}
-              minPolarAngle={Math.PI / 8}
-              maxPolarAngle={Math.PI / 2.5}
-              autoRotate={false}
-              rotateSpeed={0.5}
-            />
-          </Canvas>
-        </Suspense>
-      </ErrorBoundary>
+      <Suspense fallback={<LoadingFallback />}>
+        <Canvas
+          key={`canvas-${options.length}-${totalResponses}`}
+          camera={{ 
+            position: [0, 15, 40],
+            fov: 75,
+            near: 0.1,
+            far: 1000
+          }}
+          style={{ 
+            background: 'transparent',
+            width: '100%',
+            height: '100%',
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0
+          }}
+          shadows
+          gl={{ 
+            antialias: true, 
+            alpha: true,
+            powerPreference: "high-performance",
+            preserveDrawingBuffer: true,
+            pixelRatio: Math.min(window.devicePixelRatio, 2)
+          }}
+        >
+          <Enhanced3DScene 
+            options={options} 
+            totalResponses={totalResponses} 
+            themeColors={themeColors}
+            activityTitle={activityTitle}
+          />
+          <OrbitControls 
+            enablePan={false}
+            enableZoom={true}
+            enableRotate={true}
+            minDistance={12}
+            maxDistance={45}
+            minPolarAngle={Math.PI / 8}
+            maxPolarAngle={Math.PI / 2.5}
+            autoRotate={false}
+            rotateSpeed={0.5}
+          />
+        </Canvas>
+      </Suspense>
     </motion.div>
   );
 };
