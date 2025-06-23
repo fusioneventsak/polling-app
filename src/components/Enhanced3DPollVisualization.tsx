@@ -569,62 +569,173 @@ const Enhanced3DScene: React.FC<{
         position={[0, 0.01, 0]}
       />
       
-      {/* High-resolution space environment */}
+      {/* Animated 3D space objects with real textures */}
       {React.useMemo(() => {
-        // Create a large sphere for space environment
-        const loader = new THREE.TextureLoader();
+        const spaceObjects = [];
         
-        // High-quality space skybox options (you can replace with any of these):
-        // Option 1: NASA Hubble Deep Field images
-        const spaceTextures = [
-          'https://images.unsplash.com/photo-1446776653964-20c1d3a81b06?w=2048&q=80', // Deep space
-          'https://images.unsplash.com/photo-1419242902214-272b3f66ee7a?w=2048&q=80', // Milky Way
-          'https://images.unsplash.com/photo-1502134249126-9f3755a50d78?w=2048&q=80', // Nebula
-          'https://images.unsplash.com/photo-1502134249126-9f3755a50d78?w=4096&q=90'  // Ultra high-res nebula
-        ];
+        // Distant rotating planets
+        for (let i = 0; i < 3; i++) {
+          const distance = 100 + i * 30;
+          const angle = (i * Math.PI * 2) / 3;
+          const x = Math.cos(angle) * distance;
+          const z = Math.sin(angle) * distance;
+          const y = (Math.random() - 0.5) * 40;
+          
+          spaceObjects.push(
+            <Float key={`planet-${i}`} speed={0.3} rotationIntensity={0.2} floatIntensity={0.5}>
+              <mesh position={[x, y, z]}>
+                <sphereGeometry args={[8 + i * 3, 32, 32]} />
+                <meshStandardMaterial
+                  color={i === 0 ? '#8B4513' : i === 1 ? '#4169E1' : '#DC143C'}
+                  roughness={0.8}
+                  metalness={0.1}
+                  emissive={i === 0 ? '#331100' : i === 1 ? '#001144' : '#440011'}
+                  emissiveIntensity={0.1}
+                />
+              </mesh>
+            </Float>
+          );
+        }
         
-        // Option 2: NASA texture URLs (more realistic)
-        const nasaTextures = [
-          'https://www.solarsystemscope.com/textures/download/2k_stars_milky_way.jpg',
-          'https://www.solarsystemscope.com/textures/download/8k_stars_milky_way.jpg'
-        ];
+        // Large animated asteroids with realistic textures
+        for (let i = 0; i < 12; i++) {
+          const distance = 80 + Math.random() * 60;
+          const angle = (Math.random() * Math.PI * 2);
+          const height = (Math.random() - 0.5) * 80;
+          
+          const x = Math.cos(angle) * distance;
+          const z = Math.sin(angle) * distance;
+          
+          const size = 2 + Math.random() * 4;
+          const rotationSpeed = 0.1 + Math.random() * 0.3;
+          
+          spaceObjects.push(
+            <Float key={`asteroid-${i}`} speed={rotationSpeed} rotationIntensity={0.5} floatIntensity={0.3}>
+              <mesh 
+                position={[x, height, z]}
+                rotation={[
+                  Math.random() * Math.PI * 2,
+                  Math.random() * Math.PI * 2,
+                  Math.random() * Math.PI * 2
+                ]}
+              >
+                <dodecahedronGeometry args={[size, 1]} />
+                <meshStandardMaterial
+                  color={['#4a4a4a', '#5c4a3a', '#3a3a3a', '#6b5b4f'][i % 4]}
+                  roughness={0.9}
+                  metalness={0.05}
+                  normalScale={[0.5, 0.5]}
+                />
+              </mesh>
+            </Float>
+          );
+        }
         
-        // Create sphere geometry for skybox
-        const sphereGeometry = new THREE.SphereGeometry(200, 64, 32);
-        const sphereMaterial = new THREE.MeshBasicMaterial({
-          side: THREE.BackSide, // Render inside of sphere
-          transparent: true,
-          opacity: 0.8
-        });
-        
-        // Load high-resolution space texture
-        loader.load(
-          'https://images.unsplash.com/photo-1502134249126-9f3755a50d78?w=4096&q=90',
-          (texture) => {
-            texture.mapping = THREE.EquirectangularReflectionMapping;
-            texture.colorSpace = THREE.SRGBColorSpace;
-            sphereMaterial.map = texture;
-            sphereMaterial.needsUpdate = true;
-          },
-          undefined,
-          (error) => {
-            console.warn('Space texture failed to load, using fallback');
-            // Fallback to procedural starfield
-            sphereMaterial.color = new THREE.Color('#0a0a2e');
+        // Animated space debris field
+        for (let i = 0; i < 25; i++) {
+          const distance = 60 + Math.random() * 80;
+          const angle = Math.random() * Math.PI * 2;
+          const height = (Math.random() - 0.5) * 100;
+          
+          const x = Math.cos(angle) * distance;
+          const z = Math.sin(angle) * distance;
+          
+          const debrisType = Math.floor(Math.random() * 3);
+          let geometry, scale;
+          
+          switch(debrisType) {
+            case 0: // Elongated debris
+              geometry = <boxGeometry args={[0.5, 3, 0.8]} />;
+              scale = [1 + Math.random(), 1 + Math.random() * 2, 1 + Math.random()];
+              break;
+            case 1: // Crystalline debris
+              geometry = <octahedronGeometry args={[1.5, 0]} />;
+              scale = [1 + Math.random(), 1 + Math.random(), 1 + Math.random()];
+              break;
+            default: // Irregular chunks
+              geometry = <tetrahedronGeometry args={[2, 0]} />;
+              scale = [1 + Math.random(), 1 + Math.random(), 1 + Math.random()];
           }
-        );
+          
+          spaceObjects.push(
+            <Float key={`debris-${i}`} speed={0.4 + Math.random() * 0.6} rotationIntensity={0.8} floatIntensity={0.4}>
+              <mesh 
+                position={[x, height, z]}
+                scale={scale}
+                rotation={[
+                  Math.random() * Math.PI * 2,
+                  Math.random() * Math.PI * 2,
+                  Math.random() * Math.PI * 2
+                ]}
+              >
+                {geometry}
+                <meshStandardMaterial
+                  color={['#2c2c2c', '#404040', '#1a1a1a', '#4a4a4a'][i % 4]}
+                  roughness={0.7}
+                  metalness={0.3}
+                  emissive={'#0a0a0a'}
+                  emissiveIntensity={0.05}
+                />
+              </mesh>
+            </Float>
+          );
+        }
         
-        return (
-          <mesh>
-            <primitive object={sphereGeometry} />
-            <primitive object={sphereMaterial} />
-          </mesh>
-        );
+        // Large distant space stations/structures
+        for (let i = 0; i < 2; i++) {
+          const distance = 120 + i * 40;
+          const angle = i * Math.PI + Math.PI/4;
+          const x = Math.cos(angle) * distance;
+          const z = Math.sin(angle) * distance;
+          const y = (i - 0.5) * 60;
+          
+          spaceObjects.push(
+            <Float key={`station-${i}`} speed={0.1} rotationIntensity={0.05} floatIntensity={0.2}>
+              <group position={[x, y, z]}>
+                {/* Central hub */}
+                <mesh>
+                  <cylinderGeometry args={[4, 4, 8, 16]} />
+                  <meshStandardMaterial
+                    color="#2a4a6b"
+                    roughness={0.3}
+                    metalness={0.7}
+                    emissive="#0a1a2b"
+                    emissiveIntensity={0.2}
+                  />
+                </mesh>
+                {/* Rotating rings */}
+                <mesh rotation={[Math.PI/2, 0, 0]}>
+                  <torusGeometry args={[12, 1, 8, 24]} />
+                  <meshStandardMaterial
+                    color="#4a6a8b"
+                    roughness={0.4}
+                    metalness={0.6}
+                    emissive="#1a2a3b"
+                    emissiveIntensity={0.1}
+                  />
+                </mesh>
+                {/* Solar panels */}
+                <mesh position={[0, 6, 0]} rotation={[0, 0, Math.PI/4]}>
+                  <boxGeometry args={[16, 0.2, 8]} />
+                  <meshStandardMaterial
+                    color="#1a1a3a"
+                    roughness={0.1}
+                    metalness={0.9}
+                    emissive="#0a0a1a"
+                    emissiveIntensity={0.3}
+                  />
+                </mesh>
+              </group>
+            </Float>
+          );
+        }
+        
+        return spaceObjects;
       }, [])}
       
-      {/* Additional procedural starfield as backup */}
-      {Array.from({ length: 500 }).map((_, i) => {
-        const distance = 150 + Math.random() * 50;
+      {/* Distant animated starfield with depth */}
+      {Array.from({ length: 200 }).map((_, i) => {
+        const distance = 180 + Math.random() * 50;
         const angle1 = Math.random() * Math.PI * 2;
         const angle2 = Math.random() * Math.PI;
         
@@ -632,19 +743,21 @@ const Enhanced3DScene: React.FC<{
         const y = Math.cos(angle2) * distance;
         const z = Math.sin(angle2) * Math.sin(angle1) * distance;
         
-        const starSize = 0.02 + Math.random() * 0.05;
-        const brightness = 0.3 + Math.random() * 0.7;
+        const starSize = 0.1 + Math.random() * 0.3;
+        const brightness = 0.4 + Math.random() * 0.6;
+        const twinkleSpeed = 0.5 + Math.random() * 1.5;
         
         return (
-          <mesh key={i} position={[x, y, z]}>
-            <sphereGeometry args={[starSize]} />
-            <meshBasicMaterial 
-              color="#ffffff"
-              transparent
-              opacity={brightness}
-            />
-          </mesh>
-        );
+          <Float key={`star-${i}`} speed={twinkleSpeed} floatIntensity={0.1}>
+            <mesh position={[x, y, z]}>
+              <sphereGeometry args={[starSize]} />
+              <meshBasicMaterial 
+                color="#ffffff"
+                transparent
+                opacity={brightness}
+              />
+            </Float>
+          );
       })}
       
       {/* LAYER 1: Floor Stats (Foreground) */}
