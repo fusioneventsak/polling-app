@@ -40,21 +40,26 @@ const OptionMediaPlane: React.FC<{
 
     const loader = new THREE.TextureLoader();
     
+    // Set up CORS handling for external images
+    loader.setCrossOrigin('anonymous');
+    
     loader.load(
       imageUrl,
       (loadedTexture) => {
         console.log('OptionMediaPlane: Texture loaded successfully for:', imageUrl);
         // Apply texture properties
-        loadedTexture.flipY = false;
+        loadedTexture.flipY = true; // Ensure proper orientation
         loadedTexture.wrapS = THREE.ClampToEdgeWrapping;
         loadedTexture.wrapT = THREE.ClampToEdgeWrapping;
         loadedTexture.minFilter = THREE.LinearFilter;
         loadedTexture.magFilter = THREE.LinearFilter;
+        loadedTexture.format = THREE.RGBAFormat;
+        loadedTexture.needsUpdate = true;
         setTexture(loadedTexture);
         setLoading(false);
       },
       (progress) => {
-        console.log('OptionMediaPlane: Loading progress:', progress);
+        console.log('OptionMediaPlane: Loading progress for', imageUrl, ':', progress);
       },
       (err) => {
         console.error('OptionMediaPlane: Failed to load texture:', imageUrl, err);
@@ -73,25 +78,36 @@ const OptionMediaPlane: React.FC<{
   if (loading) {
     return (
       <mesh position={position}>
-        <planeGeometry args={[2.8, 4.0]} />
-        <meshBasicMaterial color="#334155" transparent opacity={0.3} />
+        <planeGeometry args={[3.5, 2.5]} />
+        <meshBasicMaterial color="#475569" transparent opacity={0.4}>
+          <primitive object={new THREE.Color('#64748b')} attach="color" />
+        </meshBasicMaterial>
       </mesh>
     );
   }
 
   if (error || !texture) {
+    console.log('OptionMediaPlane: Showing error state for:', imageUrl);
     return (
       <mesh position={position}>
-        <planeGeometry args={[2.8, 4.0]} />
-        <meshBasicMaterial color="#475569" transparent opacity={0.2} />
+        <planeGeometry args={[3.5, 2.5]} />
+        <meshBasicMaterial color="#ef4444" transparent opacity={0.3}>
+          <primitive object={new THREE.Color('#dc2626')} attach="color" />
+        </meshBasicMaterial>
       </mesh>
     );
   }
 
+  console.log('OptionMediaPlane: Rendering texture for:', imageUrl);
   return (
     <mesh position={position}>
-      <planeGeometry args={[2.8, 4.0]} />
-      <meshBasicMaterial map={texture} transparent opacity={0.85} />
+      <planeGeometry args={[3.5, 2.5]} />
+      <meshBasicMaterial 
+        map={texture} 
+        transparent 
+        opacity={0.9}
+        side={THREE.DoubleSide}
+      />
     </mesh>
   );
 };
@@ -190,15 +206,25 @@ const Enhanced3DBar: React.FC<{
         <group ref={imagePlaneRef}>
           {console.log(`Enhanced3DBar ${index}: Rendering image plane for URL:`, imageUrl)}
           
-          {/* Main background image plane - positioned behind the bar */}
+          {/* Main background image plane - positioned clearly behind the bar */}
           <OptionMediaPlane 
             imageUrl={imageUrl} 
-            position={[position[0], 3.0, position[2] - 2.5]} 
+            position={[position[0], animatedHeight + 1.0, position[2] - 3.0]} 
           />
           
-          {/* Subtle gradient overlay to blend with scene */}
-          <mesh position={[position[0], 3.0, position[2] - 2.55]}>
-            <planeGeometry args={[2.8, 4.0]} />
+          {/* Very subtle gradient overlay to blend with scene - much more transparent */}
+          <mesh position={[position[0], animatedHeight + 1.0, position[2] - 3.1]}>
+            <planeGeometry args={[3.6, 2.6]} />
+            <meshBasicMaterial 
+              transparent
+              opacity={0.05}
+              color="#0f172a"
+            />
+          </mesh>
+
+          {/* Minimal side fade masks for better blending - much more transparent */}
+          <mesh position={[position[0] - 2.0, animatedHeight + 1.0, position[2] - 3.1]}>
+            <planeGeometry args={[0.4, 2.8]} />
             <meshBasicMaterial 
               transparent
               opacity={0.1}
@@ -206,41 +232,11 @@ const Enhanced3DBar: React.FC<{
             />
           </mesh>
           
-          {/* Top fade mask */}
-          <mesh position={[position[0], 4.8, position[2] - 2.6]}>
-            <planeGeometry args={[3.0, 1.0]} />
+          <mesh position={[position[0] + 2.0, animatedHeight + 1.0, position[2] - 3.1]}>
+            <planeGeometry args={[0.4, 2.8]} />
             <meshBasicMaterial 
               transparent
-              opacity={0.2}
-              color="#0f172a"
-            />
-          </mesh>
-          
-          {/* Bottom fade mask */}
-          <mesh position={[position[0], 1.2, position[2] - 2.6]}>
-            <planeGeometry args={[3.0, 1.0]} />
-            <meshBasicMaterial 
-              transparent
-              opacity={0.2}
-              color="#0f172a"
-            />
-          </mesh>
-
-          {/* Side fade masks for better blending */}
-          <mesh position={[position[0] - 1.6, 3.0, position[2] - 2.6]}>
-            <planeGeometry args={[0.6, 4.2]} />
-            <meshBasicMaterial 
-              transparent
-              opacity={0.3}
-              color="#0f172a"
-            />
-          </mesh>
-          
-          <mesh position={[position[0] + 1.6, 3.0, position[2] - 2.6]}>
-            <planeGeometry args={[0.6, 4.2]} />
-            <meshBasicMaterial 
-              transparent
-              opacity={0.3}
+              opacity={0.1}
               color="#0f172a"
             />
           </mesh>
@@ -370,6 +366,19 @@ const Enhanced3DBar: React.FC<{
       >
         {String.fromCharCode(65 + index)}
       </Text>
+      
+      {/* Debug indicator for images - remove in production */}
+      {hasValidImage && (
+        <Text
+          position={[position[0], 0.3, position[2] + 1.0]}
+          fontSize={0.2}
+          color="#22c55e"
+          anchorX="center"
+          anchorY="middle"
+        >
+          📷 IMAGE
+        </Text>
+      )}
     </group>
   );
 };
