@@ -568,168 +568,149 @@ const Enhanced3DScene: React.FC<{
       />
       
       {/* Animated 3D space objects with real textures */}
-      {React.useMemo(() => {
-        const spaceObjects = [];
+      {Array.from({ length: 3 }).map((_, i) => {
+        const distance = 100 + i * 30;
+        const angle = (i * Math.PI * 2) / 3;
+        const x = Math.cos(angle) * distance;
+        const z = Math.sin(angle) * distance;
+        const y = (Math.random() - 0.5) * 40;
         
-        // Distant rotating planets
-        for (let i = 0; i < 3; i++) {
-          const distance = 100 + i * 30;
-          const angle = (i * Math.PI * 2) / 3;
-          const x = Math.cos(angle) * distance;
-          const z = Math.sin(angle) * distance;
-          const y = (Math.random() - 0.5) * 40;
-          
-          spaceObjects.push(
-            <Float key={`planet-${i}`} speed={0.3} rotationIntensity={0.2} floatIntensity={0.5}>
-              <mesh position={[x, y, z]}>
-                <sphereGeometry args={[8 + i * 3, 32, 32]} />
+        return (
+          <Float key={`planet-${i}`} speed={0.3} rotationIntensity={0.2} floatIntensity={0.5}>
+            <mesh position={[x, y, z]}>
+              <sphereGeometry args={[8 + i * 3, 32, 32]} />
+              <meshStandardMaterial
+                color={i === 0 ? '#8B4513' : i === 1 ? '#4169E1' : '#DC143C'}
+                roughness={0.8}
+                metalness={0.1}
+                emissive={i === 0 ? '#331100' : i === 1 ? '#001144' : '#440011'}
+                emissiveIntensity={0.1}
+              />
+            </mesh>
+          </Float>
+        );
+      })}
+      
+      {/* Large animated asteroids */}
+      {Array.from({ length: 12 }).map((_, i) => {
+        const distance = 80 + Math.random() * 60;
+        const angle = (Math.random() * Math.PI * 2);
+        const height = (Math.random() - 0.5) * 80;
+        
+        const x = Math.cos(angle) * distance;
+        const z = Math.sin(angle) * distance;
+        
+        const size = 2 + Math.random() * 4;
+        const rotationSpeed = 0.1 + Math.random() * 0.3;
+        
+        return (
+          <Float key={`asteroid-${i}`} speed={rotationSpeed} rotationIntensity={0.5} floatIntensity={0.3}>
+            <mesh 
+              position={[x, height, z]}
+              rotation={[
+                Math.random() * Math.PI * 2,
+                Math.random() * Math.PI * 2,
+                Math.random() * Math.PI * 2
+              ]}
+            >
+              <dodecahedronGeometry args={[size, 1]} />
+              <meshStandardMaterial
+                color={['#4a4a4a', '#5c4a3a', '#3a3a3a', '#6b5b4f'][i % 4]}
+                roughness={0.9}
+                metalness={0.05}
+              />
+            </mesh>
+          </Float>
+        );
+      })}
+      
+      {/* Space debris field */}
+      {Array.from({ length: 25 }).map((_, i) => {
+        const distance = 60 + Math.random() * 80;
+        const angle = Math.random() * Math.PI * 2;
+        const height = (Math.random() - 0.5) * 100;
+        
+        const x = Math.cos(angle) * distance;
+        const z = Math.sin(angle) * distance;
+        
+        const debrisType = Math.floor(Math.random() * 3);
+        const scale = [1 + Math.random(), 1 + Math.random(), 1 + Math.random()];
+        
+        return (
+          <Float key={`debris-${i}`} speed={0.4 + Math.random() * 0.6} rotationIntensity={0.8} floatIntensity={0.4}>
+            <mesh 
+              position={[x, height, z]}
+              scale={scale}
+              rotation={[
+                Math.random() * Math.PI * 2,
+                Math.random() * Math.PI * 2,
+                Math.random() * Math.PI * 2
+              ]}
+            >
+              {debrisType === 0 ? (
+                <boxGeometry args={[0.5, 3, 0.8]} />
+              ) : debrisType === 1 ? (
+                <octahedronGeometry args={[1.5, 0]} />
+              ) : (
+                <tetrahedronGeometry args={[2, 0]} />
+              )}
+              <meshStandardMaterial
+                color={['#2c2c2c', '#404040', '#1a1a1a', '#4a4a4a'][i % 4]}
+                roughness={0.7}
+                metalness={0.3}
+                emissive={'#0a0a0a'}
+                emissiveIntensity={0.05}
+              />
+            </mesh>
+          </Float>
+        );
+      })}
+      
+      {/* Space stations */}
+      {Array.from({ length: 2 }).map((_, i) => {
+        const distance = 120 + i * 40;
+        const angle = i * Math.PI + Math.PI/4;
+        const x = Math.cos(angle) * distance;
+        const z = Math.sin(angle) * distance;
+        const y = (i - 0.5) * 60;
+        
+        return (
+          <Float key={`station-${i}`} speed={0.1} rotationIntensity={0.05} floatIntensity={0.2}>
+            <group position={[x, y, z]}>
+              <mesh>
+                <cylinderGeometry args={[4, 4, 8, 16]} />
                 <meshStandardMaterial
-                  color={i === 0 ? '#8B4513' : i === 1 ? '#4169E1' : '#DC143C'}
-                  roughness={0.8}
-                  metalness={0.1}
-                  emissive={i === 0 ? '#331100' : i === 1 ? '#001144' : '#440011'}
+                  color="#2a4a6b"
+                  roughness={0.3}
+                  metalness={0.7}
+                  emissive="#0a1a2b"
+                  emissiveIntensity={0.2}
+                />
+              </mesh>
+              <mesh rotation={[Math.PI/2, 0, 0]}>
+                <torusGeometry args={[12, 1, 8, 24]} />
+                <meshStandardMaterial
+                  color="#4a6a8b"
+                  roughness={0.4}
+                  metalness={0.6}
+                  emissive="#1a2a3b"
                   emissiveIntensity={0.1}
                 />
               </mesh>
-            </Float>
-          );
-        }
-        
-        // Large animated asteroids with realistic textures
-        for (let i = 0; i < 12; i++) {
-          const distance = 80 + Math.random() * 60;
-          const angle = (Math.random() * Math.PI * 2);
-          const height = (Math.random() - 0.5) * 80;
-          
-          const x = Math.cos(angle) * distance;
-          const z = Math.sin(angle) * distance;
-          
-          const size = 2 + Math.random() * 4;
-          const rotationSpeed = 0.1 + Math.random() * 0.3;
-          
-          spaceObjects.push(
-            <Float key={`asteroid-${i}`} speed={rotationSpeed} rotationIntensity={0.5} floatIntensity={0.3}>
-              <mesh 
-                position={[x, height, z]}
-                rotation={[
-                  Math.random() * Math.PI * 2,
-                  Math.random() * Math.PI * 2,
-                  Math.random() * Math.PI * 2
-                ]}
-              >
-                <dodecahedronGeometry args={[size, 1]} />
+              <mesh position={[0, 6, 0]} rotation={[0, 0, Math.PI/4]}>
+                <boxGeometry args={[16, 0.2, 8]} />
                 <meshStandardMaterial
-                  color={['#4a4a4a', '#5c4a3a', '#3a3a3a', '#6b5b4f'][i % 4]}
-                  roughness={0.9}
-                  metalness={0.05}
-                  normalScale={[0.5, 0.5]}
+                  color="#1a1a3a"
+                  roughness={0.1}
+                  metalness={0.9}
+                  emissive="#0a0a1a"
+                  emissiveIntensity={0.3}
                 />
               </mesh>
-            </Float>
-          );
-        }
-        
-        // Animated space debris field
-        for (let i = 0; i < 25; i++) {
-          const distance = 60 + Math.random() * 80;
-          const angle = Math.random() * Math.PI * 2;
-          const height = (Math.random() - 0.5) * 100;
-          
-          const x = Math.cos(angle) * distance;
-          const z = Math.sin(angle) * distance;
-          
-          const debrisType = Math.floor(Math.random() * 3);
-          let geometry, scale;
-          
-          switch(debrisType) {
-            case 0: // Elongated debris
-              geometry = <boxGeometry args={[0.5, 3, 0.8]} />;
-              scale = [1 + Math.random(), 1 + Math.random() * 2, 1 + Math.random()];
-              break;
-            case 1: // Crystalline debris
-              geometry = <octahedronGeometry args={[1.5, 0]} />;
-              scale = [1 + Math.random(), 1 + Math.random(), 1 + Math.random()];
-              break;
-            default: // Irregular chunks
-              geometry = <tetrahedronGeometry args={[2, 0]} />;
-              scale = [1 + Math.random(), 1 + Math.random(), 1 + Math.random()];
-          }
-          
-          spaceObjects.push(
-            <Float key={`debris-${i}`} speed={0.4 + Math.random() * 0.6} rotationIntensity={0.8} floatIntensity={0.4}>
-              <mesh 
-                position={[x, height, z]}
-                scale={scale}
-                rotation={[
-                  Math.random() * Math.PI * 2,
-                  Math.random() * Math.PI * 2,
-                  Math.random() * Math.PI * 2
-                ]}
-              >
-                {geometry}
-                <meshStandardMaterial
-                  color={['#2c2c2c', '#404040', '#1a1a1a', '#4a4a4a'][i % 4]}
-                  roughness={0.7}
-                  metalness={0.3}
-                  emissive={'#0a0a0a'}
-                  emissiveIntensity={0.05}
-                />
-              </mesh>
-            </Float>
-          );
-        }
-        
-        // Large distant space stations/structures
-        for (let i = 0; i < 2; i++) {
-          const distance = 120 + i * 40;
-          const angle = i * Math.PI + Math.PI/4;
-          const x = Math.cos(angle) * distance;
-          const z = Math.sin(angle) * distance;
-          const y = (i - 0.5) * 60;
-          
-          spaceObjects.push(
-            <Float key={`station-${i}`} speed={0.1} rotationIntensity={0.05} floatIntensity={0.2}>
-              <group position={[x, y, z]}>
-                {/* Central hub */}
-                <mesh>
-                  <cylinderGeometry args={[4, 4, 8, 16]} />
-                  <meshStandardMaterial
-                    color="#2a4a6b"
-                    roughness={0.3}
-                    metalness={0.7}
-                    emissive="#0a1a2b"
-                    emissiveIntensity={0.2}
-                  />
-                </mesh>
-                {/* Rotating rings */}
-                <mesh rotation={[Math.PI/2, 0, 0]}>
-                  <torusGeometry args={[12, 1, 8, 24]} />
-                  <meshStandardMaterial
-                    color="#4a6a8b"
-                    roughness={0.4}
-                    metalness={0.6}
-                    emissive="#1a2a3b"
-                    emissiveIntensity={0.1}
-                  />
-                </mesh>
-                {/* Solar panels */}
-                <mesh position={[0, 6, 0]} rotation={[0, 0, Math.PI/4]}>
-                  <boxGeometry args={[16, 0.2, 8]} />
-                  <meshStandardMaterial
-                    color="#1a1a3a"
-                    roughness={0.1}
-                    metalness={0.9}
-                    emissive="#0a0a1a"
-                    emissiveIntensity={0.3}
-                  />
-                </mesh>
-              </group>
-            </Float>
-          );
-        }
-        
-        return spaceObjects;
-      }, [])}
+            </group>
+          </Float>
+        );
+      })}
       
       {/* Distant animated starfield with depth */}
       {Array.from({ length: 200 }).map((_, i) => {
