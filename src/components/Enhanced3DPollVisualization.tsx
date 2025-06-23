@@ -394,33 +394,12 @@ const StandingImagesDisplay: React.FC<{
             fallback={<group />}
           >
             <group>
-              {/* Standing holographic image - closer to stats and more transparent */}
+              {/* Standing image - positioned closer to bars */}
               <StandingImagePlane
                 imageUrl={option.media_url}
-                position={[xPosition, 1.5, 6]}
+                position={[xPosition, 1.5, -1]}
                 fallbackText={`Option ${String.fromCharCode(65 + index)}`}
               />
-              
-              {/* Holographic frame effect */}
-              <mesh position={[xPosition, 1.5, 5.99]}>
-                <planeGeometry args={[2.2, 1.7]} />
-                <meshBasicMaterial 
-                  transparent
-                  opacity={0.3}
-                  color="#00ffff"
-                  wireframe={true}
-                />
-              </mesh>
-              
-              {/* Holographic glow effect */}
-              <mesh position={[xPosition, 1.5, 5.98]}>
-                <planeGeometry args={[2.4, 1.9]} />
-                <meshBasicMaterial 
-                  transparent
-                  opacity={0.1}
-                  color="#00ffff"
-                />
-              </mesh>
             </group>
           </ErrorBoundary>
         );
