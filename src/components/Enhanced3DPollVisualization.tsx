@@ -181,8 +181,8 @@ const Enhanced3DBar: React.FC<{
       <Float speed={0.5} rotationIntensity={0.05} floatIntensity={0.1}>
         {/* Percentage display - large and prominent */}
         <Text
-          position={[position[0], animatedHeight + (texture ? 4.2 : 2.8), position[2]]}
-          fontSize={0.6}
+          position={[position[0], animatedHeight + (texture ? 3.8 : 2.4), position[2]]}
+          fontSize={0.8}
           color="#ffffff"
           anchorX="center"
           anchorY="middle"
@@ -192,8 +192,8 @@ const Enhanced3DBar: React.FC<{
         
         {/* Response count */}
         <Text
-          position={[position[0], animatedHeight + (texture ? 3.7 : 2.3), position[2]]}
-          fontSize={0.25}
+          position={[position[0], animatedHeight + (texture ? 3.2 : 1.8), position[2]]}
+          fontSize={0.35}
           color="#94a3b8"
           anchorX="center"
           anchorY="middle"
@@ -203,21 +203,21 @@ const Enhanced3DBar: React.FC<{
         
         {/* Option label */}
         <Text
-          position={[position[0], animatedHeight + (texture ? 3.3 : 1.9), position[2]]}
-          fontSize={0.3}
+          position={[position[0], animatedHeight + (texture ? 2.8 : 1.4), position[2]]}
+          fontSize={0.4}
           color="#e2e8f0"
           anchorX="center"
           anchorY="middle"
-          maxWidth={3}
+          maxWidth={2.5}
         >
-          {label.length > 30 ? `${label.substring(0, 30)}...` : label}
+          {label.length > 25 ? `${label.substring(0, 25)}...` : label}
         </Text>
         
         {/* Correct indicator */}
         {isCorrect && (
           <Text
-            position={[position[0], animatedHeight + (texture ? 2.9 : 1.5), position[2]]}
-            fontSize={0.2}
+            position={[position[0], animatedHeight + (texture ? 2.4 : 1.0), position[2]]}
+            fontSize={0.3}
             color="#10b981"
             anchorX="center"
             anchorY="middle"
@@ -228,8 +228,8 @@ const Enhanced3DBar: React.FC<{
         
         {/* Option letter indicator */}
         <Text
-          position={[position[0], animatedHeight + (texture ? 2.5 : 1.1), position[2]]}
-          fontSize={0.4}
+          position={[position[0], animatedHeight + (texture ? 2.0 : 0.6), position[2]]}
+          fontSize={0.5}
           color={barColor}
           anchorX="center"
           anchorY="middle"
@@ -240,8 +240,8 @@ const Enhanced3DBar: React.FC<{
       
       {/* Base label */}
       <Text
-        position={[position[0], -0.3, position[2] + 1.5]}
-        fontSize={0.15}
+        position={[position[0], -0.4, position[2] + 1.2]}
+        fontSize={0.2}
         color="#64748b"
         anchorX="center"
         anchorY="middle"
@@ -259,13 +259,13 @@ const CameraController: React.FC<{ optionsCount: number }> = ({ optionsCount }) 
   
   useFrame(() => {
     // Fixed camera position facing the poll results head-on
-    const distance = Math.max(8, optionsCount * 1.2);
+    const distance = Math.max(6, optionsCount * 0.8);
     
     camera.position.x = THREE.MathUtils.lerp(camera.position.x, 0, 0.02);
     camera.position.z = THREE.MathUtils.lerp(camera.position.z, distance, 0.02);
-    camera.position.y = THREE.MathUtils.lerp(camera.position.y, 5, 0.02);
+    camera.position.y = THREE.MathUtils.lerp(camera.position.y, 3, 0.02);
     
-    camera.lookAt(0, 2, 0);
+    camera.lookAt(0, 1.5, 0);
   });
   
   return null;
@@ -310,7 +310,7 @@ const Enhanced3DScene: React.FC<{
       
       {/* Enhanced ground plane with reflective material */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow>
-        <planeGeometry args={[30, 30]} />
+        <planeGeometry args={[40, 40]} />
         <meshStandardMaterial 
           color="#0f172a" 
           transparent 
@@ -322,7 +322,7 @@ const Enhanced3DScene: React.FC<{
       
       {/* Animated grid lines */}
       <gridHelper 
-        args={[30, 30, themeColors.accentColor, '#334155']} 
+        args={[40, 40, themeColors.accentColor, '#334155']} 
         position={[0, 0.01, 0]}
       />
       
@@ -331,9 +331,9 @@ const Enhanced3DScene: React.FC<{
         <Float key={i} speed={0.5 + Math.random()} rotationIntensity={0.1} floatIntensity={0.2}>
           <mesh 
             position={[
-              (Math.random() - 0.5) * 25,
+              (Math.random() - 0.5) * 35,
               Math.random() * 15 + 5,
-              (Math.random() - 0.5) * 25
+              (Math.random() - 0.5) * 35
             ]}
           >
             <sphereGeometry args={[0.05]} />
@@ -356,7 +356,7 @@ const Enhanced3DScene: React.FC<{
           : 0.8;
         
         // Calculate optimal spacing based on number of options
-        const spacing = Math.min(3.5, 20 / Math.max(options.length, 1));
+        const spacing = Math.min(2.8, 16 / Math.max(options.length, 1));
         const totalWidth = (options.length - 1) * spacing;
         const startX = -totalWidth / 2;
         
@@ -390,8 +390,8 @@ const Enhanced3DScene: React.FC<{
       {/* Floating title - NO FONT REFERENCES */}
       <Float speed={0.5} rotationIntensity={0.02} floatIntensity={0.1}>
         <Text
-          position={[0, 8, -5]}
-          fontSize={0.8}
+          position={[0, 6, -8]}
+          fontSize={1.2}
           color="#ffffff"
           anchorX="center"
           anchorY="middle"
@@ -400,8 +400,8 @@ const Enhanced3DScene: React.FC<{
         </Text>
         
         <Text
-          position={[0, 7.2, -5]}
-          fontSize={0.3}
+          position={[0, 5, -8]}
+          fontSize={0.5}
           color="#94a3b8"
           anchorX="center"
           anchorY="middle"
@@ -523,8 +523,8 @@ export const Enhanced3DPollVisualization: React.FC<Enhanced3DPollVisualizationPr
       <Suspense fallback={<LoadingFallback />}>
         <Canvas
           camera={{ 
-            position: [0, 5, 12], 
-            fov: 60,
+            position: [0, 3, 8], 
+            fov: 75,
             near: 0.1,
             far: 1000
           }}
@@ -551,8 +551,8 @@ export const Enhanced3DPollVisualization: React.FC<Enhanced3DPollVisualizationPr
             enablePan={false}
             enableZoom={true}
             enableRotate={false}
-            minDistance={5}
-            maxDistance={20}
+            minDistance={3}
+            maxDistance={15}
             minPolarAngle={Math.PI / 6}
             maxPolarAngle={Math.PI / 2}
             autoRotate={false}
