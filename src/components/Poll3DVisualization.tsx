@@ -340,7 +340,7 @@ const Scene: React.FC<{
         </mesh>
       )}
       
-      {/* Main title - Show actual activity title instead of "Live Poll Results" */}
+      {/* Main title - Show ONLY the activity title/question */}
       <Text
         position={[0, 8.5, -5]}
         fontSize={1.2}
@@ -349,10 +349,10 @@ const Scene: React.FC<{
         anchorY="middle"
         maxWidth={20}
       >
-        {activityTitle || 'Poll Question'}
+        {activityTitle || 'Poll Options'}
       </Text>
       
-      {/* Title shadow for 3D effect */}
+      {/* Title shadow for 3D effect - same text as main title */}
       <Text
         position={[0.05, 8.45, -5.05]}
         fontSize={1.2}
@@ -361,9 +361,8 @@ const Scene: React.FC<{
         anchorY="middle"
         maxWidth={20}
       >
-        {activityTitle || 'Poll Question'}
+        {activityTitle || 'Poll Options'}
       </Text>
-      
     </>
   );
 };
