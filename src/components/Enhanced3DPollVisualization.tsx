@@ -127,7 +127,13 @@ const StandingImagePlane: React.FC<{
   return (
     <mesh position={position} renderOrder={2}>
       <planeGeometry args={[2.0, 1.5]} />
-      <meshBasicMaterial map={texture} transparent opacity={0.9} />
+      <meshBasicMaterial 
+        map={texture} 
+        transparent 
+        opacity={0.7}
+        emissive="#00ffff"
+        emissiveIntensity={0.1}
+      />
     </mesh>
   );
 };
@@ -274,68 +280,6 @@ const Enhanced3DBar: React.FC<{
           />
         </mesh>
       )}
-      
-      {/* 3D Text Labels with better positioning */}
-      <Float speed={0.5} rotationIntensity={0.05} floatIntensity={0.1}>
-        {/* Percentage */}
-        <Text
-          position={[position[0], animatedHeight + 3.2, position[2]]}
-          fontSize={0.6}
-          color="#ffffff"
-          anchorX="center"
-          anchorY="middle"
-        >
-          {percentage}%
-        </Text>
-        
-        {/* Response count */}
-        <Text
-          position={[position[0], animatedHeight + 2.6, position[2]]}
-          fontSize={0.35}
-          color="#94a3b8"
-          anchorX="center"
-          anchorY="middle"
-        >
-          {responses} {responses === 1 ? 'vote' : 'votes'}
-        </Text>
-        
-        {/* Option label */}
-        <Text
-          position={[position[0], animatedHeight + 2.2, position[2]]}
-          fontSize={0.4}
-          color="#e2e8f0"
-          anchorX="center"
-          anchorY="middle"
-          maxWidth={2.5}
-        >
-          {label.length > 20 ? `${label.substring(0, 20)}...` : label}
-        </Text>
-        
-        {/* Correct indicator */}
-        {isCorrect && (
-          <Text
-            position={[position[0], animatedHeight + 1.8, position[2]]}
-            fontSize={0.3}
-            color="#10b981"
-            anchorX="center"
-            anchorY="middle"
-          >
-            ✓ CORRECT
-          </Text>
-        )}
-      </Float>
-      
-      {/* Option letter indicator on the base */}
-      <Text
-        position={[position[0], 0.15, position[2] - 1.5]}
-        fontSize={0.5}
-        color="#64748b"
-        anchorX="center"
-        anchorY="middle"
-        rotation={[-Math.PI / 2, 0, 0]}
-      >
-        {String.fromCharCode(65 + index)}
-      </Text>
     </group>
   );
 };
@@ -394,16 +338,17 @@ const FloorStatsDisplay: React.FC<{
               {option.responses} votes
             </Text>
             
-            {/* Option letter */}
+            {/* Option text on floor */}
             <Text
               position={[xPosition, 0.1, 10]}
-              fontSize={0.8}
-              color="#64748b"
+              fontSize={0.4}
+              color="#e2e8f0"
               anchorX="center"
               anchorY="middle"
               rotation={[-Math.PI / 2, 0, 0]}
+              maxWidth={4}
             >
-              {String.fromCharCode(65 + index)}
+              {option.text.length > 25 ? `${option.text.substring(0, 25)}...` : option.text}
             </Text>
           </group>
         );
@@ -431,21 +376,31 @@ const StandingImagesDisplay: React.FC<{
         
         return (
           <group key={option.id}>
-            {/* Standing image */}
+            {/* Standing holographic image - closer to stats and more transparent */}
             <StandingImagePlane
               imageUrl={option.media_url}
-              position={[xPosition, 1.5, 4]}
+              position={[xPosition, 1.5, 6]}
               fallbackText={`Option ${String.fromCharCode(65 + index)}`}
             />
             
-            {/* Image frame */}
-            <mesh position={[xPosition, 1.5, 3.99]}>
+            {/* Holographic frame effect */}
+            <mesh position={[xPosition, 1.5, 5.99]}>
               <planeGeometry args={[2.2, 1.7]} />
               <meshBasicMaterial 
                 transparent
-                opacity={0.4}
-                color="#ffffff"
+                opacity={0.3}
+                color="#00ffff"
                 wireframe={true}
+              />
+            </mesh>
+            
+            {/* Holographic glow effect */}
+            <mesh position={[xPosition, 1.5, 5.98]}>
+              <planeGeometry args={[2.4, 1.9]} />
+              <meshBasicMaterial 
+                transparent
+                opacity={0.1}
+                color="#00ffff"
               />
             </mesh>
           </group>
@@ -455,6 +410,7 @@ const StandingImagesDisplay: React.FC<{
   );
 };
 
+// Update StandingImagePlane to be more holographic
 // Main 3D Scene with Layered Layout
 const Enhanced3DScene: React.FC<{ 
   options: ActivityOption[]; 
