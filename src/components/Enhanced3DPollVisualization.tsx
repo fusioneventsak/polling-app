@@ -319,10 +319,10 @@ const Enhanced3DBar: React.FC<{
 
   return (
     <group>
-      {/* Apply unified rotation to entire group so light and bar stay together */}
+      {/* Apply unified rotation to entire group so light and bar stay perfectly aligned with options */}
       <group rotation={[0, -(rotationY || 0), 0]}>
         <SimplifiedLightBeam
-          position={position}
+          position={position} // Light uses same position as bar
           color={barColorValue}
           intensity={responses > 0 ? 1.0 : 0.3}
           responses={responses}
