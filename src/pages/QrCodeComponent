@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { QrCode, ExternalLink, Copy, Check } from 'lucide-react';
 
 interface QRCodeProps {
@@ -20,27 +20,48 @@ export const QRCodeDisplay: React.FC<QRCodeProps> = ({
 }) => {
   const [qrDataUrl, setQrDataUrl] = useState<string>('');
   const [copied, setCopied] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(false);
+  const lastUrlRef = useRef<string>('');
+  const lastSizeRef = useRef<number>(0);
 
   useEffect(() => {
-    const generateQRCode = async () => {
-      try {
-        setLoading(true);
-        // Using QR Server API for QR code generation
-        // In production, consider using a local QR code library for better reliability
-        const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(url)}&bgcolor=1e293b&color=ffffff&format=svg&ecc=M&margin=1`;
-        setQrDataUrl(qrApiUrl);
-      } catch (error) {
-        console.error('Error generating QR code:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
+    // Only generate QR code if URL or size actually changed
+    if (url && (url !== lastUrlRef.current || size !== lastSizeRef.current)) {
+      const generateQRCode = async () => {
+        try {
+          setLoading(true);
+          setError(false);
+          
+          // Store current values to prevent unnecessary re-generations
+          lastUrlRef.current = url;
+          lastSizeRef.current = size;
+          
+          // Using QR Server API for QR code generation
+          const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(url)}&bgcolor=1e293b&color=ffffff&format=svg&ecc=M&margin=1`;
+          
+          // Pre-load the image to ensure it's valid before setting
+          const img = new Image();
+          img.onload = () => {
+            setQrDataUrl(qrApiUrl);
+            setLoading(false);
+          };
+          img.onerror = () => {
+            setError(true);
+            setLoading(false);
+          };
+          img.src = qrApiUrl;
+          
+        } catch (error) {
+          console.error('Error generating QR code:', error);
+          setError(true);
+          setLoading(false);
+        }
+      };
 
-    if (url) {
       generateQRCode();
     }
-  }, [url, size]);
+  }, [url, size]); // Dependencies are still here but controlled by ref check
 
   const handleCopyUrl = async () => {
     try {
@@ -77,78 +98,86 @@ export const QRCodeDisplay: React.FC<QRCodeProps> = ({
   }
 
   return (
-    <div className={`bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700/50 p-6 ${className}`}>
+    <div className={`bg-gradient-to-br from-slate-800/60 to-slate-900/60 backdrop-blur-sm rounded-xl border border-slate-700/50 p-8 ${className}`}>
       {title && (
-        <h3 className="text-xl font-bold text-white mb-4 text-center">{title}</h3>
+        <h3 className="text-2xl font-bold text-white mb-6 text-center">{title}</h3>
       )}
       
-      {/* QR Code Container */}
-      <div className="flex justify-center mb-6">
+      {/* QR Code Container with Beautiful Styling */}
+      <div className="flex justify-center mb-8">
         <div className="relative">
           {loading ? (
             <div 
-              className="flex items-center justify-center bg-slate-700 rounded-lg border-2 border-dashed border-slate-600 animate-pulse"
-              style={{ width: size, height: size }}
-            >
-              <QrCode className="w-12 h-12 text-slate-500" />
-            </div>
-          ) : qrDataUrl ? (
-            <div className="bg-white p-3 rounded-lg shadow-lg">
-              <img 
-                src={qrDataUrl} 
-                alt="QR Code"
-                className="block"
-                style={{ width: size - 24, height: size - 24 }}
-                onError={() => {
-                  console.error('Failed to load QR code image');
-                  setQrDataUrl('');
-                }}
-              />
-            </div>
-          ) : (
-            <div 
-              className="flex items-center justify-center bg-slate-700 rounded-lg border-2 border-dashed border-slate-600"
-              style={{ width: size, height: size }}
+              className="flex items-center justify-center bg-slate-700/50 rounded-xl border-2 border-dashed border-slate-600 animate-pulse"
+              style={{ width: size + 40, height: size + 40 }}
             >
               <div className="text-center">
-                <QrCode className="w-12 h-12 text-slate-500 mx-auto mb-2" />
-                <p className="text-slate-500 text-xs">Failed to load</p>
+                <div className="w-12 h-12 border-3 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
+                <p className="text-slate-400 text-sm">Generating QR Code...</p>
               </div>
             </div>
-          )}
-          
-          {/* Loading overlay */}
-          {loading && (
-            <div className="absolute inset-0 flex items-center justify-center bg-slate-800/80 rounded-lg">
-              <div className="flex flex-col items-center">
-                <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mb-2"></div>
-                <p className="text-white text-sm">Generating...</p>
+          ) : error ? (
+            <div 
+              className="flex items-center justify-center bg-red-900/20 rounded-xl border-2 border-dashed border-red-600/50"
+              style={{ width: size + 40, height: size + 40 }}
+            >
+              <div className="text-center">
+                <QrCode className="w-12 h-12 text-red-500 mx-auto mb-2" />
+                <p className="text-red-400 text-sm">Failed to generate</p>
               </div>
             </div>
-          )}
+          ) : qrDataUrl ? (
+            <div className="relative">
+              {/* Glow effect */}
+              <div 
+                className="absolute inset-0 bg-white/20 rounded-2xl blur-xl"
+                style={{ margin: '-10px' }}
+              ></div>
+              
+              {/* Main QR container */}
+              <div className="relative bg-white p-6 rounded-2xl shadow-2xl border border-white/20">
+                <img 
+                  src={qrDataUrl} 
+                  alt="QR Code"
+                  className="block rounded-lg"
+                  style={{ width: size, height: size }}
+                  onError={() => {
+                    console.error('Failed to load QR code image');
+                    setError(true);
+                  }}
+                />
+              </div>
+              
+              {/* Decorative corners */}
+              <div className="absolute -top-2 -left-2 w-6 h-6 border-t-2 border-l-2 border-blue-400 rounded-tl-lg"></div>
+              <div className="absolute -top-2 -right-2 w-6 h-6 border-t-2 border-r-2 border-blue-400 rounded-tr-lg"></div>
+              <div className="absolute -bottom-2 -left-2 w-6 h-6 border-b-2 border-l-2 border-blue-400 rounded-bl-lg"></div>
+              <div className="absolute -bottom-2 -right-2 w-6 h-6 border-b-2 border-r-2 border-blue-400 rounded-br-lg"></div>
+            </div>
+          ) : null}
         </div>
       </div>
 
       {/* URL Display and Actions */}
-      {showUrl && (
-        <div className="space-y-3">
-          <div className="bg-slate-900/50 p-3 rounded border border-slate-600">
-            <p className="text-slate-400 text-xs mb-1">Scan QR code or visit:</p>
-            <code className="text-blue-400 text-sm break-all block">
+      {showUrl && qrDataUrl && (
+        <div className="space-y-4">
+          <div className="bg-slate-900/60 p-4 rounded-lg border border-slate-600/50 backdrop-blur-sm">
+            <p className="text-slate-400 text-sm mb-2 font-medium">Scan QR code or visit:</p>
+            <code className="text-blue-400 text-sm break-all block bg-slate-800/50 p-2 rounded border border-slate-700">
               {url}
             </code>
           </div>
           
           {/* Action Buttons */}
-          <div className="flex gap-2">
+          <div className="flex gap-3 justify-center">
             {showCopyButton && (
               <button
                 onClick={handleCopyUrl}
                 className={`
-                  flex items-center gap-2 px-3 py-2 rounded text-sm font-medium transition-all duration-200
+                  flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 shadow-lg
                   ${copied 
-                    ? 'bg-green-600 hover:bg-green-700 text-green-100' 
-                    : 'bg-slate-700 hover:bg-slate-600 text-slate-200'
+                    ? 'bg-green-600 hover:bg-green-700 text-green-100 shadow-green-500/25' 
+                    : 'bg-slate-700/80 hover:bg-slate-600/80 text-slate-200 shadow-slate-900/50 backdrop-blur-sm border border-slate-600/50'
                   }
                 `}
                 disabled={copied}
@@ -169,10 +198,10 @@ export const QRCodeDisplay: React.FC<QRCodeProps> = ({
             
             <button
               onClick={handleOpenUrl}
-              className="flex items-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-blue-100 rounded text-sm font-medium transition-colors"
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600/90 hover:bg-blue-700/90 text-blue-100 rounded-lg text-sm font-medium transition-colors shadow-lg shadow-blue-500/25 backdrop-blur-sm border border-blue-500/30"
             >
               <ExternalLink className="w-4 h-4" />
-              Open
+              Open Link
             </button>
           </div>
         </div>
@@ -181,16 +210,22 @@ export const QRCodeDisplay: React.FC<QRCodeProps> = ({
   );
 };
 
-// Alternative QR Code component for inline use (smaller, simpler)
+// Alternative QR Code component for inline use (smaller, simpler) - also stable
 export const InlineQRCode: React.FC<{
   url: string;
   size?: number;
   className?: string;
 }> = ({ url, size = 120, className = "" }) => {
   const [qrDataUrl, setQrDataUrl] = useState<string>('');
+  const lastUrlRef = useRef<string>('');
+  const lastSizeRef = useRef<number>(0);
 
   useEffect(() => {
-    if (url) {
+    // Only generate if values actually changed
+    if (url && (url !== lastUrlRef.current || size !== lastSizeRef.current)) {
+      lastUrlRef.current = url;
+      lastSizeRef.current = size;
+      
       const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(url)}&bgcolor=ffffff&color=000000&format=svg&ecc=M&margin=0`;
       setQrDataUrl(qrApiUrl);
     }
@@ -208,11 +243,11 @@ export const InlineQRCode: React.FC<{
   }
 
   return (
-    <div className={`bg-white rounded border shadow-sm ${className}`}>
+    <div className={`bg-white rounded-lg border shadow-sm ${className}`}>
       <img 
         src={qrDataUrl} 
         alt="QR Code"
-        className="w-full h-full rounded"
+        className="w-full h-full rounded-lg"
         style={{ width: size, height: size }}
       />
     </div>
