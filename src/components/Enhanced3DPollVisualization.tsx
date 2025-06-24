@@ -393,8 +393,8 @@ const FloorStatsDisplay: React.FC<{
         
         return (
           <group key={option.id}>
-            {/* Apply rotation to floor stats for tilting effect */}
-            <group rotation={[0, curvedPos.rotationY || 0, 0]}>
+            {/* Apply NEGATIVE rotation to floor stats for tilting toward camera */}
+            <group rotation={[0, -(curvedPos.rotationY || 0), 0]}>
               <mesh position={[curvedPos.x, 0.05, curvedPos.z]} rotation={[-Math.PI / 2, 0, 0]}>
                 <planeGeometry args={[spacing * 0.85, 4]} />
                 <meshStandardMaterial 
@@ -485,8 +485,8 @@ const StandingImagesDisplay: React.FC<{
         
         return (
           <group key={option.id}>
-            {/* Apply rotation to standing images for tilting effect */}
-            <group rotation={[0, curvedPos.rotationY || 0, 0]}>
+            {/* Apply NEGATIVE rotation to standing images for tilting toward camera */}
+            <group rotation={[0, -(curvedPos.rotationY || 0), 0]}>
               <StandingImagePlane
                 imageUrl={option.media_url}
                 position={[curvedPos.x, 0, curvedPos.z]}
