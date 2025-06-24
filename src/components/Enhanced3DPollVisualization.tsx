@@ -20,37 +20,37 @@ interface Enhanced3DPollVisualizationProps {
   className?: string;
 }
 
-// FIXED: Amphitheater positioning - MUCH MORE SPACING, prevent crowding
-const getCurvedPosition = (index: number, totalCount: number, radius: number = 20) => {
-  // For small counts, use straight line with MASSIVE spacing
+// FIXED: Much more spacing to prevent crowding completely
+const getCurvedPosition = (index: number, totalCount: number, radius: number = 25) => {
+  // For small counts, use straight line with HUGE spacing
   if (totalCount <= 2) {
-    const spacing = 15; // Much larger spacing
+    const spacing = 20; // Much larger spacing
     const totalWidth = (totalCount - 1) * spacing;
     const startX = -totalWidth / 2;
     return { x: startX + index * spacing, z: 0, rotationY: 0 };
   }
   
-  // For 3 options, wide spacing
+  // For 3 options, very wide spacing
   if (totalCount === 3) {
     const positions = [
-      { x: -15, z: -2, rotationY: 0.4 },
+      { x: -20, z: -3, rotationY: 0.3 },
       { x: 0, z: 0, rotationY: 0 },
-      { x: 15, z: -2, rotationY: -0.4 }
+      { x: 20, z: -3, rotationY: -0.3 }
     ];
     return positions[index];
   }
   
-  // For 4+ options, PREVENT CROWDING with much larger radius
-  const adjustedRadius = Math.max(radius, totalCount * 4); // Much larger multiplier to prevent crowding
-  const maxAngle = Math.min(Math.PI * 1.1, totalCount * 0.3); // Wider but controlled arc
+  // For 4+ options, MASSIVE radius to prevent any crowding
+  const adjustedRadius = Math.max(radius, totalCount * 6); // Much larger multiplier
+  const maxAngle = Math.min(Math.PI * 1.2, totalCount * 0.35); // Controlled arc
   const angleStep = maxAngle / Math.max(totalCount - 1, 1);
   const startAngle = -maxAngle / 2;
   const angle = startAngle + index * angleStep;
   
   return {
     x: Math.sin(angle) * adjustedRadius,
-    z: Math.cos(angle) * adjustedRadius * 0.3 - 2, // Curve back away from camera
-    rotationY: angle * 0.5
+    z: Math.cos(angle) * adjustedRadius * 0.3 - 3, // Curve away from camera
+    rotationY: angle * 0.4
   };
 };
 
@@ -85,7 +85,7 @@ const calculateTitleFontSize = (title?: string) => {
   return 1.0;
 };
 
-// FIXED: Standing Image Plane - RIGHT-SIDE UP and LARGER
+// FIXED: Standing Image Plane - RIGHT-SIDE UP and proper positioning
 const StandingImagePlane: React.FC<{
   imageUrl: string;
   position: [number, number, number];
@@ -116,11 +116,10 @@ const StandingImagePlane: React.FC<{
     }
   }, [imageUrl]);
 
-  // FIXED: Much larger images, RIGHT-SIDE UP
-  const imageWidth = 4; // Increased from 2.4
-  const imageHeight = 3; // Increased from 1.8
-  const tiltAngle = 0; // FIXED: No tilt = right-side up
-  const imageY = imageHeight / 2 + 0.1;
+  // FIXED: Larger images, completely upright
+  const imageWidth = 3.5;
+  const imageHeight = 2.8;
+  const imageY = imageHeight / 2 + 0.2; // Slightly higher off ground
 
   if (hasError || !texture) {
     return (
@@ -131,11 +130,10 @@ const StandingImagePlane: React.FC<{
         </mesh>
         <Text
           position={[position[0], imageY, position[2] + 0.01]}
-          fontSize={0.5}
+          fontSize={0.4}
           color="#9ca3af"
           anchorX="center"
           anchorY="middle"
-          rotation={[0, 0, 0]}
         >
           {fallbackText}
         </Text>
@@ -145,29 +143,19 @@ const StandingImagePlane: React.FC<{
 
   return (
     <group>
-      {/* Main image - RIGHT-SIDE UP */}
+      {/* Main image - COMPLETELY UPRIGHT */}
       <mesh position={[position[0], imageY, position[2]]} rotation={[0, 0, 0]} renderOrder={10}>
         <planeGeometry args={[imageWidth, imageHeight]} />
         <meshBasicMaterial map={texture} transparent />
       </mesh>
       
-      {/* Glow effects - RIGHT-SIDE UP */}
+      {/* Glow effects */}
       <mesh position={[position[0], imageY, position[2] - 0.01]} rotation={[0, 0, 0]} renderOrder={9}>
-        <planeGeometry args={[imageWidth + 0.3, imageHeight + 0.3]} />
+        <planeGeometry args={[imageWidth + 0.2, imageHeight + 0.2]} />
         <meshBasicMaterial 
           color={glowColorObj}
           transparent
-          opacity={0.3}
-          depthWrite={false}
-        />
-      </mesh>
-      
-      <mesh position={[position[0], imageY, position[2] - 0.02]} rotation={[0, 0, 0]} renderOrder={8}>
-        <planeGeometry args={[imageWidth + 0.6, imageHeight + 0.6]} />
-        <meshBasicMaterial 
-          color={glowColorObj}
-          transparent
-          opacity={0.1}
+          opacity={0.2}
           depthWrite={false}
         />
       </mesh>
@@ -376,7 +364,7 @@ const Enhanced3DBar: React.FC<{
   );
 };
 
-// FIXED: Floor Stats Display - NO OVERLAPPING, PROPER SPACING
+// FIXED: Floor Stats Display - CLEAR SEPARATION from images, no overlapping
 const FloorStatsDisplay: React.FC<{
   options: ActivityOption[];
   totalResponses: number;
@@ -389,11 +377,11 @@ const FloorStatsDisplay: React.FC<{
       {options.map((option, index) => {
         const percentage = totalResponses > 0 ? Math.round((option.responses / totalResponses) * 100) : 0;
         
-        // FIXED: Adaptive spacing to prevent overlapping
-        const baseSpacing = 16; // Much larger base spacing
-        const spacing = Math.max(baseSpacing, Math.min(20, 120 / Math.max(options.length, 1))); 
+        // FIXED: Much larger spacing to prevent any overlapping
+        const baseSpacing = 20; // Much larger
+        const spacing = Math.max(baseSpacing, Math.min(25, 150 / Math.max(options.length, 1))); 
         
-        const curvedPos = getCurvedPosition(index, options.length, 20); // Use larger radius
+        const curvedPos = getCurvedPosition(index, options.length, 25); // Use larger radius
         
         const hue = (index / Math.max(options.length - 1, 1)) * 300;
         const barColorValue = option.is_correct 
@@ -406,9 +394,9 @@ const FloorStatsDisplay: React.FC<{
         return (
           <group key={`${option.id}-${option.responses}`}>
             <group rotation={[0, -(curvedPos.rotationY || 0), 0]}>
-              {/* Floor panel - LARGER to prevent overlapping */}
-              <mesh position={[curvedPos.x, 0.05, curvedPos.z]} rotation={[-Math.PI / 2, 0, 0]}>
-                <planeGeometry args={[spacing * 0.8, 8]} />
+              {/* Floor panel - FRONT LAYER, far from images */}
+              <mesh position={[curvedPos.x, 0.05, curvedPos.z + 6]} rotation={[-Math.PI / 2, 0, 0]}>
+                <planeGeometry args={[spacing * 0.8, 10]} />
                 <meshStandardMaterial 
                   color={floorColor}
                   transparent
@@ -419,8 +407,8 @@ const FloorStatsDisplay: React.FC<{
               </mesh>
               
               {/* Glow panel */}
-              <mesh position={[curvedPos.x, 0.04, curvedPos.z]} rotation={[-Math.PI / 2, 0, 0]}>
-                <planeGeometry args={[spacing * 0.85, 8.4]} />
+              <mesh position={[curvedPos.x, 0.04, curvedPos.z + 6]} rotation={[-Math.PI / 2, 0, 0]}>
+                <planeGeometry args={[spacing * 0.85, 10.4]} />
                 <meshBasicMaterial 
                   color={barColor}
                   transparent
@@ -428,45 +416,45 @@ const FloorStatsDisplay: React.FC<{
                 />
               </mesh>
               
-              {/* Percentage text - MUCH LARGER */}
+              {/* Percentage text - FRONT and LARGE */}
               <Text
-                position={[curvedPos.x, 0.15, curvedPos.z - 2.5]}
-                fontSize={4.0} // Much larger
+                position={[curvedPos.x, 0.15, curvedPos.z + 3]}
+                fontSize={5.0} // Very large
                 color={barColorValue}
                 anchorX="center"
                 anchorY="middle"
                 rotation={[-Math.PI / 2, 0, 0]}
-                outlineWidth={0.15}
+                outlineWidth={0.2}
                 outlineColor={shadowColor}
                 fillOpacity={1}
               >
                 {percentage}%
               </Text>
               
-              {/* Vote count - LARGER */}
+              {/* Vote count - FRONT */}
               <Text
-                position={[curvedPos.x, 0.12, curvedPos.z]}
-                fontSize={1.8}
+                position={[curvedPos.x, 0.12, curvedPos.z + 5]}
+                fontSize={2.2}
                 color="#94a3b8"
                 anchorX="center"
                 anchorY="middle"
                 rotation={[-Math.PI / 2, 0, 0]}
-                outlineWidth={0.05}
+                outlineWidth={0.06}
                 outlineColor="#000000"
               >
                 {option.responses} votes
               </Text>
               
-              {/* Option text - LARGER */}
+              {/* Option text - FRONT */}
               <Text
-                position={[curvedPos.x, 0.12, curvedPos.z + 3]}
-                fontSize={textProps.fontSize * 1.5}
+                position={[curvedPos.x, 0.12, curvedPos.z + 8]}
+                fontSize={textProps.fontSize * 1.8}
                 color="#ffffff"
                 anchorX="center"
                 anchorY="middle"
                 rotation={[-Math.PI / 2, 0, 0]}
                 maxWidth={textProps.maxWidth}
-                outlineWidth={Math.max(0.03, textProps.fontSize * 0.05)}
+                outlineWidth={Math.max(0.04, textProps.fontSize * 0.06)}
                 outlineColor="#1e293b"
                 textAlign="center"
                 lineHeight={1.2}
@@ -481,7 +469,7 @@ const FloorStatsDisplay: React.FC<{
   );
 };
 
-// FIXED: Standing Images Display - RIGHT-SIDE UP, behind stats
+// FIXED: Standing Images Display - MIDDLE LAYER, clear separation
 const StandingImagesDisplay: React.FC<{
   options: ActivityOption[];
 }> = ({ options }) => {
@@ -493,7 +481,7 @@ const StandingImagesDisplay: React.FC<{
         }
         
         // FIXED: Use same radius and positioning as other elements
-        const curvedPos = getCurvedPosition(index, options.length, 20);
+        const curvedPos = getCurvedPosition(index, options.length, 25);
         
         const hue = (index / Math.max(options.length - 1, 1)) * 300;
         const glowColorValue = option.is_correct 
@@ -505,7 +493,7 @@ const StandingImagesDisplay: React.FC<{
             <group rotation={[0, -(curvedPos.rotationY || 0), 0]}>
               <StandingImagePlane
                 imageUrl={option.media_url}
-                position={[curvedPos.x, 0, curvedPos.z - 1]} // Behind stats, in front of bars
+                position={[curvedPos.x, 0, curvedPos.z + 1]} // MIDDLE LAYER - between stats and bars
                 fallbackText={`Option ${String.fromCharCode(65 + index)}`}
                 glowColor={glowColorValue}
               />
@@ -537,10 +525,10 @@ const Enhanced3DScene: React.FC<{
   const floorColor = useMemo(() => new THREE.Color("#1a1a1a"), []);
   const titleShadowColor = useMemo(() => new THREE.Color("#1e293b"), []);
   
-  // FIXED: Camera positioning for proper view of larger, spaced out layout
+  // FIXED: Camera MUCH closer for better view
   useEffect(() => {
-    const startDistance = 100; // Much further back to see wider spacing
-    const startHeight = 45;
+    const startDistance = 60; // Closer starting position
+    const startHeight = 30;
     
     camera.position.set(0, startHeight, startDistance);
     camera.lookAt(0, 0, 0);
@@ -548,14 +536,14 @@ const Enhanced3DScene: React.FC<{
     const animateCamera = () => {
       const targetX = 0;
       
-      // FIXED: Camera positioning for wider layout
-      const baseHeight = 20; // Higher for better view of larger elements
-      const extraHeight = Math.max(0, (options.length - 3) * 1.0);
+      // FIXED: Much closer camera for better view
+      const baseHeight = 15; // Lower for closer view
+      const extraHeight = Math.max(0, (options.length - 3) * 0.8);
       const targetY = baseHeight + extraHeight;
       
-      // FIXED: Much further distance to see the full amphitheater without crowding
-      const baseDistance = 35; // Much further back for proper view
-      const distanceAdjustment = Math.max(0, (options.length - 3) * 3);
+      // FIXED: Much closer distance
+      const baseDistance = 22; // Much closer
+      const distanceAdjustment = Math.max(0, (options.length - 3) * 2);
       const targetZ = baseDistance + distanceAdjustment;
       
       const animationDuration = 3500;
@@ -574,9 +562,9 @@ const Enhanced3DScene: React.FC<{
         camera.position.y = startPos.y + (targetY - startPos.y) * easeProgress;
         camera.position.z = startPos.z + (targetZ - startPos.z) * easeProgress;
         
-        // FIXED: Look at the center of the amphitheater
+        // FIXED: Look at the center of all elements
         const lookAtY = 2;
-        camera.lookAt(0, lookAtY, -1); // Look slightly forward into the amphitheater
+        camera.lookAt(0, lookAtY, 0);
         
         if (progress < 1) {
           requestAnimationFrame(animate);
@@ -624,14 +612,14 @@ const Enhanced3DScene: React.FC<{
       <FloorStatsDisplay options={options} totalResponses={totalResponses} />
       <StandingImagesDisplay options={options} />
       
-      {/* FIXED: 3D Bars - BACK LAYER, larger and properly positioned */}
+      {/* FIXED: 3D Bars - BACK LAYER, properly scaled */}
       {options.map((option, index) => {
         const percentage = totalResponses > 0 ? Math.round((option.responses / totalResponses) * 100) : 0;
         const height = totalResponses > 0 
-          ? Math.max((option.responses / maxResponses) * maxHeight, 0.3)
-          : 1.0; // Larger minimum height
+          ? Math.max((option.responses / maxResponses) * maxHeight, 0.5)
+          : 1.2; // Larger minimum height
         
-        const curvedPos = getCurvedPosition(index, options.length, 20); // Use larger radius
+        const curvedPos = getCurvedPosition(index, options.length, 25); // Use larger radius
         
         const hue = (index / Math.max(options.length - 1, 1)) * 300;
         const barColorValue = option.is_correct 
@@ -640,8 +628,8 @@ const Enhanced3DScene: React.FC<{
         
         return (
           <Enhanced3DBar
-            key={`${option.id}-${option.responses}`} // REAL-TIME FIX: Include responses in key
-            position={[curvedPos.x, 0, curvedPos.z - 3]} // BACK LAYER - bars behind everything
+            key={`${option.id}-${option.responses}`}
+            position={[curvedPos.x, 0, curvedPos.z - 4]} // BACK LAYER - bars behind everything
             height={height}
             color={barColorValue}
             label={option.text}
@@ -769,13 +757,13 @@ export const Enhanced3DPollVisualization: React.FC<Enhanced3DPollVisualizationPr
             enablePan={false}
             enableZoom={true}
             enableRotate={true}
-            minDistance={Math.max(18, 32 - options.length * 1.5)} // FIXED: Further min distance for layers
-            maxDistance={Math.max(50, options.length * 5)} // FIXED: Much further max distance
-            minPolarAngle={Math.PI / 35} // FIXED: Allow more downward angle for layers
+            minDistance={Math.max(12, 20 - options.length * 1)} // FIXED: Much closer min distance
+            maxDistance={Math.max(35, options.length * 3)} // FIXED: Closer max distance
+            minPolarAngle={Math.PI / 40} // FIXED: Better angle range
             maxPolarAngle={Math.PI / 2.0}
             autoRotate={false}
-            rotateSpeed={0.4} // Slightly slower for better control
-            target={[0, 2, 0]} // FIXED: Look at center of all layers
+            rotateSpeed={0.4}
+            target={[0, 2, 0]} // FIXED: Look at center
           />
         </Canvas>
       </Suspense>
