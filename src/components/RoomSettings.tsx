@@ -17,6 +17,11 @@ import {
 } from 'lucide-react';
 import type { Room, RoomSettings } from '../types';
 
+// Helper function to generate a unique 4-digit room code
+const generateRoomCode = (): string => {
+  return Math.floor(1000 + Math.random() * 9000).toString();
+};
+
 interface RoomSettingsProps {
   room?: Room;
   onSave: (roomData: any) => Promise<void> | void;
@@ -131,7 +136,8 @@ export const RoomSettings: React.FC<RoomSettingsProps> = ({ room, onSave, onCanc
         await onSave({ settings });
       } else {
         // Create new room
-        await onSave({ name, description, settings });
+        const roomCode = generateRoomCode();
+        await onSave({ name, description, code: roomCode, settings });
       }
     } catch (error) {
       console.error('Failed to save settings:', error);
