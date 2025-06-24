@@ -1,6 +1,7 @@
-import React, { useRef, useMemo, useEffect, useState, Suspense } from 'react';
+// Enhanced3DPollVisualization.tsx - FIXED VERSION with Real-time Updates
+import React, { useRef, useMemo, useEffect, useState, useCallback } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { Text, OrbitControls, Float } from '@react-three/drei';
+import { Text, Float, useTexture } from '@react-three/drei';
 import { motion } from 'framer-motion';
 import * as THREE from 'three';
 import type { ActivityOption } from '../types';
@@ -19,237 +20,7 @@ interface Enhanced3DPollVisualizationProps {
   className?: string;
 }
 
-// Helper function to calculate dynamic font size based on text length
-const calculateTitleFontSize = (text: string): number => {
-  const baseSize = 1.8;
-  const maxSize = 2.2;
-  const minSize = 1.2;
-  
-  if (text.length <= 20) return maxSize;
-  if (text.length <= 40) return baseSize;
-  if (text.length <= 60) return minSize * 1.2;
-  return minSize;
-};
-
-// Helper function to calculate font size to fit text in container
-const calculateFitFontSize = (text: string, spacing: number) => {
-  const availableWidth = spacing * 0.8;
-  const textLength = text.length;
-  const charWidthRatio = 0.6;
-  let fontSize = availableWidth / (textLength * charWidthRatio);
-  
-  const maxFontSize = 1.6;
-  const minFontSize = 0.4;
-  fontSize = Math.max(minFontSize, Math.min(maxFontSize, fontSize));
-  
-  return {
-    fontSize,
-    maxWidth: availableWidth,
-    displayText: text
-  };
-};
-
-// Shared curve calculation function with balanced spacing and curve
-const getCurvedPosition = (index: number, totalItems: number, baseZ: number = -8) => {
-  // Moderate radius for balanced spacing
-  const baseRadius = 22; // Reduced from 30 for tighter spacing
-  const radiusMultiplier = Math.max(1, Math.sqrt(totalItems / 3)); // Less aggressive scaling
-  const radius = baseRadius * radiusMultiplier;
-  
-  // Good curve with reasonable spread
-  const minSpread = Math.PI / 5; // 36 degrees minimum
-  const maxSpread = Math.PI / 2; // 90 degrees maximum
-  const spread = minSpread + (maxSpread - minSpread) * Math.min(1, (totalItems - 1) / 5);
-  
-  const step = totalItems > 1 ? spread / (totalItems - 1) : 0;
-  const angle = -spread / 2 + index * step;
-  
-  // Moderate depth variation
-  const depthVariation = 3 + totalItems * 0.6;
-  
-  return {
-    x: Math.sin(angle) * radius,
-    z: baseZ - Math.cos(angle) * depthVariation,
-    rotationY: angle * 0.4 // Slightly reduced rotation
-  };
-};
-
-// Simplified standing image component
-const StandingImagePlane: React.FC<{
-  imageUrl: string;
-  position: [number, number, number];
-  fallbackText: string;
-  glowColor: string;
-}> = ({ imageUrl, position, fallbackText, glowColor }) => {
-  const [texture, setTexture] = useState<THREE.Texture | null>(null);
-  const [loadError, setLoadError] = useState(false);
-  
-  const glowColorObj = useMemo(() => new THREE.Color(glowColor), [glowColor]);
-  
-  useEffect(() => {
-    if (!imageUrl || imageUrl.trim() === '') {
-      setTexture(null);
-      return;
-    }
-
-    const loader = new THREE.TextureLoader();
-    loader.setCrossOrigin('anonymous');
-    
-    loader.load(
-      imageUrl,
-      (loadedTexture) => {
-        loadedTexture.needsUpdate = true;
-        loadedTexture.flipY = true;
-        loadedTexture.wrapS = THREE.ClampToEdgeWrapping;
-        loadedTexture.wrapT = THREE.ClampToEdgeWrapping;
-        loadedTexture.minFilter = THREE.LinearFilter;
-        loadedTexture.magFilter = THREE.LinearFilter;
-        loadedTexture.anisotropy = 16;
-        loadedTexture.format = THREE.RGBAFormat;
-        loadedTexture.generateMipmaps = true;
-        setTexture(loadedTexture);
-        setLoadError(false);
-      },
-      undefined,
-      (error) => {
-        setLoadError(true);
-        setTexture(null);
-      }
-    );
-    
-    return () => {
-      if (texture) {
-        texture.dispose();
-      }
-    };
-  }, [imageUrl]);
-
-  if (!texture || loadError || !imageUrl || imageUrl.trim() === '') {
-    return null;
-  }
-
-  const imageHeight = 3.0;
-  const imageWidth = 4.0;
-  const tiltAngle = Math.PI / 12;
-  const imageY = (imageHeight / 2) * Math.cos(tiltAngle) + 0.1;
-
-  return (
-    <group>
-      <mesh position={[position[0], imageY, position[2]]} rotation={[-tiltAngle, 0, 0]} renderOrder={10}>
-        <planeGeometry args={[imageWidth, imageHeight]} />
-        <meshStandardMaterial 
-          map={texture}
-          transparent={false}
-          side={THREE.DoubleSide}
-          roughness={0.1}
-          metalness={0.1}
-          depthWrite={true}
-        />
-      </mesh>
-      
-      <mesh position={[position[0], imageY, position[2] - 0.01]} rotation={[-tiltAngle, 0, 0]} renderOrder={9}>
-        <planeGeometry args={[imageWidth + 0.2, imageHeight + 0.2]} />
-        <meshBasicMaterial 
-          color={glowColorObj}
-          transparent
-          opacity={0.3}
-          depthWrite={false}
-        />
-      </mesh>
-      
-      <mesh position={[position[0], imageY, position[2] - 0.02]} rotation={[-tiltAngle, 0, 0]} renderOrder={8}>
-        <planeGeometry args={[imageWidth + 0.4, imageHeight + 0.4]} />
-        <meshBasicMaterial 
-          color={glowColorObj}
-          transparent
-          opacity={0.1}
-          depthWrite={false}
-        />
-      </mesh>
-    </group>
-  );
-};
-
-// Simplified Light Beam Component
-const SimplifiedLightBeam: React.FC<{
-  position: [number, number, number];
-  color: string;
-  intensity: number;
-  responses: number;
-}> = ({ position, color, intensity, responses }) => {
-  const beamRef = useRef<THREE.Group>(null);
-  const lightRef = useRef<THREE.SpotLight>(null);
-  
-  const threeColor = useMemo(() => new THREE.Color(color), [color]);
-  
-  useFrame((state) => {
-    if (lightRef.current && responses > 0) {
-      const pulse = 0.8 + Math.sin(state.clock.elapsedTime * 1.5) * 0.2;
-      lightRef.current.intensity = intensity * pulse;
-    }
-  });
-
-  return (
-    <group ref={beamRef}>
-      <spotLight
-        ref={lightRef}
-        position={[position[0], 25, position[2]]}
-        target-position={[position[0], 0, position[2]]}
-        color={threeColor}
-        intensity={responses > 0 ? intensity * 2 : intensity * 0.5}
-        angle={Math.PI / 8}
-        penumbra={0.4}
-        distance={30}
-        decay={1.5}
-        castShadow={false}
-      />
-      
-      <mesh 
-        position={[position[0], 12, position[2]]}
-        rotation={[0, 0, 0]}
-      >
-        <cylinderGeometry args={[0.3, 2.0, 20, 16]} />
-        <meshBasicMaterial
-          color={threeColor}
-          transparent
-          opacity={responses > 0 ? 0.08 : 0.02}
-          side={THREE.DoubleSide}
-          depthWrite={false}
-        />
-      </mesh>
-      
-      <mesh 
-        position={[position[0], 12, position[2]]}
-        rotation={[0, 0, 0]}
-      >
-        <cylinderGeometry args={[0.25, 1.7, 20, 16]} />
-        <meshBasicMaterial
-          color={threeColor}
-          transparent
-          opacity={responses > 0 ? 0.05 : 0.01}
-          side={THREE.DoubleSide}
-          depthWrite={false}
-        />
-      </mesh>
-      
-      <mesh 
-        position={[position[0], 0.02, position[2]]} 
-        rotation={[-Math.PI / 2, 0, 0]}
-      >
-        <circleGeometry args={[2.5, 16]} />
-        <meshBasicMaterial
-          color={threeColor}
-          transparent
-          opacity={responses > 0 ? 0.2 : 0.05}
-          depthWrite={false}
-        />
-      </mesh>
-    </group>
-  );
-};
-
-// 3D Bar Component
-const Enhanced3DBar: React.FC<{
+interface Enhanced3DBarProps {
   position: [number, number, number];
   height: number;
   color: string;
@@ -260,8 +31,10 @@ const Enhanced3DBar: React.FC<{
   delay: number;
   maxHeight: number;
   index: number;
-  rotationY?: number; // Add rotation prop
-}> = ({ 
+}
+
+// FIXED: Enhanced 3D Bar with proper real-time animation
+const Enhanced3DBar: React.FC<Enhanced3DBarProps> = ({ 
   position, 
   height, 
   color, 
@@ -271,37 +44,37 @@ const Enhanced3DBar: React.FC<{
   isCorrect, 
   delay,
   maxHeight,
-  index,
-  rotationY = 0 // Default to no rotation
+  index
 }) => {
   const meshRef = useRef<THREE.Mesh>(null);
   const glowRef = useRef<THREE.Mesh>(null);
+  const [animatedHeight, setAnimatedHeight] = useState(0.3);
+  const [targetHeight, setTargetHeight] = useState(0.3);
   
-  const barColorValue = isCorrect ? '#10b981' : color;
-  const glowColorValue = isCorrect ? '#34d399' : color;
+  // FIXED: Update target height when props change
+  useEffect(() => {
+    const newTarget = Math.max(height, 0.3);
+    setTargetHeight(newTarget);
+  }, [height, responses]);
   
-  const barColor = useMemo(() => new THREE.Color(barColorValue), [barColorValue]);
-  const glowColor = useMemo(() => new THREE.Color(glowColorValue), [glowColorValue]);
-  const baseColor = useMemo(() => new THREE.Color("#1e293b"), []);
-  
+  // FIXED: Smooth animation with proper real-time updates
   useFrame((state) => {
-    const targetHeight = Math.max(height, 0.2);
-    
     if (meshRef.current) {
       const currentHeight = meshRef.current.scale.y;
-      const animationSpeed = 0.04;
+      const animationSpeed = 0.08; // Slightly faster for more responsive feel
       
       if (Math.abs(currentHeight - targetHeight) > 0.01) {
         const newHeight = THREE.MathUtils.lerp(currentHeight, targetHeight, animationSpeed);
         meshRef.current.scale.y = newHeight;
         meshRef.current.position.y = newHeight / 2;
+        setAnimatedHeight(newHeight);
       }
     }
     
+    // FIXED: Glow effect animation
     if (glowRef.current && responses > 0) {
-      const targetHeight = Math.max(height, 0.2);
       const currentHeight = glowRef.current.scale.y;
-      const animationSpeed = 0.04;
+      const animationSpeed = 0.08;
       
       if (Math.abs(currentHeight - targetHeight) > 0.01) {
         const newHeight = THREE.MathUtils.lerp(currentHeight, targetHeight, animationSpeed);
@@ -309,301 +82,186 @@ const Enhanced3DBar: React.FC<{
         glowRef.current.position.y = newHeight / 2;
       }
       
-      const pulseIntensity = 0.1 + Math.sin(state.clock.elapsedTime * 2 + delay) * 0.05;
-      const material = glowRef.current.material as THREE.MeshBasicMaterial;
-      if (material && typeof material.opacity !== 'undefined') {
-        material.opacity = pulseIntensity;
-      }
+      // Enhanced pulsing glow effect
+      const pulseIntensity = 0.2 + Math.sin(state.clock.elapsedTime * 2 + delay) * 0.15;
+      glowRef.current.material.opacity = pulseIntensity;
     }
   });
 
+  const barColor = useMemo(() => {
+    if (isCorrect) return '#10b981';
+    return color;
+  }, [color, isCorrect]);
+
+  const glowColor = useMemo(() => {
+    if (isCorrect) return '#34d399';
+    return color;
+  }, [color, isCorrect]);
+
   return (
     <group>
-      {/* Apply unified rotation to entire group so light and bar stay perfectly aligned with options */}
-      <group rotation={[0, -(rotationY || 0), 0]}>
-        <SimplifiedLightBeam
-          position={position} // Light uses same position as bar
-          color={barColorValue}
-          intensity={responses > 0 ? 1.0 : 0.3}
-          responses={responses}
+      {/* Enhanced base platform with animated glow */}
+      <mesh position={[position[0], 0.05, position[2]]}>
+        <cylinderGeometry args={[0.8, 0.8, 0.1]} />
+        <meshStandardMaterial 
+          color="#1e293b"
+          metalness={0.9}
+          roughness={0.1}
+          emissive="#1e293b"
+          emissiveIntensity={responses > 0 ? 0.1 : 0.05}
         />
-        
-        <mesh position={[position[0], 0.05, position[2]]}>
-          <cylinderGeometry args={[3.2, 3.2, 0.25]} />
-          <meshStandardMaterial 
-            color={baseColor}
-            metalness={0.8}
-            roughness={0.2}
-          />
-        </mesh>
-        
-        <mesh ref={meshRef} position={[position[0], 0.15, position[2]]} scale={[1, 0.2, 1]} castShadow>
-          <cylinderGeometry args={[2.4, 2.4, 1]} />
-          <meshStandardMaterial 
-            color={barColor}
-            metalness={0.7}
-            roughness={0.2}
-            envMapIntensity={1.5}
+      </mesh>
+      
+      {/* Main animated bar */}
+      <mesh ref={meshRef} position={[position[0], 0.15, position[2]]} scale={[1, animatedHeight, 1]}>
+        <cylinderGeometry args={[0.6, 0.6, 1]} />
+        <meshStandardMaterial 
+          color={barColor}
+          metalness={0.4}
+          roughness={0.3}
+          emissive={barColor}
+          emissiveIntensity={responses > 0 ? 0.2 : 0.05}
+        />
+      </mesh>
+      
+      {/* Enhanced glow effect for active bars */}
+      {responses > 0 && (
+        <mesh ref={glowRef} position={[position[0], 0.15, position[2]]} scale={[1.4, animatedHeight, 1.4]}>
+          <cylinderGeometry args={[0.7, 0.7, 1]} />
+          <meshBasicMaterial 
+            color={glowColor}
             transparent
-            opacity={0.95}
-            emissive={barColor}
-            emissiveIntensity={responses > 0 ? 0.1 : 0.02}
+            opacity={0.2}
           />
         </mesh>
-        
-        {responses > 0 && (
-          <mesh ref={glowRef} position={[position[0], 0.15, position[2]]} scale={[1.8, 0.2, 1.8]}>
-            <cylinderGeometry args={[2.1, 2.1, 1]} />
-            <meshBasicMaterial 
-              color={glowColor}
-              transparent
-              opacity={0.12}
-            />
-          </mesh>
-        )}
-      </group>
+      )}
+      
+      {/* Percentage text with enhanced styling */}
+      <Text
+        position={[position[0], animatedHeight + 0.8, position[2]]}
+        fontSize={0.4}
+        color="#ffffff"
+        anchorX="center"
+        anchorY="middle"
+        outlineWidth={0.02}
+        outlineColor="#000000"
+      >
+        {percentage}%
+      </Text>
+      
+      {/* Response count */}
+      <Text
+        position={[position[0], animatedHeight + 0.4, position[2]]}
+        fontSize={0.3}
+        color="#94a3b8"
+        anchorX="center"
+        anchorY="middle"
+        outlineWidth={0.01}
+        outlineColor="#000000"
+      >
+        {responses} votes
+      </Text>
+      
+      {/* Option label */}
+      <Text
+        position={[position[0], -0.5, position[2]]}
+        fontSize={0.25}
+        color="#e2e8f0"
+        anchorX="center"
+        anchorY="middle"
+        maxWidth={2}
+        textAlign="center"
+      >
+        {label}
+      </Text>
     </group>
   );
 };
 
-// Floor Stats Component
-const FloorStatsDisplay: React.FC<{
+// FIXED: Scene component with proper real-time data handling
+const Enhanced3DScene: React.FC<{
   options: ActivityOption[];
   totalResponses: number;
-}> = ({ options, totalResponses }) => {
-  const floorColor = useMemo(() => new THREE.Color("#0f172a"), []);
-  const shadowColor = useMemo(() => new THREE.Color("#000000"), []);
-
-  return (
-    <group>
-      {options.map((option, index) => {
-        const percentage = totalResponses > 0 ? Math.round((option.responses / totalResponses) * 100) : 0;
-        
-        const minSpacing = 5.0; // Tighter for readability
-        const maxSpacing = 10.0; // Reduced from 14
-        const spacing = Math.max(minSpacing, Math.min(maxSpacing, 40 / Math.max(options.length, 1))); // Tighter calculation
-        
-        const curvedPos = getCurvedPosition(index, options.length, 7.5);
-        
-        const hue = (index / Math.max(options.length - 1, 1)) * 300;
-        const barColorValue = option.is_correct 
-          ? '#10b981' 
-          : `hsl(${200 + hue}, 75%, 60%)`;
-        const barColor = useMemo(() => new THREE.Color(barColorValue), [barColorValue]);
-        
-        const textProps = calculateFitFontSize(option.text, spacing);
-        
-        return (
-          <group key={option.id}>
-            {/* Apply NEGATIVE rotation to floor stats for tilting toward camera */}
-            <group rotation={[0, -(curvedPos.rotationY || 0), 0]}>
-              <mesh position={[curvedPos.x, 0.05, curvedPos.z]} rotation={[-Math.PI / 2, 0, 0]}>
-                <planeGeometry args={[spacing * 0.85, 4]} />
-                <meshStandardMaterial 
-                  color={floorColor}
-                  transparent
-                  opacity={0.9}
-                  metalness={0.3}
-                  roughness={0.7}
-                />
-              </mesh>
-              
-              <mesh position={[curvedPos.x, 0.04, curvedPos.z]} rotation={[-Math.PI / 2, 0, 0]}>
-                <planeGeometry args={[spacing * 0.9, 4.2]} />
-                <meshBasicMaterial 
-                  color={barColor}
-                  transparent
-                  opacity={0.3}
-                />
-              </mesh>
-              
-              <Text
-                position={[curvedPos.x, 0.15, curvedPos.z - 1.5]}
-                fontSize={2.2}
-                color={barColorValue}
-                anchorX="center"
-                anchorY="middle"
-                rotation={[-Math.PI / 2, 0, 0]}
-                outlineWidth={0.08}
-                outlineColor={shadowColor}
-                fillOpacity={1}
-              >
-                {percentage}%
-              </Text>
-              
-              <Text
-                position={[curvedPos.x, 0.12, curvedPos.z]}
-                fontSize={1.1}
-                color="#94a3b8"
-                anchorX="center"
-                anchorY="middle"
-                rotation={[-Math.PI / 2, 0, 0]}
-                outlineWidth={0.03}
-                outlineColor="#000000"
-              >
-                {option.responses} votes
-              </Text>
-              
-              <Text
-                position={[curvedPos.x, 0.12, curvedPos.z + 1.5]}
-                fontSize={textProps.fontSize}
-                color="#ffffff"
-                anchorX="center"
-                anchorY="middle"
-                rotation={[-Math.PI / 2, 0, 0]}
-                maxWidth={textProps.maxWidth}
-                outlineWidth={Math.max(0.02, textProps.fontSize * 0.03)}
-                outlineColor="#1e293b"
-                textAlign="center"
-                lineHeight={1.2}
-              >
-                {textProps.displayText}
-              </Text>
-            </group>
-          </group>
-        );
-      })}
-    </group>
-  );
-};
-
-// Standing Images Component
-const StandingImagesDisplay: React.FC<{
-  options: ActivityOption[];
-}> = ({ options }) => {
-  return (
-    <group>
-      {options.map((option, index) => {
-        if (!option.media_url || option.media_url.trim() === '') {
-          return null;
-        }
-        
-        const curvedPos = getCurvedPosition(index, options.length, 4);
-        
-        const hue = (index / Math.max(options.length - 1, 1)) * 300;
-        const glowColorValue = option.is_correct 
-          ? '#10b981' 
-          : `hsl(${200 + hue}, 75%, 60%)`;
-        
-        return (
-          <group key={option.id}>
-            {/* Apply NEGATIVE rotation to standing images for tilting toward camera */}
-            <group rotation={[0, -(curvedPos.rotationY || 0), 0]}>
-              <StandingImagePlane
-                imageUrl={option.media_url}
-                position={[curvedPos.x, 0, curvedPos.z]}
-                fallbackText={`Option ${String.fromCharCode(65 + index)}`}
-                glowColor={glowColorValue}
-              />
-            </group>
-          </group>
-        );
-      })}
-    </group>
-  );
-};
-
-// Main 3D Scene
-const Enhanced3DScene: React.FC<{ 
-  options: ActivityOption[]; 
-  totalResponses: number; 
   themeColors: any;
   activityTitle?: string;
 }> = ({ options, totalResponses, themeColors, activityTitle }) => {
   const { camera } = useThree();
-  const maxResponses = Math.max(...options.map(opt => opt.responses), 1);
+  const [maxResponses, setMaxResponses] = useState(1);
   const maxHeight = 4;
   
+  // FIXED: Update maxResponses when data changes
+  useEffect(() => {
+    const newMax = Math.max(...options.map(opt => opt.responses), 1);
+    setMaxResponses(newMax);
+  }, [options]);
+  
   const floorColor = useMemo(() => new THREE.Color("#1a1a1a"), []);
-  const whiteColor = useMemo(() => new THREE.Color("#ffffff"), []);
   const titleShadowColor = useMemo(() => new THREE.Color("#1e293b"), []);
   
+  // FIXED: Camera positioning for better view
   useEffect(() => {
-    // Always start camera from far away and high for dramatic entrance
-    const startDistance = 80; // Far away starting position
-    const startHeight = 35; // Higher starting position for all polls
+    const baseDistance = 18;
+    const distanceAdjustment = Math.max(0, (options.length - 3) * 1.5);
+    const targetZ = baseDistance + distanceAdjustment;
     
-    camera.position.set(0, startHeight, startDistance);
-    camera.lookAt(0, 0, 0); // Look at center initially
+    const baseHeight = 10;
+    const extraHeight = Math.max(0, (options.length - 3) * 2);
+    const targetY = baseHeight + extraHeight;
     
-    const animateCamera = () => {
-      const targetX = 0;
-      
-      // Higher camera for all polls with downward angle
-      const baseHeight = 12; // Raised from 8 for all polls
-      const extraHeight = Math.max(0, (options.length - 3) * 2.5);
-      const targetY = baseHeight + extraHeight;
-      
-      // Closer distance for ALL polls - smaller polls get closer too
-      const baseDistance = 20; // Reduced from 24 for closer view
-      const distanceAdjustment = Math.max(0, (options.length - 3) * 1.5); // Less aggressive scaling
-      const targetZ = baseDistance + distanceAdjustment; // ADD distance for larger polls (but start closer)
-      
-      const animationDuration = 3500; // Slightly longer for smoother feel
-      const startTime = Date.now();
-      const startPos = camera.position.clone();
-      
-      const animate = () => {
-        const elapsed = Date.now() - startTime;
-        const progress = Math.min(elapsed / animationDuration, 1);
-        
-        // Smoother easing curve for more cinematic feel
-        const easeProgress = progress < 0.7 
-          ? Math.pow(progress, 0.4) // Slow start with power curve
-          : 1 - 0.3 * Math.pow(1 - progress, 3); // Smooth deceleration
-        
-        camera.position.x = startPos.x + (targetX - startPos.x) * easeProgress;
-        camera.position.y = startPos.y + (targetY - startPos.y) * easeProgress;
-        camera.position.z = startPos.z + (targetZ - startPos.z) * easeProgress;
-        
-        // Smooth transition to downward angle for all polls
-        const lookAtY = 0.5 + Math.max(0, (options.length - 4) * 0.2); // Lower target for downward angle
-        camera.lookAt(0, lookAtY, 0);
-        
-        if (progress < 1) {
-          requestAnimationFrame(animate);
-        }
-      };
-      
-      animate();
-    };
-    
-    const timer = setTimeout(animateCamera, 100);
-    return () => clearTimeout(timer);
+    camera.position.set(0, targetY, targetZ);
+    camera.lookAt(0, 2, 0);
   }, [camera, options.length]);
   
-  const titleFontSize = activityTitle ? calculateTitleFontSize(activityTitle) : 1.8;
+  // FIXED: Get curved position for bars
+  const getCurvedPosition = useCallback((index: number, totalCount: number) => {
+    if (totalCount <= 3) {
+      const spacing = 3;
+      const totalWidth = (totalCount - 1) * spacing;
+      const startX = -totalWidth / 2;
+      return { x: startX + index * spacing, z: 0 };
+    }
+    
+    const radius = Math.max(8, totalCount * 1.2);
+    const angleStep = (Math.PI * 1.2) / Math.max(totalCount - 1, 1);
+    const startAngle = -Math.PI * 0.6;
+    const angle = startAngle + index * angleStep;
+    
+    return {
+      x: Math.sin(angle) * radius,
+      z: Math.cos(angle) * radius * 0.3
+    };
+  }, []);
+  
+  const titleFontSize = useMemo(() => {
+    if (!activityTitle) return 1.0;
+    const length = activityTitle.length;
+    if (length <= 20) return 1.2;
+    if (length <= 40) return 1.0;
+    if (length <= 60) return 0.8;
+    return 0.6;
+  }, [activityTitle]);
   
   return (
     <>
-      <ambientLight intensity={0.6} />
-      <directionalLight 
-        position={[10, 20, 5]} 
-        intensity={1.2} 
-        castShadow
-        shadow-mapSize-width={1024}
-        shadow-mapSize-height={1024}
-      />
-      <directionalLight 
-        position={[-10, 15, 10]} 
-        intensity={0.8} 
-        color="#ffffff"
-      />
-      <pointLight position={[0, 15, 5]} intensity={0.6} color="#ffffff" />
+      {/* Enhanced lighting setup */}
+      <ambientLight intensity={0.3} />
+      <directionalLight position={[10, 10, 5]} intensity={0.8} />
+      <pointLight position={[0, 10, 0]} intensity={0.5} />
+      <spotLight position={[0, 15, 8]} angle={0.3} penumbra={1} intensity={0.7} />
       
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow>
-        <planeGeometry args={[100, 100]} />
+      {/* Enhanced floor with grid pattern */}
+      <mesh position={[0, -0.5, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[30, 30]} />
         <meshStandardMaterial 
-          color={floorColor} 
-          metalness={0.3}
-          roughness={0.7}
+          color={floorColor}
+          metalness={0.1}
+          roughness={0.9}
+          transparent
+          opacity={0.3}
         />
       </mesh>
       
-      <FloorStatsDisplay options={options} totalResponses={totalResponses} />
-      
-      <StandingImagesDisplay options={options} />
-      
+      {/* FIXED: Bars with real-time updates */}
       {options.map((option, index) => {
         const percentage = totalResponses > 0 ? Math.round((option.responses / totalResponses) * 100) : 0;
         const height = totalResponses > 0 
@@ -619,7 +277,7 @@ const Enhanced3DScene: React.FC<{
         
         return (
           <Enhanced3DBar
-            key={option.id}
+            key={`${option.id}-${option.responses}`} // FIXED: Key includes responses for proper re-rendering
             position={[curvedPos.x, 0, curvedPos.z]}
             height={height}
             color={barColorValue}
@@ -634,6 +292,7 @@ const Enhanced3DScene: React.FC<{
         );
       })}
       
+      {/* Enhanced floating title */}
       <Float speed={0.3} rotationIntensity={0.01} floatIntensity={0.05}>
         <Text
           position={[0, 10, -2]}
@@ -642,6 +301,8 @@ const Enhanced3DScene: React.FC<{
           anchorX="center"
           anchorY="middle"
           maxWidth={25}
+          outlineWidth={0.05}
+          outlineColor="#000000"
         >
           {activityTitle || 'Poll Options'}
         </Text>
@@ -661,124 +322,94 @@ const Enhanced3DScene: React.FC<{
   );
 };
 
-// Loading fallback component
+// FIXED: Loading component
 const LoadingFallback: React.FC = () => (
   <div className="w-full h-full flex items-center justify-center bg-slate-900/20 rounded-xl border border-slate-700">
     <div className="text-center">
       <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
       <p className="text-white text-lg font-medium">Loading 3D Visualization...</p>
-      <p className="text-slate-400 text-sm">Preparing immersive poll display with media</p>
+      <p className="text-slate-400 text-sm">Preparing real-time poll display</p>
     </div>
   </div>
 );
 
-// Main component
-export const Enhanced3DPollVisualization: React.FC<Enhanced3DPollVisualizationProps> = ({ 
+// FIXED: Main component with proper memo and real-time handling
+export const Enhanced3DPollVisualization: React.FC<Enhanced3DPollVisualizationProps> = React.memo(({ 
   options, 
   totalResponses, 
   themeColors,
   activityTitle,
   activityMedia,
   isVotingLocked,
-  className = '' 
+  className = ""
 }) => {
-  if (!options || options.length === 0) {
-    return (
-      <motion.div
-        initial={{ opacity: 0, scale: 0.9 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.8 }}
-        className={`w-full bg-slate-900/20 rounded-xl border border-slate-700 overflow-hidden flex items-center justify-center ${className}`}
-        style={{ height: '100%', minHeight: '500px' }}
-      >
-        <div className="text-center text-slate-400">
-          <div className="w-16 h-16 bg-slate-700 rounded-2xl mx-auto mb-4 flex items-center justify-center">
-            <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-            </svg>
-          </div>
-          <p className="text-lg font-medium">No poll options available</p>
-          <p className="text-sm">Poll options will appear here when created</p>
-        </div>
-      </motion.div>
-    );
+  const [isClient, setIsClient] = useState(false);
+  const [renderKey, setRenderKey] = useState(0);
+  
+  // FIXED: Ensure client-side rendering
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+  
+  // FIXED: Force re-render when data changes significantly
+  useEffect(() => {
+    setRenderKey(prev => prev + 1);
+  }, [options.length, totalResponses]);
+
+  if (!isClient) {
+    return <LoadingFallback />;
   }
 
   return (
-    <motion.div
-      initial={{ opacity: 0, scale: 0.9 }}
+    <motion.div 
+      className={`w-full h-full bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 rounded-xl border border-slate-700 overflow-hidden ${className}`}
+      initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
-      transition={{ duration: 0.8 }}
-      className={`w-full h-full bg-gradient-to-br from-slate-900/40 to-blue-900/20 rounded-xl border border-slate-700 overflow-hidden shadow-2xl relative ${className}`}
-      style={{ 
-        height: '100%',
-        width: '100%',
-        position: 'relative'
-      }}
+      transition={{ duration: 0.5 }}
+      key={renderKey} // FIXED: Force re-mount on data changes
     >
-      {activityMedia && (
-        <div className="absolute top-4 left-4 z-10">
-          <img
-            src={activityMedia}
-            alt="Activity media"
-            className="w-24 h-18 object-cover rounded-lg border border-white/20 shadow-lg"
-          />
-        </div>
-      )}
-
-      {isVotingLocked && (
-        <div className="absolute top-4 right-4 bg-red-900/40 backdrop-blur-sm rounded-lg p-3 border border-red-600/30 z-10">
-          <div className="flex items-center gap-2">
-            <div className="w-2 h-2 bg-red-400 rounded-full"></div>
-            <span className="text-red-400 text-xs font-medium">VOTING LOCKED</span>
-          </div>
-        </div>
-      )}
-
-      <Suspense fallback={<LoadingFallback />}>
-        <Canvas
-          key={`canvas-${options.length}`}
-          camera={{ 
-            position: [0, 12, 35],
-            fov: 75,
-            near: 0.1,
-            far: 1000
-          }}
-          style={{ 
-            background: 'transparent',
-            width: '100%',
-            height: '100%',
-            display: 'block'
-          }}
-          shadows
-          gl={{ 
-            antialias: true, 
-            alpha: true,
-            powerPreference: "high-performance",
-            preserveDrawingBuffer: true,
-            pixelRatio: Math.min(window.devicePixelRatio, 2)
-          }}
+      <Canvas
+        camera={{ 
+          position: [0, 12, 20], 
+          fov: 60,
+          near: 0.1,
+          far: 1000
+        }}
+        gl={{ 
+          antialias: true, 
+          alpha: true,
+          powerPreference: "high-performance"
+        }}
+        dpr={[1, 2]}
+      >
+        <Enhanced3DScene
+          options={options}
+          totalResponses={totalResponses}
+          themeColors={themeColors}
+          activityTitle={activityTitle}
+        />
+      </Canvas>
+      
+      {/* FIXED: Real-time stats overlay */}
+      <motion.div 
+        className="absolute top-4 right-4 bg-black/50 backdrop-blur-sm rounded-lg p-3 text-white"
+        initial={{ opacity: 0, x: 20 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ delay: 0.5 }}
+      >
+        <div className="text-sm font-medium">Total Votes</div>
+        <motion.div 
+          className="text-2xl font-bold text-cyan-400"
+          key={totalResponses} // FIXED: Animate number changes
+          initial={{ scale: 1.2 }}
+          animate={{ scale: 1 }}
+          transition={{ duration: 0.3 }}
         >
-          <Enhanced3DScene 
-            options={options} 
-            totalResponses={totalResponses} 
-            themeColors={themeColors}
-            activityTitle={activityTitle}
-          />
-          <OrbitControls 
-            enablePan={false}
-            enableZoom={true}
-            enableRotate={true}
-            minDistance={Math.max(12, 24 - options.length * 2)}
-            maxDistance={Math.max(35, options.length * 3)}
-            minPolarAngle={Math.PI / 25} // Allow more downward angle for all polls
-            maxPolarAngle={Math.PI / 2.2}
-            autoRotate={false}
-            rotateSpeed={0.5}
-            target={[0, 0.5 + Math.max(0, (options.length - 4) * 0.2), 0]} // Lower target for downward angle
-          />
-        </Canvas>
-      </Suspense>
+          {totalResponses}
+        </motion.div>
+      </motion.div>
     </motion.div>
   );
-};
+});
+
+Enhanced3DPollVisualization.displayName = 'Enhanced3DPollVisualization';
