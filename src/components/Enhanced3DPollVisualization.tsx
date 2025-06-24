@@ -85,7 +85,7 @@ const calculateTitleFontSize = (title?: string) => {
   return 1.0;
 };
 
-// FIXED: Standing Image Plane - RIGHT-SIDE UP and proper positioning
+// FIXED: Standing Image Plane - PROPERLY RIGHT-SIDE UP
 const StandingImagePlane: React.FC<{
   imageUrl: string;
   position: [number, number, number];
@@ -103,7 +103,7 @@ const StandingImagePlane: React.FC<{
       loader.load(
         imageUrl,
         (loadedTexture) => {
-          loadedTexture.flipY = false;
+          loadedTexture.flipY = true; // FIXED: Flip Y to make images right-side up
           setTexture(loadedTexture);
           setHasError(false);
         },
@@ -116,10 +116,10 @@ const StandingImagePlane: React.FC<{
     }
   }, [imageUrl]);
 
-  // FIXED: Larger images, completely upright
+  // FIXED: Good size images, right-side up
   const imageWidth = 3.5;
   const imageHeight = 2.8;
-  const imageY = imageHeight / 2 + 0.2; // Slightly higher off ground
+  const imageY = imageHeight / 2 + 0.2;
 
   if (hasError || !texture) {
     return (
@@ -143,7 +143,7 @@ const StandingImagePlane: React.FC<{
 
   return (
     <group>
-      {/* Main image - COMPLETELY UPRIGHT */}
+      {/* Main image - RIGHT-SIDE UP with flipY = true */}
       <mesh position={[position[0], imageY, position[2]]} rotation={[0, 0, 0]} renderOrder={10}>
         <planeGeometry args={[imageWidth, imageHeight]} />
         <meshBasicMaterial map={texture} transparent />
@@ -416,45 +416,45 @@ const FloorStatsDisplay: React.FC<{
                 />
               </mesh>
               
-              {/* Percentage text - FRONT and LARGE */}
+              {/* Percentage text - SMALLER SIZE */}
               <Text
                 position={[curvedPos.x, 0.15, curvedPos.z + 3]}
-                fontSize={5.0} // Very large
+                fontSize={2.5} // FIXED: Smaller text (was 5.0)
                 color={barColorValue}
                 anchorX="center"
                 anchorY="middle"
                 rotation={[-Math.PI / 2, 0, 0]}
-                outlineWidth={0.2}
+                outlineWidth={0.1}
                 outlineColor={shadowColor}
                 fillOpacity={1}
               >
                 {percentage}%
               </Text>
               
-              {/* Vote count - FRONT */}
+              {/* Vote count - SMALLER */}
               <Text
                 position={[curvedPos.x, 0.12, curvedPos.z + 5]}
-                fontSize={2.2}
+                fontSize={1.2} // FIXED: Smaller text (was 2.2)
                 color="#94a3b8"
                 anchorX="center"
                 anchorY="middle"
                 rotation={[-Math.PI / 2, 0, 0]}
-                outlineWidth={0.06}
+                outlineWidth={0.03}
                 outlineColor="#000000"
               >
                 {option.responses} votes
               </Text>
               
-              {/* Option text - FRONT */}
+              {/* Option text - SMALLER */}
               <Text
                 position={[curvedPos.x, 0.12, curvedPos.z + 8]}
-                fontSize={textProps.fontSize * 1.8}
+                fontSize={textProps.fontSize * 1.2} // FIXED: Smaller multiplier (was 1.8)
                 color="#ffffff"
                 anchorX="center"
                 anchorY="middle"
                 rotation={[-Math.PI / 2, 0, 0]}
                 maxWidth={textProps.maxWidth}
-                outlineWidth={Math.max(0.04, textProps.fontSize * 0.06)}
+                outlineWidth={Math.max(0.02, textProps.fontSize * 0.03)}
                 outlineColor="#1e293b"
                 textAlign="center"
                 lineHeight={1.2}
