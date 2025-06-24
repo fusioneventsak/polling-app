@@ -43,9 +43,10 @@ const StatsCard: React.FC<{
 // FIXED: Activity display component with proper real-time handling
 const ActivityDisplay: React.FC<{
   activity: Activity;
+  currentRoom: Room;
   className?: string;
   isVotingLocked?: boolean;
-}> = ({ activity, className = "", isVotingLocked = false }) => {
+}> = ({ activity, currentRoom, className = "", isVotingLocked = false }) => {
   // FIXED: Force re-render when activity data changes
   const [renderKey, setRenderKey] = useState(0);
   
@@ -393,30 +394,32 @@ export const DisplayPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+    <div 
+      className="min-h-screen"
+      style={{
+        background: currentRoom?.settings?.theme?.background_gradient 
+          ? `linear-gradient(to bottom right, ${currentRoom.settings.theme.background_gradient.replace('from-', '').replace('via-', '').replace('to-', '').split(' ').map(color => {
+              const colorMap: { [key: string]: string } = {
+                'slate-900': '#0f172a',
+                'blue-900': '#1e3a8a',
+                'purple-900': '#581c87',
+                'green-900': '#14532d',
+                'red-900': '#7f1d1d',
+                'orange-900': '#7c2d12',
+                'gray-900': '#111827',
+                'blue-950': '#172554',
+                'slate-950': '#020617',
+                'black': '#000000',
+                'slate-800': '#1e293b'
+              };
+              return colorMap[color] || color;
+            }).join(', ')})` 
+          : 'linear-gradient(to bottom right, #15172a, #1e3a8a, #15172a)'
+      }}
+    >
       {/* FIXED: Enhanced header with connection status */}
       <motion.div 
-        className="backdrop-blur-sm border-b border-slate-700 px-6 py-4"
-        style={{
-          background: currentRoom?.settings?.theme?.background_gradient 
-            ? `linear-gradient(to bottom right, ${currentRoom.settings.theme.background_gradient.replace('from-', '').replace('via-', '').replace('to-', '').split(' ').map(color => {
-                const colorMap: { [key: string]: string } = {
-                  'slate-900': '#0f172a',
-                  'blue-900': '#1e3a8a',
-                  'purple-900': '#581c87',
-                  'green-900': '#14532d',
-                  'red-900': '#7f1d1d',
-                  'orange-900': '#7c2d12',
-                  'gray-900': '#111827',
-                  'blue-950': '#172554',
-                  'slate-950': '#020617',
-                  'black': '#000000',
-                  'slate-800': '#1e293b'
-                };
-                return colorMap[color] || color;
-              }).join(', ')})` 
-            : 'rgba(15, 23, 42, 0.8)'
-        }}
+        className="bg-slate-900/80 backdrop-blur-sm border-b border-slate-700 px-6 py-4"
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
@@ -473,6 +476,7 @@ export const DisplayPage: React.FC = () => {
             >
               <ActivityDisplay
                 activity={activeActivity}
+                currentRoom={currentRoom}
                 isVotingLocked={activeActivity.settings?.voting_locked || false}
                 className="h-full"
               />
