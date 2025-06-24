@@ -394,9 +394,9 @@ const FloorStatsDisplay: React.FC<{
         return (
           <group key={`${option.id}-${option.responses}`}>
             <group rotation={[0, -(curvedPos.rotationY || 0), 0]}>
-              {/* Floor panel - SMALLER width to prevent collisions */}
+              {/* Floor panel - NARROW and LONG to prevent width collisions */}
               <mesh position={[curvedPos.x, 0.05, curvedPos.z + 6]} rotation={[-Math.PI / 2, 0, 0]}>
-                <planeGeometry args={[spacing * 0.5, 5]} />
+                <planeGeometry args={[spacing * 0.3, 8]} />
                 <meshStandardMaterial 
                   color={floorColor}
                   transparent
@@ -406,9 +406,9 @@ const FloorStatsDisplay: React.FC<{
                 />
               </mesh>
               
-              {/* Glow panel - SMALLER width */}
+              {/* Glow panel - NARROW and LONG */}
               <mesh position={[curvedPos.x, 0.04, curvedPos.z + 6]} rotation={[-Math.PI / 2, 0, 0]}>
-                <planeGeometry args={[spacing * 0.55, 5.2]} />
+                <planeGeometry args={[spacing * 0.35, 8.3]} />
                 <meshBasicMaterial 
                   color={barColor}
                   transparent
@@ -416,9 +416,9 @@ const FloorStatsDisplay: React.FC<{
                 />
               </mesh>
               
-              {/* Percentage text - MUCH SMALLER */}
+              {/* Percentage text - positioned in longer container */}
               <Text
-                position={[curvedPos.x, 0.15, curvedPos.z + 4.5]}
+                position={[curvedPos.x, 0.15, curvedPos.z + 3.5]}
                 fontSize={1.5}
                 color={barColorValue}
                 anchorX="center"
@@ -431,7 +431,7 @@ const FloorStatsDisplay: React.FC<{
                 {percentage}%
               </Text>
               
-              {/* Vote count - MUCH SMALLER */}
+              {/* Vote count - centered in longer container */}
               <Text
                 position={[curvedPos.x, 0.12, curvedPos.z + 6]}
                 fontSize={0.8}
@@ -445,15 +445,15 @@ const FloorStatsDisplay: React.FC<{
                 {option.responses} votes
               </Text>
               
-              {/* Option text - MUCH SMALLER */}
+              {/* Option text - at back of longer container */}
               <Text
-                position={[curvedPos.x, 0.12, curvedPos.z + 7.5]}
+                position={[curvedPos.x, 0.12, curvedPos.z + 8.5]}
                 fontSize={textProps.fontSize * 0.8}
                 color="#ffffff"
                 anchorX="center"
                 anchorY="middle"
                 rotation={[-Math.PI / 2, 0, 0]}
-                maxWidth={textProps.maxWidth * 0.8}
+                maxWidth={textProps.maxWidth * 0.6}
                 outlineWidth={Math.max(0.01, textProps.fontSize * 0.02)}
                 outlineColor="#1e293b"
                 textAlign="center"
