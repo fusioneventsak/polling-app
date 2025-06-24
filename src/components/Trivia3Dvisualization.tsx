@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect, Suspense } from 'react';
+import React, { useRef, useState, useEffect, Suspense, useMemo } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { Text, Float, OrbitControls, Stars, Environment } from '@react-three/drei';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -48,36 +48,33 @@ const TriviaOptionCard: React.FC<{
     return new THREE.Color(`hsl(${hue}, 70%, 60%)`);
   }, [isRevealed, option.is_correct, index]);
 
-
   const glowColor = useMemo(() => {
-    const colorValue = isCorrect ? '#34d399' : color;
-    return new THREE.Color(colorValue);
-  }, [color, isCorrect]);
+    if (isRevealed && option.is_correct) {
+      return new THREE.Color('#34d399'); // Brighter green glow
+    }
+    return optionColor;
+  }, [isRevealed, option.is_correct, optionColor]);
 
-  const baseColor = useMemo(() => new THREE.Color("#1e293b"), []);
-  
+  // Animation loop
   useFrame((state) => {
     if (meshRef.current) {
       // Gentle floating animation
       meshRef.current.position.y = position[1] + Math.sin(state.clock.elapsedTime + delay) * 0.2;
-      
-      // Rotation based on phase
-      if (isAnswering) {
-    return `hsl(${hue}, 70%, 60%)`;
-  };
-
-  const getGlowColor = () => {
-    if (isRevealed && option.is_correct) {
-      return '#34d399'; // Brighter green glow
     }
-    return getOptionColor();
+  });
+
+  return (
+    <group position={position}>
+      <mesh
+        ref={meshRef}
+        onPointerOver={() => setHovered(true)}
+        onPointerOut={() => setHovered(false)}
       >
         <boxGeometry args={[4, 6, 0.5]} />
         <meshPhysicalMaterial
-          color={optionColor}
           transparent
           opacity={0.9}
-          color={baseColor}
+          color={optionColor}
           metalness={0.8}
           clearcoat={1}
           clearcoatRoughness={0.1}
