@@ -48,19 +48,6 @@ const TriviaOptionCard: React.FC<{
     return new THREE.Color(`hsl(${hue}, 70%, 60%)`);
   }, [isRevealed, option.is_correct, index]);
 
-  const glowColor = useMemo(() => {
-    if (isRevealed && option.is_correct) {
-      return new THREE.Color('#34d399'); // Brighter green glow
-    }
-    return optionColor;
-  }, [isRevealed, option.is_correct, optionColor]);
-
-  // Animation loop
-  // Create THREE.Color objects to prevent undefined value errors
-  const barColor = useMemo(() => {
-    const colorValue = isCorrect ? '#10b981' : color;
-    return new THREE.Color(colorValue);
-  }, [color, isCorrect]);
 
   const glowColor = useMemo(() => {
     const colorValue = isCorrect ? '#34d399' : color;
