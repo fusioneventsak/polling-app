@@ -134,116 +134,68 @@ const StandingImagePlane: React.FC<{
   );
 };
 
-// Volumetric Light Beam Component with realistic atmospheric scattering
-const VolumetricLightBeam: React.FC<{
+// Simplified Light Beam Component - More stable version
+const SimplifiedLightBeam: React.FC<{
   position: [number, number, number];
-  color: string; // Always expect string, convert to THREE.Color internally
+  color: string;
   intensity: number;
   responses: number;
 }> = ({ position, color, intensity, responses }) => {
   const beamRef = useRef<THREE.Group>(null);
+  const lightRef = useRef<THREE.SpotLight>(null);
   
-  // Create THREE.Color objects to prevent undefined value errors
+  // Create stable THREE.Color object
   const threeColor = useMemo(() => new THREE.Color(color), [color]);
   
   useFrame((state) => {
-    if (beamRef.current) {
-      // Subtle animation for the light beam
-      const time = state.clock.elapsedTime;
-      beamRef.current.children.forEach((child, index) => {
-        if (child instanceof THREE.Mesh) {
-          const material = child.material as THREE.MeshBasicMaterial;
-          if (material && material.opacity !== undefined) {
-            // Subtle pulsing based on responses
-            const baseOpacity = responses > 0 ? 0.15 : 0.03;
-            const pulse = Math.sin(time * 2 + index * 0.5) * 0.02;
-            material.opacity = baseOpacity + pulse;
-          }
-        }
-      });
+    if (lightRef.current && responses > 0) {
+      // Gentle pulsing for active responses
+      const pulse = 0.8 + Math.sin(state.clock.elapsedTime * 1.5) * 0.2;
+      lightRef.current.intensity = intensity * pulse;
     }
   });
 
   return (
     <group ref={beamRef}>
-      {/* Main Spotlight - This provides actual lighting */}
+      {/* Main spotlight for actual lighting */}
       <spotLight
-        position={[position[0], 18, position[2]]}
+        ref={lightRef}
+        position={[position[0], 16, position[2]]}
         target-position={[position[0], 0, position[2]]}
         color={threeColor}
-        intensity={responses > 0 ? intensity * 3 : intensity * 0.8}
-        angle={Math.PI / 8}
-        penumbra={0.4}
-        distance={25}
-        decay={1.5}
-        castShadow={true}
-        shadow-mapSize-width={1024}
-        shadow-mapSize-height={1024}
+        intensity={responses > 0 ? intensity * 2 : intensity * 0.5}
+        angle={Math.PI / 6}
+        penumbra={0.5}
+        distance={20}
+        decay={2}
+        castShadow={false}
       />
       
-      {/* Atmospheric Scattering - Multiple layers for depth */}
-      {Array.from({ length: 8 }).map((_, i) => {
-        const height = 2 + i * 1.8;
-        const radius = 0.3 + i * 0.4;
-        const opacity = responses > 0 ? (0.08 - i * 0.008) : (0.02 - i * 0.002);
-        
-        return (
-          <mesh 
-            key={i}
-            position={[position[0], 16 - height, position[2]]}
-            rotation={[0, 0, 0]}
-          >
-            <cylinderGeometry args={[radius, radius + 0.2, height, 16]} />
-            <meshBasicMaterial
-              color={threeColor}
-              transparent
-              opacity={Math.max(0.001, opacity)}
-              side={THREE.DoubleSide}
-              depthWrite={false}
-              blending={THREE.AdditiveBlending}
-            />
-          </mesh>
-        );
-      })}
-      
-      {/* Light Particles - Floating dust/particles in the beam */}
-      {responses > 0 && Array.from({ length: 12 }).map((_, i) => {
-        const angle = (i / 12) * Math.PI * 2;
-        const radius = Math.random() * 2;
-        const height = 2 + Math.random() * 12;
-        
-        return (
-          <mesh
-            key={`particle-${i}`}
-            position={[
-              position[0] + Math.cos(angle) * radius,
-              16 - height,
-              position[2] + Math.sin(angle) * radius
-            ]}
-          >
-            <sphereGeometry args={[0.02]} />
-            <meshBasicMaterial
-              color={threeColor}
-              transparent
-              opacity={0.6}
-              emissive={threeColor}
-              emissiveIntensity={0.3}
-            />
-          </mesh>
-        );
-      })}
-      
-      {/* Ground Light Pool - Where the light hits the floor */}
+      {/* Simple beam visualization - single cylinder */}
       <mesh 
-        position={[position[0], 0.01, position[2]]} 
-        rotation={[-Math.PI / 2, 0, 0]}
+        position={[position[0], 8, position[2]]}
+        rotation={[0, 0, 0]}
       >
-        <circleGeometry args={[3, 32]} />
+        <cylinderGeometry args={[1.5, 0.5, 16, 12]} />
         <meshBasicMaterial
           color={threeColor}
           transparent
-          opacity={responses > 0 ? 0.15 : 0.05}
-          blending={THREE.AdditiveBlending}
+          opacity={responses > 0 ? 0.1 : 0.03}
+          side={THREE.DoubleSide}
+          depthWrite={false}
+        />
+      </mesh>
+      
+      {/* Ground light pool */}
+      <mesh 
+        position={[position[0], 0.02, position[2]]} 
+        rotation={[-Math.PI / 2, 0, 0]}
+      >
+        <circleGeometry args={[2.5, 16]} />
+        <meshBasicMaterial
+          color={threeColor}
+          transparent
+          opacity={responses > 0 ? 0.2 : 0.05}
           depthWrite={false}
         />
       </mesh>
@@ -279,7 +231,7 @@ const Enhanced3DBar: React.FC<{
   const glowRef = useRef<THREE.Mesh>(null);
   const [animatedHeight, setAnimatedHeight] = useState(0.2);
   
-  // Create THREE.Color objects to prevent undefined value errors
+  // Create stable color values
   const barColorValue = isCorrect ? '#10b981' : color;
   const glowColorValue = isCorrect ? '#34d399' : color;
   
@@ -315,7 +267,7 @@ const Enhanced3DBar: React.FC<{
       
       const pulseIntensity = 0.1 + Math.sin(state.clock.elapsedTime * 2 + delay) * 0.05;
       const material = glowRef.current.material as THREE.MeshBasicMaterial;
-      if (material && material.opacity !== undefined) {
+      if (material && typeof material.opacity !== 'undefined') {
         material.opacity = pulseIntensity;
       }
     }
@@ -323,11 +275,11 @@ const Enhanced3DBar: React.FC<{
 
   return (
     <group>
-      {/* Volumetric Light Beam - Pass string color, not THREE.Color */}
-      <VolumetricLightBeam
+      {/* Simplified Light Beam */}
+      <SimplifiedLightBeam
         position={position}
-        color={barColorValue} // Pass string instead of THREE.Color object
-        intensity={responses > 0 ? 1.2 : 0.4}
+        color={barColorValue}
+        intensity={responses > 0 ? 1.0 : 0.3}
         responses={responses}
       />
       
@@ -374,22 +326,19 @@ const calculateFitFontSize = (text: string, spacing: number) => {
   const textLength = text.length;
   
   // Base calculation: estimate character width relative to font size
-  // Rough estimate: each character is about 0.6x the font size in width
   const charWidthRatio = 0.6;
-  
-  // Calculate the font size needed to fit the text
   let fontSize = availableWidth / (textLength * charWidthRatio);
   
   // Set reasonable bounds
-  const maxFontSize = 1.6; // Don't go bigger than this for short text
-  const minFontSize = 0.4; // Don't go smaller than this for readability
+  const maxFontSize = 1.6;
+  const minFontSize = 0.4;
   
   fontSize = Math.max(minFontSize, Math.min(maxFontSize, fontSize));
   
   return {
     fontSize,
     maxWidth: availableWidth,
-    displayText: text // Always show full text, no truncation
+    displayText: text
   };
 };
 
@@ -398,7 +347,6 @@ const FloorStatsDisplay: React.FC<{
   options: ActivityOption[];
   totalResponses: number;
 }> = ({ options, totalResponses }) => {
-  // Create THREE.Color objects for floor materials
   const floorColor = useMemo(() => new THREE.Color("#0f172a"), []);
   const shadowColor = useMemo(() => new THREE.Color("#000000"), []);
 
@@ -414,14 +362,12 @@ const FloorStatsDisplay: React.FC<{
         const startX = -totalWidth / 2;
         const xPosition = startX + index * spacing;
         
-        // Dynamic colors based on option
         const hue = (index / Math.max(options.length - 1, 1)) * 300;
         const barColorValue = option.is_correct 
           ? '#10b981' 
           : `hsl(${200 + hue}, 75%, 60%)`;
         const barColor = useMemo(() => new THREE.Color(barColorValue), [barColorValue]);
         
-        // Calculate font size to fit entire text
         const textProps = calculateFitFontSize(option.text, spacing);
         
         return (
@@ -463,20 +409,7 @@ const FloorStatsDisplay: React.FC<{
               {percentage}%
             </Text>
             
-            {/* Percentage shadow for depth */}
-            <Text
-              position={[xPosition + 0.1, 0.1, 6.1]}
-              fontSize={2.2}
-              color={shadowColor}
-              anchorX="center"
-              anchorY="middle"
-              rotation={[-Math.PI / 2, 0, 0]}
-              fillOpacity={0.3}
-            >
-              {percentage}%
-            </Text>
-            
-            {/* Vote count with better styling */}
+            {/* Vote count */}
             <Text
               position={[xPosition, 0.12, 7.5]}
               fontSize={1.1}
@@ -490,7 +423,7 @@ const FloorStatsDisplay: React.FC<{
               {option.responses} votes
             </Text>
             
-            {/* Auto-scaling option text - fits entire text */}
+            {/* Auto-scaling option text */}
             <Text
               position={[xPosition, 0.12, 9]}
               fontSize={textProps.fontSize}
@@ -501,22 +434,6 @@ const FloorStatsDisplay: React.FC<{
               maxWidth={textProps.maxWidth}
               outlineWidth={Math.max(0.02, textProps.fontSize * 0.03)}
               outlineColor="#1e293b"
-              textAlign="center"
-              lineHeight={1.2}
-            >
-              {textProps.displayText}
-            </Text>
-            
-            {/* Option text shadow */}
-            <Text
-              position={[xPosition + 0.05, 0.08, 9.05]}
-              fontSize={textProps.fontSize}
-              color="#000000"
-              anchorX="center"
-              anchorY="middle"
-              rotation={[-Math.PI / 2, 0, 0]}
-              maxWidth={textProps.maxWidth}
-              fillOpacity={0.4}
               textAlign="center"
               lineHeight={1.2}
             >
@@ -548,12 +465,9 @@ const StandingImagesDisplay: React.FC<{
         const xPosition = startX + index * spacing;
         
         const hue = (index / Math.max(options.length - 1, 1)) * 300;
-        const saturation = 75;
-        const lightness = 60;
-        
         const glowColorValue = option.is_correct 
           ? '#10b981' 
-          : `hsl(${200 + hue}, ${saturation}%, ${lightness}%)`;
+          : `hsl(${200 + hue}, 75%, 60%)`;
         
         return (
           <group key={option.id}>
@@ -581,22 +495,22 @@ const Enhanced3DScene: React.FC<{
   const maxResponses = Math.max(...options.map(opt => opt.responses), 1);
   const maxHeight = 4;
   
-  // Create THREE.Color objects for scene materials
-  const floorColor = useMemo(() => new THREE.Color("#000000"), []);
-  const accentColor = useMemo(() => new THREE.Color(themeColors.accentColor), [themeColors.accentColor]);
-  const secondaryColor = useMemo(() => new THREE.Color(themeColors.secondaryColor), [themeColors.secondaryColor]);
+  // Create stable THREE.Color objects
+  const floorColor = useMemo(() => new THREE.Color("#1a1a1a"), []); // Lighter floor for visibility
   const whiteColor = useMemo(() => new THREE.Color("#ffffff"), []);
   const titleShadowColor = useMemo(() => new THREE.Color("#1e293b"), []);
   
   useEffect(() => {
-    camera.position.set(0, 15, 40);
+    // Better camera positioning for floor visibility
+    camera.position.set(0, 12, 35);
+    camera.lookAt(0, 2, 0);
     
     const animateCamera = () => {
       const targetX = 0;
-      const targetY = 4;
+      const targetY = 8; // Lower Y for better floor view
       
-      const baseDistance = 18;
-      const extraDistance = Math.max(0, (options.length - 2) * 2.5);
+      const baseDistance = 25; // Closer to see floor better
+      const extraDistance = Math.max(0, (options.length - 2) * 2);
       const targetZ = baseDistance + extraDistance;
       
       const animationDuration = 2000;
@@ -622,7 +536,6 @@ const Enhanced3DScene: React.FC<{
     };
     
     const timer = setTimeout(animateCamera, 100);
-    
     return () => clearTimeout(timer);
   }, [camera, options.length]);
   
@@ -630,50 +543,29 @@ const Enhanced3DScene: React.FC<{
   
   return (
     <>
-      <ambientLight intensity={0.8} />
+      {/* Simpler lighting setup to avoid uniform errors */}
+      <ambientLight intensity={0.6} />
       <directionalLight 
         position={[10, 20, 5]} 
-        intensity={1.5} 
+        intensity={1.2} 
         castShadow
-        shadow-mapSize-width={2048}
-        shadow-mapSize-height={2048}
-        shadow-camera-far={50}
-        shadow-camera-left={-25}
-        shadow-camera-right={25}
-        shadow-camera-top={25}
-        shadow-camera-bottom={-25}
+        shadow-mapSize-width={1024}
+        shadow-mapSize-height={1024}
       />
       <directionalLight 
         position={[-10, 15, 10]} 
-        intensity={1.2} 
+        intensity={0.8} 
         color="#ffffff"
       />
-      <directionalLight 
-        position={[0, 25, -10]} 
-        intensity={1.0} 
-        color="#ffffff"
-      />
-      <pointLight position={[-10, 10, 10]} intensity={0.8} color={themeColors.accentColor} />
-      <pointLight position={[10, 10, -10]} intensity={0.6} color={themeColors.secondaryColor} />
-      <pointLight position={[0, 15, 5]} intensity={0.9} color="#ffffff" />
-      <spotLight 
-        position={[0, 18, 0]} 
-        intensity={1.2} 
-        angle={Math.PI / 3}
-        penumbra={0.3}
-        color={whiteColor}
-        castShadow
-      />
+      <pointLight position={[0, 15, 5]} intensity={0.6} color="#ffffff" />
       
+      {/* More visible floor */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow>
         <planeGeometry args={[100, 100]} />
         <meshStandardMaterial 
           color={floorColor} 
-          transparent 
-          opacity={1.0}
-          metalness={0.95}
-          roughness={0.05}
-          envMapIntensity={3.0}
+          metalness={0.3}
+          roughness={0.7}
         />
       </mesh>
       
@@ -694,12 +586,9 @@ const Enhanced3DScene: React.FC<{
         const startX = -totalWidth / 2;
         
         const hue = (index / Math.max(options.length - 1, 1)) * 300;
-        const saturation = 75;
-        const lightness = 60;
-        
         const barColorValue = option.is_correct 
           ? '#10b981' 
-          : `hsl(${200 + hue}, ${saturation}%, ${lightness}%)`;
+          : `hsl(${200 + hue}, 75%, 60%)`;
         
         return (
           <Enhanced3DBar
@@ -720,7 +609,7 @@ const Enhanced3DScene: React.FC<{
       
       <Float speed={0.3} rotationIntensity={0.01} floatIntensity={0.05}>
         <Text
-          position={[0, 12, -15]}
+          position={[0, 10, -15]}
           fontSize={titleFontSize}
           color="#ffffff"
           anchorX="center"
@@ -731,7 +620,7 @@ const Enhanced3DScene: React.FC<{
         </Text>
         
         <Text
-          position={[0.1, 11.9, -15.1]}
+          position={[0.1, 9.9, -15.1]}
           fontSize={titleFontSize}
           color={titleShadowColor}
           anchorX="center"
@@ -823,7 +712,7 @@ export const Enhanced3DPollVisualization: React.FC<Enhanced3DPollVisualizationPr
         <Canvas
           key={`canvas-${options.length}`}
           camera={{ 
-            position: [0, 15, 40],
+            position: [0, 12, 35],
             fov: 75,
             near: 0.1,
             far: 1000
@@ -853,12 +742,13 @@ export const Enhanced3DPollVisualization: React.FC<Enhanced3DPollVisualizationPr
             enablePan={false}
             enableZoom={true}
             enableRotate={true}
-            minDistance={12}
-            maxDistance={45}
-            minPolarAngle={Math.PI / 8}
-            maxPolarAngle={Math.PI / 2.5}
+            minDistance={15}
+            maxDistance={50}
+            minPolarAngle={Math.PI / 12}
+            maxPolarAngle={Math.PI / 2.2}
             autoRotate={false}
             rotateSpeed={0.5}
+            target={[0, 2, 0]}
           />
         </Canvas>
       </Suspense>
