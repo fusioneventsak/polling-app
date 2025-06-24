@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Users, Play, Square, Trash2, Edit3, MoreVertical, ExternalLink, BarChart3, Clock, Target, Lock, Unlock, RotateCcw, Settings } from 'lucide-react';
+import { Plus, Users, Play, Square, Trash2, Edit3, MoreVertical, ExternalLink, BarChart3, Clock, Target, Lock, Unlock, RotateCcw, Settings, MessageSquare, HelpCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card } from '../components/Card';
 import { Button } from '../components/Button';
@@ -8,7 +8,34 @@ import { ActivityEditor } from '../components/ActivityEditor';
 import { TriviaGameControls } from '../components/TriviaGameControls';
 import { roomService } from '../services/roomService';
 import { supabase } from '../lib/supabase';
-import type { Room, Activity, CreateRoomData, CreateActivityData } from '../types';
+import type { Room, Activity, CreateRoomData, CreateActivityData, ActivityType } from '../types';
+
+// Add the missing helper functions
+const getActivityIcon = (type: ActivityType) => {
+  switch (type) {
+    case 'poll':
+      return Target;
+    case 'trivia':
+      return HelpCircle;
+    case 'quiz':
+      return MessageSquare;
+    default:
+      return Target;
+  }
+};
+
+const getActivityTypeLabel = (type: ActivityType) => {
+  switch (type) {
+    case 'poll':
+      return 'Poll';
+    case 'trivia':
+      return 'Trivia';
+    case 'quiz':
+      return 'Quiz';
+    default:
+      return 'Activity';
+  }
+};
 
 export const AdminPage: React.FC = () => {
   const [rooms, setRooms] = useState<Room[]>([]);
