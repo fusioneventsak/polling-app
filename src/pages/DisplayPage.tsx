@@ -432,12 +432,29 @@ export const DisplayPage: React.FC = () => {
               }
             }
           )
+      } catch (error) {
+        console.error(`❌ DisplayPage: Failed to setup subscriptions for ${pollId} (attempt ${retryCount}):`, error);
+        
+        // Retry with exponential backoff if we haven't exceeded max retries
+        if (retryCount < maxRetries) {
+          const retryDelay = Math.min(retryCount * 2000, 10000);
+          console.log(`🔄 DisplayPage: Retrying subscription setup in ${retryDelay}ms...`);
+          
+          setTimeout(() => {
+            if (isActive) {
+              setupSubscriptions();
+            }
+          }, retryDelay);
+        } else {
+          console.warn(`⚠️ DisplayPage: Max retry attempts reached for room ${pollId}`);
+        }
+      }
       }
     }
 
     // Start setup
     setupSubscriptions();
-    // Cleanup
+    
     // Cleanup
     return () => {
       console.log('🧹 DisplayPage: Component cleanup');
@@ -448,6 +465,8 @@ export const DisplayPage: React.FC = () => {
       }
     };
   }, [pollId, loadRoom, currentRoom?.id]);
+
+  const [currentTime, setCurrentTime] = useState(new Date());
 
   const getRoomStats = () => {
     if (!currentRoom) return null;
