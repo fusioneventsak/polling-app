@@ -20,28 +20,28 @@ interface Enhanced3DPollVisualizationProps {
   className?: string;
 }
 
-// FINAL: BIGGER amphitheater to prevent collisions
+// FINAL: Amphitheater curve TOWARD camera for all options
 const getCurvedPosition = (index: number, totalCount: number, radius: number = 28) => {
   // For small counts, use straight line with MASSIVE spacing
   if (totalCount <= 2) {
-    const spacing = 25; // Much bigger
+    const spacing = 25;
     const totalWidth = (totalCount - 1) * spacing;
     const startX = -totalWidth / 2;
-    return { x: startX + index * spacing, z: 0, rotationY: 0 };
+    return { x: startX + index * spacing, z: 2, rotationY: 0 }; // FORWARD toward camera
   }
   
-  // For 3 options, huge spacing
+  // For 3 options, curve TOWARD camera
   if (totalCount === 3) {
     const positions = [
-      { x: -25, z: -2, rotationY: 0.25 },
-      { x: 0, z: 0, rotationY: 0 },
-      { x: 25, z: -2, rotationY: -0.25 }
+      { x: -25, z: 0, rotationY: 0.2 },   // CURVE FORWARD
+      { x: 0, z: 3, rotationY: 0 },       // CENTER FORWARD
+      { x: 25, z: 0, rotationY: -0.2 }    // CURVE FORWARD
     ];
     return positions[index];
   }
   
-  // For 4+ options, MASSIVE amphitheater to prevent collisions
-  const adjustedRadius = Math.max(radius, totalCount * 5); // Much bigger multiplier
+  // For 4+ options, AMPHITHEATER CURVE TOWARD CAMERA
+  const adjustedRadius = Math.max(radius, totalCount * 5);
   const maxAngle = Math.min(Math.PI * 1.1, totalCount * 0.35);
   const angleStep = maxAngle / Math.max(totalCount - 1, 1);
   const startAngle = -maxAngle / 2;
@@ -49,7 +49,7 @@ const getCurvedPosition = (index: number, totalCount: number, radius: number = 2
   
   return {
     x: Math.sin(angle) * adjustedRadius,
-    z: Math.cos(angle) * adjustedRadius * 0.25 - 2,
+    z: Math.cos(angle) * adjustedRadius * 0.4 + 5, // CURVE TOWARD CAMERA (+5 instead of -2)
     rotationY: angle * 0.3
   };
 };
@@ -326,9 +326,9 @@ const Enhanced3DBar: React.FC<{
           responses={responses}
         />
         
-        {/* FIXED: Larger base platform */}
+        {/* MUCH LARGER base platform */}
         <mesh position={[position[0], 0.1, position[2]]}>
-          <cylinderGeometry args={[1.2, 1.2, 0.2]} />
+          <cylinderGeometry args={[2.0, 2.0, 0.3]} />
           <meshStandardMaterial 
             color={baseColor}
             metalness={0.8}
@@ -336,9 +336,9 @@ const Enhanced3DBar: React.FC<{
           />
         </mesh>
         
-        {/* FIXED: Larger main bar */}
-        <mesh ref={meshRef} position={[position[0], 0.2, position[2]]} scale={[1, 0.2, 1]}>
-          <cylinderGeometry args={[1.0, 1.0, 1]} />
+        {/* MUCH LARGER main bar */}
+        <mesh ref={meshRef} position={[position[0], 0.3, position[2]]} scale={[1, 0.2, 1]}>
+          <cylinderGeometry args={[1.6, 1.6, 1]} />
           <meshStandardMaterial 
             color={barColor}
             metalness={0.4}
@@ -348,10 +348,10 @@ const Enhanced3DBar: React.FC<{
           />
         </mesh>
         
-        {/* FIXED: Larger glow effect */}
+        {/* MUCH LARGER glow effect */}
         {responses > 0 && (
-          <mesh ref={glowRef} position={[position[0], 0.2, position[2]]} scale={[1.3, 0.2, 1.3]}>
-            <cylinderGeometry args={[1.1, 1.1, 1]} />
+          <mesh ref={glowRef} position={[position[0], 0.3, position[2]]} scale={[1.3, 0.2, 1.3]}>
+            <cylinderGeometry args={[1.8, 1.8, 1]} />
             <meshBasicMaterial 
               color={glowColor}
               transparent
@@ -394,8 +394,8 @@ const FloorStatsDisplay: React.FC<{
         return (
           <group key={`${option.id}-${option.responses}`}>
             <group rotation={[0, -(curvedPos.rotationY || 0), 0]}>
-              {/* Floor panel - NARROW and LONG to prevent width collisions */}
-              <mesh position={[curvedPos.x, 0.05, curvedPos.z + 6]} rotation={[-Math.PI / 2, 0, 0]}>
+              {/* Floor panel - positioned forward in amphitheater */}
+              <mesh position={[curvedPos.x, 0.05, curvedPos.z + 7]} rotation={[-Math.PI / 2, 0, 0]}>
                 <planeGeometry args={[spacing * 0.3, 8]} />
                 <meshStandardMaterial 
                   color={floorColor}
@@ -406,8 +406,8 @@ const FloorStatsDisplay: React.FC<{
                 />
               </mesh>
               
-              {/* Glow panel - NARROW and LONG */}
-              <mesh position={[curvedPos.x, 0.04, curvedPos.z + 6]} rotation={[-Math.PI / 2, 0, 0]}>
+              {/* Glow panel - positioned forward */}
+              <mesh position={[curvedPos.x, 0.04, curvedPos.z + 7]} rotation={[-Math.PI / 2, 0, 0]}>
                 <planeGeometry args={[spacing * 0.35, 8.3]} />
                 <meshBasicMaterial 
                   color={barColor}
@@ -416,9 +416,9 @@ const FloorStatsDisplay: React.FC<{
                 />
               </mesh>
               
-              {/* Percentage text - positioned in longer container */}
+              {/* Percentage text - forward position */}
               <Text
-                position={[curvedPos.x, 0.15, curvedPos.z + 3.5]}
+                position={[curvedPos.x, 0.15, curvedPos.z + 4.5]}
                 fontSize={1.5}
                 color={barColorValue}
                 anchorX="center"
@@ -431,9 +431,9 @@ const FloorStatsDisplay: React.FC<{
                 {percentage}%
               </Text>
               
-              {/* Vote count - centered in longer container */}
+              {/* Vote count - forward position */}
               <Text
-                position={[curvedPos.x, 0.12, curvedPos.z + 6]}
+                position={[curvedPos.x, 0.12, curvedPos.z + 7]}
                 fontSize={0.8}
                 color="#94a3b8"
                 anchorX="center"
@@ -445,9 +445,9 @@ const FloorStatsDisplay: React.FC<{
                 {option.responses} votes
               </Text>
               
-              {/* Option text - at back of longer container */}
+              {/* Option text - forward position */}
               <Text
-                position={[curvedPos.x, 0.12, curvedPos.z + 8.5]}
+                position={[curvedPos.x, 0.12, curvedPos.z + 9.5]}
                 fontSize={textProps.fontSize * 0.8}
                 color="#ffffff"
                 anchorX="center"
@@ -493,7 +493,7 @@ const StandingImagesDisplay: React.FC<{
             <group rotation={[0, -(curvedPos.rotationY || 0), 0]}>
               <StandingImagePlane
                 imageUrl={option.media_url}
-                position={[curvedPos.x, 0, curvedPos.z + 1]} // MIDDLE LAYER - between stats and bars
+                position={[curvedPos.x, 0, curvedPos.z + 2]} // Images in front of bars, behind stats
                 fallbackText={`Option ${String.fromCharCode(65 + index)}`}
                 glowColor={glowColorValue}
               />
@@ -629,7 +629,7 @@ const Enhanced3DScene: React.FC<{
         return (
           <Enhanced3DBar
             key={`${option.id}-${option.responses}`}
-            position={[curvedPos.x, 0, curvedPos.z - 4]} // BACK LAYER - bars behind everything
+            position={[curvedPos.x, 0, curvedPos.z - 2]} // Bars behind images
             height={height}
             color={barColorValue}
             label={option.text}
