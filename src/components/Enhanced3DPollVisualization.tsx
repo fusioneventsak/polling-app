@@ -49,16 +49,27 @@ const calculateFitFontSize = (text: string, spacing: number) => {
   };
 };
 
-// Shared curve calculation function
+// Shared curve calculation function with dynamic spacing
 const getCurvedPosition = (index: number, totalItems: number, baseZ: number = -8) => {
-  const radius = 30;
-  const spread = Math.PI / 4;
+  // Dynamic radius based on number of options for better spacing
+  const baseRadius = 30;
+  const radiusMultiplier = Math.max(1, totalItems / 3); // Increase radius for more items
+  const radius = baseRadius * radiusMultiplier;
+  
+  // Dynamic spread - wider arc for more options
+  const baseSpread = Math.PI / 4; // 45 degrees for 2-3 items
+  const maxSpread = Math.PI / 2.2; // Max ~82 degrees for many items
+  const spread = Math.min(maxSpread, baseSpread * Math.max(1, totalItems / 3));
+  
   const step = totalItems > 1 ? spread / (totalItems - 1) : 0;
   const angle = -spread / 2 + index * step;
   
+  // Dynamic depth variation - more pronounced for larger groups
+  const depthVariation = Math.max(5, totalItems * 1.2);
+  
   return {
     x: Math.sin(angle) * radius,
-    z: baseZ + Math.cos(angle) * 5
+    z: baseZ + Math.cos(angle) * depthVariation
   };
 };
 
