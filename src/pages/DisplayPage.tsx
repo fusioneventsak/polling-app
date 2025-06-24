@@ -56,7 +56,7 @@ const QRCodeDisplay: React.FC<{ url: string; size?: number }> = ({ url, size = 2
 };
 
 // Enhanced Activity Display Component with Fixed Trivia Detection
-const ActivityDisplay = ({ currentRoom, currentTime, formatTime }: {
+const ActivityDisplay = ({ currentRoom, currentTime, formatTime, displayActiveActivity }: {
   currentRoom: Room;
   currentTime: Date;
   formatTime: (date: Date) => string;
