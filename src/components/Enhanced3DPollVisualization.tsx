@@ -326,15 +326,6 @@ const Enhanced3DBar: React.FC<{
     }
   });
 
-  const barColor = useMemo(() => {
-    if (isCorrect) return '#10b981';
-    return color;
-  }, [color, isCorrect]);
-
-  const glowColor = useMemo(() => {
-    if (isCorrect) return '#34d399';
-    return color;
-  }, [color, isCorrect]);
 
   return (
     <group>
