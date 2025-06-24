@@ -9,8 +9,8 @@ import { Trivia3DVisualization } from '../components/Trivia3Dvisualization';
 import { useTriviaGame } from '../hooks/useTriviaGame';
 import type { ActivityType, Room, Activity } from '../types';
 
-// Import our new static QR Code component
-import QRCodeDisplay from '../components/QRCodeDisplay';
+// Import our static QR Code component
+import QRCodeDisplay from './QRCodeComponent';
 
 // Enhanced Activity Display Component with Fixed Trivia Detection
 const ActivityDisplay = ({ currentRoom, currentTime, formatTime, displayActiveActivity }: {
