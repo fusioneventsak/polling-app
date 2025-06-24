@@ -324,8 +324,8 @@ const Enhanced3DBar: React.FC<{
         responses={responses}
       />
       
-      {/* Apply rotation to the entire bar group for tilting effect */}
-      <group rotation={[0, getCurvedPosition(index, 1).rotationY || 0, 0]}>
+      {/* Apply NEGATIVE rotation to bars for tilting toward camera (amphitheater style) */}
+      <group rotation={[0, -(getCurvedPosition(index, 1).rotationY || 0), 0]}>
         <mesh position={[position[0], 0.05, position[2]]}>
           <cylinderGeometry args={[3.2, 3.2, 0.25]} />
           <meshStandardMaterial 
