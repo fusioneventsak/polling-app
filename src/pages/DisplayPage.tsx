@@ -337,8 +337,6 @@ export const DisplayPage: React.FC = () => {
     let isActive = true;
     let retryCount = 0;
     const maxRetries = 3;
-    let retryCount = 0;
-    const maxRetries = 3;
 
     const setupSubscriptions = async () => {
       if (retryCount >= maxRetries) {
