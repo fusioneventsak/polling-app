@@ -528,18 +528,14 @@ const Enhanced3DScene: React.FC<{
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow>
         <planeGeometry args={[100, 100]} />
         <meshStandardMaterial 
-          color="#0f172a" 
+          color="#000000" 
           transparent 
-          opacity={0.9}
-          metalness={0.3}
-          roughness={0.7}
+          opacity={1.0}
+          metalness={0.95}
+          roughness={0.05}
+          envMapIntensity={2.0}
         />
       </mesh>
-      
-      <gridHelper 
-        args={[100, 100, themeColors.accentColor, '#334155']} 
-        position={[0, 0.01, 0]}
-      />
       
       <FloorStatsDisplay options={options} totalResponses={totalResponses} />
       
