@@ -519,7 +519,11 @@ const Enhanced3DScene: React.FC<{
   const titleShadowColor = useMemo(() => new THREE.Color("#1e293b"), []);
   
   useEffect(() => {
-    camera.position.set(0, 12, 35);
+    // Always start camera from far away for dramatic entrance
+    const startDistance = 80; // Far away starting position
+    const startHeight = 25; // High starting position
+    
+    camera.position.set(0, startHeight, startDistance);
     camera.lookAt(0, 2, 0);
     
     const animateCamera = () => {
@@ -530,12 +534,12 @@ const Enhanced3DScene: React.FC<{
       const extraHeight = Math.max(0, (options.length - 3) * 1.5); // Raise camera for more options
       const targetY = baseHeight + extraHeight;
       
-      // Closer camera for better readability
-      const baseDistance = 24; // Closer than 28 for readable text
-      const extraDistance = Math.max(0, (options.length - 2) * 3); // Moderate scaling
+      // Dynamic distance for optimal viewing
+      const baseDistance = 24;
+      const extraDistance = Math.max(0, (options.length - 2) * 3);
       const targetZ = baseDistance + extraDistance;
       
-      const animationDuration = 2000;
+      const animationDuration = 3000; // Longer animation for dramatic effect
       const startTime = Date.now();
       const startPos = camera.position.clone();
       
@@ -543,7 +547,10 @@ const Enhanced3DScene: React.FC<{
         const elapsed = Date.now() - startTime;
         const progress = Math.min(elapsed / animationDuration, 1);
         
-        const easeProgress = 1 - Math.pow(1 - progress, 3);
+        // Smooth easing with slight bounce at the end
+        const easeProgress = progress < 0.8 
+          ? 1 - Math.pow(1 - progress, 3) // Ease out cubic for first 80%
+          : 1 - 0.1 * Math.sin((progress - 0.8) * Math.PI * 5); // Subtle bounce for last 20%
         
         camera.position.x = startPos.x + (targetX - startPos.x) * easeProgress;
         camera.position.y = startPos.y + (targetY - startPos.y) * easeProgress;
@@ -764,11 +771,11 @@ export const Enhanced3DPollVisualization: React.FC<Enhanced3DPollVisualizationPr
             enableRotate={true}
             minDistance={16} // Closer for readability
             maxDistance={Math.max(40, options.length * 4)} // Reduced scaling
-            minPolarAngle={Math.PI / 12}
+            minPolarAngle={Math.PI / 16} // Slightly higher angle for better overview
             maxPolarAngle={Math.PI / 2.2}
             autoRotate={false}
             rotateSpeed={0.5}
-            target={[0, 2, 0]}
+            target={[0, 2 + Math.max(0, (options.length - 4) * 0.5), 0]} // Dynamic target
           />
         </Canvas>
       </Suspense>
