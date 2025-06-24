@@ -157,30 +157,46 @@ const SimplifiedLightBeam: React.FC<{
 
   return (
     <group ref={beamRef}>
-      {/* Main spotlight for actual lighting */}
+      {/* Main spotlight for actual lighting - positioned high above scene */}
       <spotLight
         ref={lightRef}
-        position={[position[0], 16, position[2]]}
+        position={[position[0], 25, position[2]]}
         target-position={[position[0], 0, position[2]]}
         color={threeColor}
         intensity={responses > 0 ? intensity * 2 : intensity * 0.5}
-        angle={Math.PI / 6}
-        penumbra={0.5}
-        distance={20}
-        decay={2}
+        angle={Math.PI / 8}
+        penumbra={0.4}
+        distance={30}
+        decay={1.5}
         castShadow={false}
       />
       
-      {/* Simple beam visualization - single cylinder */}
+      {/* Light beam visualization - cone shape pointing down from sky */}
       <mesh 
-        position={[position[0], 8, position[2]]}
+        position={[position[0], 12, position[2]]}
         rotation={[0, 0, 0]}
       >
-        <cylinderGeometry args={[1.5, 0.5, 16, 12]} />
+        {/* Corrected geometry: small radius at top (0.3), large at bottom (2.0) */}
+        <cylinderGeometry args={[2.0, 0.3, 20, 16]} />
         <meshBasicMaterial
           color={threeColor}
           transparent
-          opacity={responses > 0 ? 0.1 : 0.03}
+          opacity={responses > 0 ? 0.08 : 0.02}
+          side={THREE.DoubleSide}
+          depthWrite={false}
+        />
+      </mesh>
+      
+      {/* Additional beam layers for depth */}
+      <mesh 
+        position={[position[0], 12, position[2]]}
+        rotation={[0, 0, 0]}
+      >
+        <cylinderGeometry args={[1.7, 0.25, 20, 16]} />
+        <meshBasicMaterial
+          color={threeColor}
+          transparent
+          opacity={responses > 0 ? 0.05 : 0.01}
           side={THREE.DoubleSide}
           depthWrite={false}
         />
