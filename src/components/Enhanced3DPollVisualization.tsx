@@ -69,7 +69,8 @@ const getCurvedPosition = (index: number, totalItems: number, baseZ: number = -8
   
   return {
     x: Math.sin(angle) * radius,
-    z: baseZ - Math.cos(angle) * depthVariation // Curve toward audience
+    z: baseZ - Math.cos(angle) * depthVariation, // Curve toward audience
+    rotationY: angle * 0.7 // Add rotation to face the center (reduced intensity)
   };
 };
 
@@ -323,39 +324,42 @@ const Enhanced3DBar: React.FC<{
         responses={responses}
       />
       
-      <mesh position={[position[0], 0.05, position[2]]}>
-        <cylinderGeometry args={[3.2, 3.2, 0.25]} />
-        <meshStandardMaterial 
-          color={baseColor}
-          metalness={0.8}
-          roughness={0.2}
-        />
-      </mesh>
-      
-      <mesh ref={meshRef} position={[position[0], 0.15, position[2]]} scale={[1, 0.2, 1]} castShadow>
-        <cylinderGeometry args={[2.4, 2.4, 1]} />
-        <meshStandardMaterial 
-          color={barColor}
-          metalness={0.7}
-          roughness={0.2}
-          envMapIntensity={1.5}
-          transparent
-          opacity={0.95}
-          emissive={barColor}
-          emissiveIntensity={responses > 0 ? 0.1 : 0.02}
-        />
-      </mesh>
-      
-      {responses > 0 && (
-        <mesh ref={glowRef} position={[position[0], 0.15, position[2]]} scale={[1.8, 0.2, 1.8]}>
-          <cylinderGeometry args={[2.1, 2.1, 1]} />
-          <meshBasicMaterial 
-            color={glowColor}
-            transparent
-            opacity={0.12}
+      {/* Apply rotation to the entire bar group for tilting effect */}
+      <group rotation={[0, getCurvedPosition(index, 1).rotationY || 0, 0]}>
+        <mesh position={[position[0], 0.05, position[2]]}>
+          <cylinderGeometry args={[3.2, 3.2, 0.25]} />
+          <meshStandardMaterial 
+            color={baseColor}
+            metalness={0.8}
+            roughness={0.2}
           />
         </mesh>
-      )}
+        
+        <mesh ref={meshRef} position={[position[0], 0.15, position[2]]} scale={[1, 0.2, 1]} castShadow>
+          <cylinderGeometry args={[2.4, 2.4, 1]} />
+          <meshStandardMaterial 
+            color={barColor}
+            metalness={0.7}
+            roughness={0.2}
+            envMapIntensity={1.5}
+            transparent
+            opacity={0.95}
+            emissive={barColor}
+            emissiveIntensity={responses > 0 ? 0.1 : 0.02}
+          />
+        </mesh>
+        
+        {responses > 0 && (
+          <mesh ref={glowRef} position={[position[0], 0.15, position[2]]} scale={[1.8, 0.2, 1.8]}>
+            <cylinderGeometry args={[2.1, 2.1, 1]} />
+            <meshBasicMaterial 
+              color={glowColor}
+              transparent
+              opacity={0.12}
+            />
+          </mesh>
+        )}
+      </group>
     </group>
   );
 };
@@ -389,68 +393,71 @@ const FloorStatsDisplay: React.FC<{
         
         return (
           <group key={option.id}>
-            <mesh position={[curvedPos.x, 0.05, curvedPos.z]} rotation={[-Math.PI / 2, 0, 0]}>
-              <planeGeometry args={[spacing * 0.85, 4]} />
-              <meshStandardMaterial 
-                color={floorColor}
-                transparent
-                opacity={0.9}
-                metalness={0.3}
-                roughness={0.7}
-              />
-            </mesh>
-            
-            <mesh position={[curvedPos.x, 0.04, curvedPos.z]} rotation={[-Math.PI / 2, 0, 0]}>
-              <planeGeometry args={[spacing * 0.9, 4.2]} />
-              <meshBasicMaterial 
-                color={barColor}
-                transparent
-                opacity={0.3}
-              />
-            </mesh>
-            
-            <Text
-              position={[curvedPos.x, 0.15, curvedPos.z - 1.5]}
-              fontSize={2.2}
-              color={barColorValue}
-              anchorX="center"
-              anchorY="middle"
-              rotation={[-Math.PI / 2, 0, 0]}
-              outlineWidth={0.08}
-              outlineColor={shadowColor}
-              fillOpacity={1}
-            >
-              {percentage}%
-            </Text>
-            
-            <Text
-              position={[curvedPos.x, 0.12, curvedPos.z]}
-              fontSize={1.1}
-              color="#94a3b8"
-              anchorX="center"
-              anchorY="middle"
-              rotation={[-Math.PI / 2, 0, 0]}
-              outlineWidth={0.03}
-              outlineColor="#000000"
-            >
-              {option.responses} votes
-            </Text>
-            
-            <Text
-              position={[curvedPos.x, 0.12, curvedPos.z + 1.5]}
-              fontSize={textProps.fontSize}
-              color="#ffffff"
-              anchorX="center"
-              anchorY="middle"
-              rotation={[-Math.PI / 2, 0, 0]}
-              maxWidth={textProps.maxWidth}
-              outlineWidth={Math.max(0.02, textProps.fontSize * 0.03)}
-              outlineColor="#1e293b"
-              textAlign="center"
-              lineHeight={1.2}
-            >
-              {textProps.displayText}
-            </Text>
+            {/* Apply rotation to floor stats for tilting effect */}
+            <group rotation={[0, curvedPos.rotationY || 0, 0]}>
+              <mesh position={[curvedPos.x, 0.05, curvedPos.z]} rotation={[-Math.PI / 2, 0, 0]}>
+                <planeGeometry args={[spacing * 0.85, 4]} />
+                <meshStandardMaterial 
+                  color={floorColor}
+                  transparent
+                  opacity={0.9}
+                  metalness={0.3}
+                  roughness={0.7}
+                />
+              </mesh>
+              
+              <mesh position={[curvedPos.x, 0.04, curvedPos.z]} rotation={[-Math.PI / 2, 0, 0]}>
+                <planeGeometry args={[spacing * 0.9, 4.2]} />
+                <meshBasicMaterial 
+                  color={barColor}
+                  transparent
+                  opacity={0.3}
+                />
+              </mesh>
+              
+              <Text
+                position={[curvedPos.x, 0.15, curvedPos.z - 1.5]}
+                fontSize={2.2}
+                color={barColorValue}
+                anchorX="center"
+                anchorY="middle"
+                rotation={[-Math.PI / 2, 0, 0]}
+                outlineWidth={0.08}
+                outlineColor={shadowColor}
+                fillOpacity={1}
+              >
+                {percentage}%
+              </Text>
+              
+              <Text
+                position={[curvedPos.x, 0.12, curvedPos.z]}
+                fontSize={1.1}
+                color="#94a3b8"
+                anchorX="center"
+                anchorY="middle"
+                rotation={[-Math.PI / 2, 0, 0]}
+                outlineWidth={0.03}
+                outlineColor="#000000"
+              >
+                {option.responses} votes
+              </Text>
+              
+              <Text
+                position={[curvedPos.x, 0.12, curvedPos.z + 1.5]}
+                fontSize={textProps.fontSize}
+                color="#ffffff"
+                anchorX="center"
+                anchorY="middle"
+                rotation={[-Math.PI / 2, 0, 0]}
+                maxWidth={textProps.maxWidth}
+                outlineWidth={Math.max(0.02, textProps.fontSize * 0.03)}
+                outlineColor="#1e293b"
+                textAlign="center"
+                lineHeight={1.2}
+              >
+                {textProps.displayText}
+              </Text>
+            </group>
           </group>
         );
       })}
@@ -478,12 +485,15 @@ const StandingImagesDisplay: React.FC<{
         
         return (
           <group key={option.id}>
-            <StandingImagePlane
-              imageUrl={option.media_url}
-              position={[curvedPos.x, 0, curvedPos.z]}
-              fallbackText={`Option ${String.fromCharCode(65 + index)}`}
-              glowColor={glowColorValue}
-            />
+            {/* Apply rotation to standing images for tilting effect */}
+            <group rotation={[0, curvedPos.rotationY || 0, 0]}>
+              <StandingImagePlane
+                imageUrl={option.media_url}
+                position={[curvedPos.x, 0, curvedPos.z]}
+                fallbackText={`Option ${String.fromCharCode(65 + index)}`}
+                glowColor={glowColorValue}
+              />
+            </group>
           </group>
         );
       })}
