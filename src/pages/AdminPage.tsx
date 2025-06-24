@@ -545,7 +545,8 @@ export const AdminPage: React.FC = () => {
     try {
       if (!selectedRoom) return;
       
-      const newActivity = await roomService.createActivity(selectedRoom.id, activityData);
+      // The activityData is already a created Activity object from ActivityEditor
+      const newActivity = activityData as Activity;
       
       // Update the selected room with the new activity
       const updatedRoom = {
