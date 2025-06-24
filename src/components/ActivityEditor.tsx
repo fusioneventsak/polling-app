@@ -3,7 +3,22 @@ import { motion } from 'framer-motion';
 import { Button } from './Button';
 import { Card } from './Card';
 import { ImageUpload } from './ImageUpload';
-import { Plus, Trash2, Check, X, Lock, Unlock, Timer, Zap, Trophy, Eye, EyeOff, Target, CheckCircle, AlertCircle } from 'lucide-react';
+import { 
+  Plus, 
+  Trash2, 
+  Check, 
+  X, 
+  Lock, 
+  Unlock, 
+  CheckCircle, 
+  Target, 
+  Timer, 
+  Zap, 
+  Trophy, 
+  Eye, 
+  EyeOff,
+  AlertCircle
+} from 'lucide-react';
 import { roomService } from '../services/roomService';
 import type { Activity, ActivityType, CreateActivityData } from '../types';
 
@@ -14,6 +29,7 @@ interface ActivityEditorProps {
   onCancel: () => void;
 }
 
+// Trivia Settings Panel Component
 const TriviaSettingsPanel: React.FC<{
   settings: any;
   onUpdateSettings: (newSettings: any) => void;
@@ -235,6 +251,16 @@ export const ActivityEditor: React.FC<ActivityEditorProps> = ({
   const [description, setDescription] = useState(activity?.description || '');
   const [type, setType] = useState<ActivityType>(activity?.type || 'poll');
   const [mediaUrl, setMediaUrl] = useState(activity?.media_url || '');
+  const [settings, setSettings] = useState(activity?.settings || {
+    voting_locked: false,
+    countdown_duration: 30,
+    points_per_correct: 10,
+    points_per_speed: 0,
+    show_correct_answer: true,
+    reveal_answer_delay: 3,
+    auto_advance: false,
+    randomize_options: false
+  });
   const [isVotingLocked, setIsVotingLocked] = useState(
     activity?.settings?.voting_locked || false
   );
@@ -252,7 +278,7 @@ export const ActivityEditor: React.FC<ActivityEditorProps> = ({
   const saveInProgress = useRef(false);
 
   const addOption = () => {
-    if (options.length < 6) {
+    if (options.length < (type === 'trivia' ? 6 : 8)) {
       setOptions(prev => [...prev, { text: '', isCorrect: false, mediaUrl: '' }]);
     }
   };
@@ -271,95 +297,66 @@ export const ActivityEditor: React.FC<ActivityEditorProps> = ({
     setOptions(prev => prev.map((opt, i) => i === index ? { ...opt, mediaUrl } : opt));
   };
 
-  const toggleCorrectAnswer = (index: number) => {
-    if (type === 'trivia') {
-      // For trivia, only one answer can be correct
-      setOptions(prev => prev.map((opt, i) => ({
-        ...opt,
-        isCorrect: i === index ? !opt.isCorrect : false
-      })));
-    } else {
-      // For other types, multiple answers can be correct
-      setOptions(prev => prev.map((opt, i) => 
-        i === index ? { ...opt, isCorrect: !opt.isCorrect } : opt
-      ));
-    }
-  };
-
   const markAsCorrect = (index: number) => {
-    if (type === 'trivia') {
-      // For trivia, clear all other correct answers and set this one
-      setOptions(prev => prev.map((opt, i) => ({
-        ...opt,
-        isCorrect: i === index
-      })));
-    } else {
-      toggleCorrectAnswer(index);
-    }
+    setOptions(prev => prev.map((opt, i) => ({
+      ...opt,
+      isCorrect: i === index
+    })));
   };
 
   const handleSave = async () => {
-    // Prevent multiple simultaneous save attempts
-    if (saving || saveInProgress.current) {
-      console.log('Save already in progress, ignoring duplicate request');
+    if (saveInProgress.current) return;
+
+    // Validation
+    if (!title.trim()) {
+      alert('Please enter a title for the activity');
       return;
     }
 
-    if (!title.trim() || !options.every(opt => opt.text.trim())) {
+    const validOptions = options.filter(opt => opt.text.trim());
+    if (validOptions.length < 2) {
+      alert('Please add at least 2 options');
       return;
     }
 
-    saveInProgress.current = true;
-    setSaving(true);
-    
+    // Trivia validation
+    if (type === 'trivia' && !validOptions.some(opt => opt.isCorrect)) {
+      alert('Please mark one answer as correct for trivia questions');
+      return;
+    }
+
     try {
-      console.log('Starting activity save process...');
-      
+      setSaving(true);
+      saveInProgress.current = true;
+
+      const activityData: CreateActivityData = {
+        room_id: roomId,
+        type,
+        title: title.trim(),
+        description: description.trim() || undefined,
+        media_url: mediaUrl || undefined,
+        settings: {
+          ...settings,
+          voting_locked: isVotingLocked
+        },
+        options: validOptions.map((opt, index) => ({
+          text: opt.text.trim(),
+          media_url: opt.mediaUrl || undefined,
+          is_correct: opt.isCorrect,
+          option_order: index
+        }))
+      };
+
+      let savedActivity: Activity;
       if (activity) {
-        // Update existing activity
-        console.log('Updating existing activity:', activity.id);
-        const updatedActivity = await roomService.updateActivity(activity.id, {
-          title,
-          description,
-          media_url: mediaUrl,
-          settings: {
-            ...activity.settings,
-            voting_locked: isVotingLocked
-          },
-          options: options.map(opt => ({
-            text: opt.text,
-            is_correct: opt.isCorrect,
-            media_url: opt.mediaUrl || undefined
-          }))
-        });
-        console.log('Activity updated successfully');
-        onSave(updatedActivity);
+        savedActivity = await roomService.updateActivity(activity.id, activityData);
       } else {
-        // Create new activity
-        console.log('Creating new activity');
-        const activityData: CreateActivityData = {
-          room_id: roomId,
-          type,
-          title,
-          description,
-          media_url: mediaUrl,
-          settings: {
-            voting_locked: isVotingLocked
-          },
-          options: options.map(opt => ({
-            text: opt.text,
-            is_correct: opt.isCorrect,
-            media_url: opt.mediaUrl || undefined
-          }))
-        };
-        
-        const newActivity = await roomService.createActivity(roomId, activityData);
-        console.log('Activity created successfully');
-        onSave(newActivity);
+        savedActivity = await roomService.createActivity(activityData);
       }
+
+      onSave(savedActivity);
     } catch (error) {
-      console.error('Failed to save activity:', error);
-      // Show user-friendly error message
+      console.error('Error saving activity:', error);
       alert('Failed to save activity. Please try again.');
     } finally {
       setSaving(false);
@@ -432,7 +429,7 @@ export const ActivityEditor: React.FC<ActivityEditorProps> = ({
               Activity Media (Optional)
             </label>
             <ImageUpload
-              roomCode="temp" // We'll use a temp code for now
+              roomCode="temp"
               currentImageUrl={mediaUrl}
               onImageUploaded={setMediaUrl}
               onImageRemoved={() => setMediaUrl('')}
@@ -442,8 +439,17 @@ export const ActivityEditor: React.FC<ActivityEditorProps> = ({
             />
           </div>
 
-          {/* Vote Locking Control */}
-          {activity && (
+          {/* Trivia Settings Panel */}
+          {type === 'trivia' && (
+            <TriviaSettingsPanel
+              settings={settings}
+              onUpdateSettings={setSettings}
+              saving={saving}
+            />
+          )}
+
+          {/* Vote Locking Control for existing activities */}
+          {activity && type !== 'trivia' && (
             <div className="border-t border-slate-600 pt-6">
               <div className="flex items-center justify-between p-4 bg-slate-800/50 rounded-lg border border-slate-600">
                 <div className="flex items-center gap-3">
@@ -484,14 +490,7 @@ export const ActivityEditor: React.FC<ActivityEditorProps> = ({
             </div>
           )}
 
-          {type === 'trivia' && (
-            <TriviaSettingsPanel
-              settings={settings}
-              onUpdateSettings={setSettings}
-              saving={saving}
-            />
-          )}
-
+          {/* Options Section */}
           <div>
             <label className="block text-sm font-medium text-slate-300 mb-2">
               {type === 'trivia' ? 'Answer Options' : 'Options'}
@@ -514,7 +513,7 @@ export const ActivityEditor: React.FC<ActivityEditorProps> = ({
                       disabled={saving}
                     />
                     
-                    {type === 'trivia' || type === 'quiz' ? (
+                    {(type === 'trivia' || type === 'quiz') && (
                       <Button
                         variant={option.isCorrect ? "success" : "ghost"}
                         size="sm"
@@ -534,7 +533,7 @@ export const ActivityEditor: React.FC<ActivityEditorProps> = ({
                           </>
                         )}
                       </Button>
-                    ) : null}
+                    )}
                     
                     {options.length > 2 && (
                       <Button
@@ -547,35 +546,36 @@ export const ActivityEditor: React.FC<ActivityEditorProps> = ({
                       </Button>
                     )}
                   </div>
-                  
-                  {/* Enhanced Image Upload for Trivia */}
-                  <div className="mt-3">
-                    <ImageUpload
-                      roomCode="temp" // We'll use a temp code for now
-                      currentImageUrl={option.mediaUrl}
-                      onImageUploaded={(url) => updateOptionMedia(index, url)}
-                      onImageRemoved={() => updateOptionMedia(index, '')}
-                      label={type === 'trivia' ? `Add image for answer ${String.fromCharCode(65 + index)}` : `Option ${index + 1} Image (Optional)`}
-                      description={type === 'trivia' ? "Visual content can make trivia more engaging" : "Upload an image for this option"}
-                      maxSizeMB={type === 'trivia' ? 2 : 5}
-                    />
-                  </div>
+
+                  {/* Option Image Upload for Trivia */}
+                  {type === 'trivia' && (
+                    <div className="mt-3">
+                      <ImageUpload
+                        roomCode="temp"
+                        currentImageUrl={option.mediaUrl}
+                        onImageUploaded={(url) => updateOptionMedia(index, url)}
+                        onImageRemoved={() => updateOptionMedia(index, '')}
+                        label={`Add image for answer ${String.fromCharCode(65 + index)}`}
+                        description="Visual content can make trivia more engaging"
+                        maxSizeMB={2}
+                        compact={true}
+                      />
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
-            
-            {options.length < (type === 'trivia' ? 6 : 8) && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={addOption}
-                disabled={saving || options.length >= (type === 'trivia' ? 6 : 8)}
-                className="w-full mt-4 border-2 border-dashed border-slate-600 hover:border-slate-500"
-              >
-                <Plus className="w-4 h-4" />
-                Add {type === 'trivia' ? 'Answer' : 'Option'} {options.length < (type === 'trivia' ? 6 : 8) ? `(${options.length}/${type === 'trivia' ? 6 : 8})` : ''}
-              </Button>
-            )}
+
+            {/* Add Option Button */}
+            <Button
+              variant="ghost"
+              onClick={addOption}
+              disabled={saving || options.length >= (type === 'trivia' ? 6 : 8)}
+              className="w-full mt-4 border-2 border-dashed border-slate-600 hover:border-slate-500"
+            >
+              <Plus className="w-4 h-4" />
+              Add {type === 'trivia' ? 'Answer' : 'Option'} {options.length < (type === 'trivia' ? 6 : 8) ? `(${options.length}/${type === 'trivia' ? 6 : 8})` : ''}
+            </Button>
 
             {/* Trivia Validation Warning */}
             {type === 'trivia' && !options.some(opt => opt.isCorrect) && options.length > 1 && (
@@ -590,31 +590,16 @@ export const ActivityEditor: React.FC<ActivityEditorProps> = ({
               </div>
             )}
           </div>
-        </div>
 
-        <div className="flex gap-3 mt-8">
-          <Button
-            onClick={handleSave}
-            loading={saving}
-            disabled={
-              !title.trim() || 
-              !options.every(opt => opt.text.trim()) || 
-              (type === 'trivia' && !options.some(opt => opt.isCorrect)) ||
-              saving
-            }
-            className="flex-1"
-          >
-            <Check className="w-4 h-4" />
-            {activity ? 'Save Changes' : 'Create Activity'}
-          </Button>
-          <Button
-            variant="ghost"
-            onClick={onCancel}
-            disabled={saving}
-          >
-            <X className="w-4 h-4" />
-            Cancel
-          </Button>
+          {/* Footer */}
+          <div className="flex items-center justify-end gap-3 pt-6 border-t border-slate-600">
+            <Button variant="ghost" onClick={onCancel} disabled={saving}>
+              Cancel
+            </Button>
+            <Button onClick={handleSave} loading={saving}>
+              {activity ? 'Update Activity' : 'Create Activity'}
+            </Button>
+          </div>
         </div>
       </Card>
     </motion.div>
