@@ -31,6 +31,37 @@ const calculateTitleFontSize = (text: string): number => {
   return minSize;
 };
 
+// Helper function to calculate font size to fit text in container
+const calculateFitFontSize = (text: string, spacing: number) => {
+  const availableWidth = spacing * 0.8;
+  const textLength = text.length;
+  const charWidthRatio = 0.6;
+  let fontSize = availableWidth / (textLength * charWidthRatio);
+  
+  const maxFontSize = 1.6;
+  const minFontSize = 0.4;
+  fontSize = Math.max(minFontSize, Math.min(maxFontSize, fontSize));
+  
+  return {
+    fontSize,
+    maxWidth: availableWidth,
+    displayText: text
+  };
+};
+
+// Shared curve calculation function
+const getCurvedPosition = (index: number, totalItems: number, baseZ: number = -8) => {
+  const radius = 30;
+  const spread = Math.PI / 4;
+  const step = totalItems > 1 ? spread / (totalItems - 1) : 0;
+  const angle = -spread / 2 + index * step;
+  
+  return {
+    x: Math.sin(angle) * radius,
+    z: baseZ + Math.cos(angle) * 5
+  };
+};
+
 // Simplified standing image component
 const StandingImagePlane: React.FC<{
   imageUrl: string;
@@ -41,7 +72,6 @@ const StandingImagePlane: React.FC<{
   const [texture, setTexture] = useState<THREE.Texture | null>(null);
   const [loadError, setLoadError] = useState(false);
   
-  // Create THREE.Color objects for glow materials
   const glowColorObj = useMemo(() => new THREE.Color(glowColor), [glowColor]);
   
   useEffect(() => {
@@ -86,17 +116,13 @@ const StandingImagePlane: React.FC<{
     return null;
   }
 
-  // Calculate position and rotation for tilted image
   const imageHeight = 3.0;
   const imageWidth = 4.0;
-  const tiltAngle = Math.PI / 12; // 15 degrees tilt toward camera
-  
-  // Adjust Y position to account for tilt - bottom edge should touch floor
+  const tiltAngle = Math.PI / 12;
   const imageY = (imageHeight / 2) * Math.cos(tiltAngle) + 0.1;
 
   return (
     <group>
-      {/* Main image plane - tilted toward camera with bottom on floor */}
       <mesh position={[position[0], imageY, position[2]]} rotation={[-tiltAngle, 0, 0]} renderOrder={10}>
         <planeGeometry args={[imageWidth, imageHeight]} />
         <meshStandardMaterial 
@@ -109,7 +135,6 @@ const StandingImagePlane: React.FC<{
         />
       </mesh>
       
-      {/* Subtle glow behind image */}
       <mesh position={[position[0], imageY, position[2] - 0.01]} rotation={[-tiltAngle, 0, 0]} renderOrder={9}>
         <planeGeometry args={[imageWidth + 0.2, imageHeight + 0.2]} />
         <meshBasicMaterial 
@@ -120,7 +145,6 @@ const StandingImagePlane: React.FC<{
         />
       </mesh>
       
-      {/* Outer glow */}
       <mesh position={[position[0], imageY, position[2] - 0.02]} rotation={[-tiltAngle, 0, 0]} renderOrder={8}>
         <planeGeometry args={[imageWidth + 0.4, imageHeight + 0.4]} />
         <meshBasicMaterial 
@@ -134,7 +158,7 @@ const StandingImagePlane: React.FC<{
   );
 };
 
-// Simplified Light Beam Component - More stable version
+// Simplified Light Beam Component
 const SimplifiedLightBeam: React.FC<{
   position: [number, number, number];
   color: string;
@@ -144,12 +168,10 @@ const SimplifiedLightBeam: React.FC<{
   const beamRef = useRef<THREE.Group>(null);
   const lightRef = useRef<THREE.SpotLight>(null);
   
-  // Create stable THREE.Color object
   const threeColor = useMemo(() => new THREE.Color(color), [color]);
   
   useFrame((state) => {
     if (lightRef.current && responses > 0) {
-      // Gentle pulsing for active responses
       const pulse = 0.8 + Math.sin(state.clock.elapsedTime * 1.5) * 0.2;
       lightRef.current.intensity = intensity * pulse;
     }
@@ -157,7 +179,6 @@ const SimplifiedLightBeam: React.FC<{
 
   return (
     <group ref={beamRef}>
-      {/* Main spotlight for actual lighting - positioned high above scene */}
       <spotLight
         ref={lightRef}
         position={[position[0], 25, position[2]]}
@@ -171,12 +192,10 @@ const SimplifiedLightBeam: React.FC<{
         castShadow={false}
       />
       
-      {/* Light beam visualization - cone shape pointing down from sky */}
       <mesh 
         position={[position[0], 12, position[2]]}
         rotation={[0, 0, 0]}
       >
-        {/* Reversed geometry: small radius at top (0.3), large at bottom (2.0) */}
         <cylinderGeometry args={[0.3, 2.0, 20, 16]} />
         <meshBasicMaterial
           color={threeColor}
@@ -187,7 +206,6 @@ const SimplifiedLightBeam: React.FC<{
         />
       </mesh>
       
-      {/* Additional beam layers for depth */}
       <mesh 
         position={[position[0], 12, position[2]]}
         rotation={[0, 0, 0]}
@@ -202,7 +220,6 @@ const SimplifiedLightBeam: React.FC<{
         />
       </mesh>
       
-      {/* Ground light pool */}
       <mesh 
         position={[position[0], 0.02, position[2]]} 
         rotation={[-Math.PI / 2, 0, 0]}
@@ -245,9 +262,7 @@ const Enhanced3DBar: React.FC<{
 }) => {
   const meshRef = useRef<THREE.Mesh>(null);
   const glowRef = useRef<THREE.Mesh>(null);
-  const [animatedHeight, setAnimatedHeight] = useState(0.2);
   
-  // Create stable color values
   const barColorValue = isCorrect ? '#10b981' : color;
   const glowColorValue = isCorrect ? '#34d399' : color;
   
@@ -266,7 +281,6 @@ const Enhanced3DBar: React.FC<{
         const newHeight = THREE.MathUtils.lerp(currentHeight, targetHeight, animationSpeed);
         meshRef.current.scale.y = newHeight;
         meshRef.current.position.y = newHeight / 2;
-        setAnimatedHeight(newHeight);
       }
     }
     
@@ -291,7 +305,6 @@ const Enhanced3DBar: React.FC<{
 
   return (
     <group>
-      {/* Simplified Light Beam */}
       <SimplifiedLightBeam
         position={position}
         color={barColorValue}
@@ -336,29 +349,7 @@ const Enhanced3DBar: React.FC<{
   );
 };
 
-// Helper function to calculate font size to fit text in container
-const calculateFitFontSize = (text: string, spacing: number) => {
-  const availableWidth = spacing * 0.8;
-  const textLength = text.length;
-  
-  // Base calculation: estimate character width relative to font size
-  const charWidthRatio = 0.6;
-  let fontSize = availableWidth / (textLength * charWidthRatio);
-  
-  // Set reasonable bounds
-  const maxFontSize = 1.6;
-  const minFontSize = 0.4;
-  
-  fontSize = Math.max(minFontSize, Math.min(maxFontSize, fontSize));
-  
-  return {
-    fontSize,
-    maxWidth: availableWidth,
-    displayText: text
-  };
-};
-
-// Floor Stats Component with Auto-Scaling Text
+// Floor Stats Component
 const FloorStatsDisplay: React.FC<{
   options: ActivityOption[];
   totalResponses: number;
@@ -374,38 +365,8 @@ const FloorStatsDisplay: React.FC<{
         const minSpacing = 6.0;
         const maxSpacing = 12.0;
         const spacing = Math.max(minSpacing, Math.min(maxSpacing, 50 / Math.max(options.length, 1)));
-        const totalWidth = (options.length - 1) * spacing;
-        const startX = -totalWidth / 2;
-        const xPosition = startX + index * spacing;
         
-        // Add curved positioning for standing images to match bars
-        const curveRadius = 30;
-        const angleSpread = Math.PI / 4;
-        const angleStep = options.length > 1 ? angleSpread / (options.length - 1) : 0;
-        const angle = -angleSpread / 2 + index * angleStep;
-        
-        const curvedX = Math.sin(angle) * curveRadius;
-        const curvedZ = 4 + Math.cos(angle) * 5;
-        
-        // Add curved positioning for floor stats to match bars
-        const curveRadius = 30;
-        const angleSpread = Math.PI / 4;
-        const angleStep = options.length > 1 ? angleSpread / (options.length - 1) : 0;
-        const angle = -angleSpread / 2 + index * angleStep;
-        
-        const curvedX = Math.sin(angle) * curveRadius;
-        const curvedZ = Math.cos(angle) * 5;
-        
-        // Add curved positioning for better readability
-        const curveRadius = 30; // Radius of the arc
-        const angleSpread = Math.PI / 4; // Total angle span (45 degrees)
-        const angleStep = options.length > 1 ? angleSpread / (options.length - 1) : 0;
-        const angle = -angleSpread / 2 + index * angleStep;
-        
-        // Calculate curved position
-        const curvedX = Math.sin(angle) * curveRadius;
-        const curvedZ = -8 + Math.cos(angle) * 5; // Slight Z variation for depth
-        const xPosition = startX + index * spacing;
+        const curvedPos = getCurvedPosition(index, options.length, 7.5);
         
         const hue = (index / Math.max(options.length - 1, 1)) * 300;
         const barColorValue = option.is_correct 
@@ -417,8 +378,7 @@ const FloorStatsDisplay: React.FC<{
         
         return (
           <group key={option.id}>
-            {/* Background platform for better contrast */}
-            <mesh position={[curvedX, 0.05, 7.5 + curvedZ]} rotation={[-Math.PI / 2, 0, 0]}>
+            <mesh position={[curvedPos.x, 0.05, curvedPos.z]} rotation={[-Math.PI / 2, 0, 0]}>
               <planeGeometry args={[spacing * 0.85, 4]} />
               <meshStandardMaterial 
                 color={floorColor}
@@ -429,8 +389,7 @@ const FloorStatsDisplay: React.FC<{
               />
             </mesh>
             
-            {/* Glowing border for platform */}
-            <mesh position={[curvedX, 0.04, 7.5 + curvedZ]} rotation={[-Math.PI / 2, 0, 0]}>
+            <mesh position={[curvedPos.x, 0.04, curvedPos.z]} rotation={[-Math.PI / 2, 0, 0]}>
               <planeGeometry args={[spacing * 0.9, 4.2]} />
               <meshBasicMaterial 
                 color={barColor}
@@ -439,9 +398,8 @@ const FloorStatsDisplay: React.FC<{
               />
             </mesh>
             
-            {/* Large percentage text with glow */}
             <Text
-              position={[curvedX, 0.15, 6 + curvedZ]}
+              position={[curvedPos.x, 0.15, curvedPos.z - 1.5]}
               fontSize={2.2}
               color={barColorValue}
               anchorX="center"
@@ -454,9 +412,8 @@ const FloorStatsDisplay: React.FC<{
               {percentage}%
             </Text>
             
-            {/* Vote count */}
             <Text
-              position={[curvedX, 0.12, 7.5 + curvedZ]}
+              position={[curvedPos.x, 0.12, curvedPos.z]}
               fontSize={1.1}
               color="#94a3b8"
               anchorX="center"
@@ -468,9 +425,8 @@ const FloorStatsDisplay: React.FC<{
               {option.responses} votes
             </Text>
             
-            {/* Auto-scaling option text */}
             <Text
-              position={[curvedX, 0.12, 9 + curvedZ]}
+              position={[curvedPos.x, 0.12, curvedPos.z + 1.5]}
               fontSize={textProps.fontSize}
               color="#ffffff"
               anchorX="center"
@@ -502,12 +458,7 @@ const StandingImagesDisplay: React.FC<{
           return null;
         }
         
-        const minSpacing = 6.0;
-        const maxSpacing = 12.0;
-        const spacing = Math.max(minSpacing, Math.min(maxSpacing, 50 / Math.max(options.length, 1)));
-        const totalWidth = (options.length - 1) * spacing;
-        const startX = -totalWidth / 2;
-        const xPosition = startX + index * spacing;
+        const curvedPos = getCurvedPosition(index, options.length, 4);
         
         const hue = (index / Math.max(options.length - 1, 1)) * 300;
         const glowColorValue = option.is_correct 
@@ -518,7 +469,7 @@ const StandingImagesDisplay: React.FC<{
           <group key={option.id}>
             <StandingImagePlane
               imageUrl={option.media_url}
-              position={[curvedX, 0, curvedZ]}
+              position={[curvedPos.x, 0, curvedPos.z]}
               fallbackText={`Option ${String.fromCharCode(65 + index)}`}
               glowColor={glowColorValue}
             />
@@ -540,21 +491,19 @@ const Enhanced3DScene: React.FC<{
   const maxResponses = Math.max(...options.map(opt => opt.responses), 1);
   const maxHeight = 4;
   
-  // Create stable THREE.Color objects
-  const floorColor = useMemo(() => new THREE.Color("#1a1a1a"), []); // Lighter floor for visibility
+  const floorColor = useMemo(() => new THREE.Color("#1a1a1a"), []);
   const whiteColor = useMemo(() => new THREE.Color("#ffffff"), []);
   const titleShadowColor = useMemo(() => new THREE.Color("#1e293b"), []);
   
   useEffect(() => {
-    // Better camera positioning for floor visibility
     camera.position.set(0, 12, 35);
     camera.lookAt(0, 2, 0);
     
     const animateCamera = () => {
       const targetX = 0;
-      const targetY = 8; // Lower Y for better floor view
+      const targetY = 8;
       
-      const baseDistance = 25; // Closer to see floor better
+      const baseDistance = 25;
       const extraDistance = Math.max(0, (options.length - 2) * 2);
       const targetZ = baseDistance + extraDistance;
       
@@ -588,7 +537,6 @@ const Enhanced3DScene: React.FC<{
   
   return (
     <>
-      {/* Simpler lighting setup to avoid uniform errors */}
       <ambientLight intensity={0.6} />
       <directionalLight 
         position={[10, 20, 5]} 
@@ -604,7 +552,6 @@ const Enhanced3DScene: React.FC<{
       />
       <pointLight position={[0, 15, 5]} intensity={0.6} color="#ffffff" />
       
-      {/* More visible floor */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow>
         <planeGeometry args={[100, 100]} />
         <meshStandardMaterial 
@@ -614,16 +561,9 @@ const Enhanced3DScene: React.FC<{
         />
       </mesh>
       
-      <FloorStatsDisplay 
-        options={options} 
-        totalResponses={totalResponses}
-        calculateCurvedPosition={calculateCurvedPosition}
-      />
+      <FloorStatsDisplay options={options} totalResponses={totalResponses} />
       
-      <StandingImagesDisplay 
-        options={options}
-        calculateCurvedPosition={calculateCurvedPosition}
-      />
+      <StandingImagesDisplay options={options} />
       
       {options.map((option, index) => {
         const percentage = totalResponses > 0 ? Math.round((option.responses / totalResponses) * 100) : 0;
@@ -631,11 +571,7 @@ const Enhanced3DScene: React.FC<{
           ? Math.max((option.responses / maxResponses) * maxHeight, 0.2)
           : 0.8;
         
-        const minSpacing = 6.0;
-        const maxSpacing = 12.0;
-        const spacing = Math.max(minSpacing, Math.min(maxSpacing, 50 / Math.max(options.length, 1)));
-        const totalWidth = (options.length - 1) * spacing;
-        const startX = -totalWidth / 2;
+        const curvedPos = getCurvedPosition(index, options.length);
         
         const hue = (index / Math.max(options.length - 1, 1)) * 300;
         const barColorValue = option.is_correct 
@@ -645,7 +581,7 @@ const Enhanced3DScene: React.FC<{
         return (
           <Enhanced3DBar
             key={option.id}
-            position={[curvedX, 0, curvedZ]}
+            position={[curvedPos.x, 0, curvedPos.z]}
             height={height}
             color={barColorValue}
             label={option.text}
