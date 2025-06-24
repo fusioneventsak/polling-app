@@ -81,7 +81,36 @@ export interface ActivitySettings {
   time_limit?: number; // seconds
   points_per_correct?: number;
   randomize_options?: boolean;
+  voting_locked?: boolean;
   [key: string]: any;
+}
+
+// Enhanced ActivitySettings interface for trivia-specific settings
+export interface TriviaSettings extends ActivitySettings {
+  countdown_duration?: number; // seconds (5-60)
+  points_per_correct?: number;
+  points_per_speed?: number; // bonus points for quick answers
+  show_correct_answer?: boolean;
+  auto_advance?: boolean; // move to next question after timer
+  reveal_answer_delay?: number; // seconds before showing correct answer
+}
+
+// Trivia-specific participant response with timing and scoring
+export interface TriviaResponse extends ParticipantResponse {
+  points_earned?: number;
+  time_to_answer?: number; // milliseconds
+  is_correct?: boolean;
+}
+
+// Trivia game state management
+export interface TriviaGameState {
+  isActive: boolean;
+  timeRemaining: number;
+  phase: 'waiting' | 'countdown' | 'answering' | 'revealing' | 'completed';
+  startTime?: number;
+  endTime?: number;
+  correctAnswerRevealed: boolean;
+  participantScores?: { [participantId: string]: number };
 }
 
 // Legacy types for backward compatibility
@@ -115,6 +144,15 @@ export interface SocketEvents {
   'participant-joined': (data: { roomId: string; participantCount: number }) => void;
   'participant-left': (data: { roomId: string; participantCount: number }) => void;
   'error': (message: string) => void;
+}
+
+// Enhanced socket events for trivia
+export interface TriviaSocketEvents extends SocketEvents {
+  'trivia-started': (data: { activityId: string; duration: number }) => void;
+  'trivia-countdown': (data: { activityId: string; timeRemaining: number }) => void;
+  'trivia-ended': (data: { activityId: string; correctOptionId: string }) => void;
+  'trivia-answer-revealed': (data: { activityId: string; correctOption: ActivityOption }) => void;
+  'participant-scored': (data: { participantId: string; points: number; totalScore: number }) => void;
 }
 
 // Create data interfaces
