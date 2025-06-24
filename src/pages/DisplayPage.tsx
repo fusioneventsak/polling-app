@@ -5,6 +5,7 @@ import { useParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../lib/supabase';
 import { connectionManager } from '../lib/connectionManager';
+import { connectionManager } from '../lib/connectionManager';
 import { roomService } from '../services/roomService';
 import { useTheme } from '../components/ThemeProvider';
 import { Users, BarChart, Clock, MessageSquare, HelpCircle, Cloud, Trophy, Target, Calendar, Activity as ActivityIcon, TrendingUp, CheckCircle, Lock, QrCode, X } from 'lucide-react';
@@ -281,7 +282,6 @@ export const DisplayPage: React.FC = () => {
   const [currentRoom, setCurrentRoom] = useState<Room | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [currentTime, setCurrentTime] = useState(new Date());
   
   // Get all activities for stats
   const allActivities = currentRoom?.activities || [];
@@ -338,7 +338,98 @@ export const DisplayPage: React.FC = () => {
     let isActive = true;
     let retryCount = 0;
     const maxRetries = 3;
+    let retryCount = 0;
+    const maxRetries = 3;
 
+    const setupSubscriptions = async () => {
+      if (retryCount >= maxRetries) {
+        console.warn(`⚠️ DisplayPage: Max retry attempts reached for room ${pollId}`);
+        return;
+      }
+      
+      retryCount++;
+      
+      try {
+        console.log(`🔄 DisplayPage: Setting up subscriptions for room ${pollId} (attempt ${retryCount}/${maxRetries})`);
+
+        const channelName = `display_room_${pollId}`;
+        
+        // Step 1: Get channel
+        const channel = await connectionManager.getChannel(channelName);
+        if (!channel || !isActive) {
+          console.warn('⚠️ DisplayPage: Failed to get channel or component unmounted');
+          return;
+        }
+
+        // Step 2: Add event listeners BEFORE subscribing
+        console.log('📡 DisplayPage: Adding postgres_changes listeners...');
+        
+        channel
+          .on('postgres_changes', 
+            { 
+              event: '*', 
+              schema: 'public', 
+              table: 'rooms',
+              filter: `code=eq.${pollId}`
+            },
+            (payload) => {
+              if (!isActive) return;
+              try {
+                console.log('🏠 DisplayPage: Room change:', {
+                  eventType: payload.eventType,
+                  currentActivityId: payload.new?.current_activity_id
+                });
+                loadRoom();
+              } catch (error) {
+                console.warn('⚠️ DisplayPage: Error handling room change:', error);
+              }
+            }
+          )
+          .on('postgres_changes',
+            { 
+              event: '*', 
+              schema: 'public', 
+              table: 'activities'
+            },
+            (payload) => {
+              if (!isActive) return;
+              try {
+                console.log('🎯 DisplayPage: Activity change:', {
+                  eventType: payload.eventType,
+                  activityId: payload.new?.id || payload.old?.id,
+                  isActive: payload.new?.is_active,
+                  roomId: payload.new?.room_id || payload.old?.room_id
+                });
+                
+                // Only reload if this belongs to our room
+                if (currentRoom && (payload.new?.room_id === currentRoom.id || payload.old?.room_id === currentRoom.id)) {
+                  console.log('🔄 DisplayPage: Reloading for our room...');
+                  loadRoom();
+                }
+              } catch (error) {
+                console.warn('⚠️ DisplayPage: Error handling activity change:', error);
+              }
+            }
+          )
+          .on('postgres_changes',
+            { event: '*', schema: 'public', table: 'activity_options' },
+            (payload) => {
+              if (!isActive) return;
+              try {
+                console.log('📝 DisplayPage: Options change:', payload.eventType);
+                loadRoom();
+              } catch (error) {
+                console.warn('⚠️ DisplayPage: Error handling options change:', error);
+              }
+            }
+          )
+          .on('postgres_changes',
+            { event: '*', schema: 'public', table: 'participant_responses' },
+            (payload) => {
+              if (!isActive) return;
+              try {
+                console.log('👥 DisplayPage: Response change:', payload.eventType);
+                loadRoom();
     const setupSubscriptions = async () => {
       if (retryCount >= maxRetries) {
         console.warn(`⚠️ DisplayPage: Max retry attempts reached for room ${pollId}`);
@@ -464,9 +555,11 @@ export const DisplayPage: React.FC = () => {
 
     // Start setup
     setupSubscriptions();
-
+    // Cleanup
     // Cleanup
     return () => {
+      console.log('🧹 DisplayPage: Component cleanup');
+      isActive = false;
       console.log('🧹 DisplayPage: Component cleanup');
       isActive = false;
       
