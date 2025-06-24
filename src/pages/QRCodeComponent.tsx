@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, useMemo, memo } from 'react';
+import React, { useEffect, useState, useMemo, memo } from 'react';
 import { QrCode, ExternalLink, Copy, Check } from 'lucide-react';
 
 interface QRCodeProps {
