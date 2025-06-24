@@ -378,6 +378,35 @@ const FloorStatsDisplay: React.FC<{
         const startX = -totalWidth / 2;
         const xPosition = startX + index * spacing;
         
+        // Add curved positioning for standing images to match bars
+        const curveRadius = 30;
+        const angleSpread = Math.PI / 4;
+        const angleStep = options.length > 1 ? angleSpread / (options.length - 1) : 0;
+        const angle = -angleSpread / 2 + index * angleStep;
+        
+        const curvedX = Math.sin(angle) * curveRadius;
+        const curvedZ = 4 + Math.cos(angle) * 5;
+        
+        // Add curved positioning for floor stats to match bars
+        const curveRadius = 30;
+        const angleSpread = Math.PI / 4;
+        const angleStep = options.length > 1 ? angleSpread / (options.length - 1) : 0;
+        const angle = -angleSpread / 2 + index * angleStep;
+        
+        const curvedX = Math.sin(angle) * curveRadius;
+        const curvedZ = Math.cos(angle) * 5;
+        
+        // Add curved positioning for better readability
+        const curveRadius = 30; // Radius of the arc
+        const angleSpread = Math.PI / 4; // Total angle span (45 degrees)
+        const angleStep = options.length > 1 ? angleSpread / (options.length - 1) : 0;
+        const angle = -angleSpread / 2 + index * angleStep;
+        
+        // Calculate curved position
+        const curvedX = Math.sin(angle) * curveRadius;
+        const curvedZ = -8 + Math.cos(angle) * 5; // Slight Z variation for depth
+        const xPosition = startX + index * spacing;
+        
         const hue = (index / Math.max(options.length - 1, 1)) * 300;
         const barColorValue = option.is_correct 
           ? '#10b981' 
@@ -389,7 +418,7 @@ const FloorStatsDisplay: React.FC<{
         return (
           <group key={option.id}>
             {/* Background platform for better contrast */}
-            <mesh position={[xPosition, 0.05, 7.5]} rotation={[-Math.PI / 2, 0, 0]}>
+            <mesh position={[curvedX, 0.05, 7.5 + curvedZ]} rotation={[-Math.PI / 2, 0, 0]}>
               <planeGeometry args={[spacing * 0.85, 4]} />
               <meshStandardMaterial 
                 color={floorColor}
@@ -401,7 +430,7 @@ const FloorStatsDisplay: React.FC<{
             </mesh>
             
             {/* Glowing border for platform */}
-            <mesh position={[xPosition, 0.04, 7.5]} rotation={[-Math.PI / 2, 0, 0]}>
+            <mesh position={[curvedX, 0.04, 7.5 + curvedZ]} rotation={[-Math.PI / 2, 0, 0]}>
               <planeGeometry args={[spacing * 0.9, 4.2]} />
               <meshBasicMaterial 
                 color={barColor}
@@ -412,7 +441,7 @@ const FloorStatsDisplay: React.FC<{
             
             {/* Large percentage text with glow */}
             <Text
-              position={[xPosition, 0.15, 6]}
+              position={[curvedX, 0.15, 6 + curvedZ]}
               fontSize={2.2}
               color={barColorValue}
               anchorX="center"
@@ -427,7 +456,7 @@ const FloorStatsDisplay: React.FC<{
             
             {/* Vote count */}
             <Text
-              position={[xPosition, 0.12, 7.5]}
+              position={[curvedX, 0.12, 7.5 + curvedZ]}
               fontSize={1.1}
               color="#94a3b8"
               anchorX="center"
@@ -441,7 +470,7 @@ const FloorStatsDisplay: React.FC<{
             
             {/* Auto-scaling option text */}
             <Text
-              position={[xPosition, 0.12, 9]}
+              position={[curvedX, 0.12, 9 + curvedZ]}
               fontSize={textProps.fontSize}
               color="#ffffff"
               anchorX="center"
@@ -489,7 +518,7 @@ const StandingImagesDisplay: React.FC<{
           <group key={option.id}>
             <StandingImagePlane
               imageUrl={option.media_url}
-              position={[xPosition, 0, 4]}
+              position={[curvedX, 0, curvedZ]}
               fallbackText={`Option ${String.fromCharCode(65 + index)}`}
               glowColor={glowColorValue}
             />
@@ -609,7 +638,7 @@ const Enhanced3DScene: React.FC<{
         return (
           <Enhanced3DBar
             key={option.id}
-            position={[startX + index * spacing, 0, -8]}
+            position={[curvedX, 0, curvedZ]}
             height={height}
             color={barColorValue}
             label={option.text}
