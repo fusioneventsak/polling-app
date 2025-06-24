@@ -42,19 +42,19 @@ class ConnectionManager {
   }
 
   async subscribe(channelName: string): Promise<boolean> {
-    const channel = this.channels.get(channelName);
-    const currentState = this.subscriptionStates.get(channelName);
-    const attempts = this.retryAttempts.get(channelName) || 0;
-
+    // Always ensure we have a channel first
+    let channel = this.channels.get(channelName);
     if (!channel) {
-      console.warn(`⚠️ Channel ${channelName} not found, creating...`);
-      const newChannel = await this.getChannel(channelName);
-      if (!newChannel) {
+      console.log(`🔌 Channel ${channelName} not found, creating...`);
+      channel = await this.getChannel(channelName);
+      if (!channel) {
         console.error(`❌ Failed to create channel ${channelName}`);
         return false;
       }
-      return this.subscribe(channelName);
     }
+
+    const currentState = this.subscriptionStates.get(channelName);
+    const attempts = this.retryAttempts.get(channelName) || 0;
 
     // Check retry limit
     if (attempts >= this.maxRetries) {
@@ -62,13 +62,36 @@ class ConnectionManager {
       return false;
     }
 
-    // Don't subscribe if already subscribed or subscribing
-    if (currentState === 'subscribed' || currentState === 'subscribing') {
-      console.log(`⚠️ Channel ${channelName} already ${currentState}`);
-      return currentState === 'subscribed';
+    // Don't subscribe if already subscribed
+    if (currentState === 'subscribed') {
+      console.log(`✅ Channel ${channelName} already subscribed`);
+      return true;
+    }
+    
+    if (currentState === 'subscribing') {
+      console.log(`⏳ Channel ${channelName} subscription already in progress`);
+      // Wait for the current subscription to complete
+      return new Promise((resolve) => {
+        const checkInterval = setInterval(() => {
+          const state = this.subscriptionStates.get(channelName);
+          if (state === 'subscribed') {
+            clearInterval(checkInterval);
+            resolve(true);
+          } else if (state === 'error' || state === 'idle') {
+            clearInterval(checkInterval);
+            resolve(false);
+          }
+        }, 100);
+        
+        // Timeout after 15 seconds
+        setTimeout(() => {
+          clearInterval(checkInterval);
+          resolve(false);
+        }, 15000);
+      });
     }
 
-    console.log(`📡 Subscribing to channel: ${channelName}`);
+    console.log(`📡 Subscribing to channel: ${channelName} (attempt ${attempts + 1})`);
     this.subscriptionStates.set(channelName, 'subscribing');
     this.retryAttempts.set(channelName, attempts + 1);
 
@@ -94,10 +117,10 @@ class ConnectionManager {
           console.warn(`⚠️ Channel ${channelName} error:`, status, err);
           resolve(false);
         } else if (status === 'CLOSED') {
+          clearTimeout(timeout);
           console.log(`🔌 Channel ${channelName} closed`);
           this.subscriptionStates.set(channelName, 'idle');
-          this.channels.delete(channelName);
-          this.retryAttempts.delete(channelName);
+          resolve(false);
         }
       });
     });
