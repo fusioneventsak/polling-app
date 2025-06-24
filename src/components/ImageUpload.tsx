@@ -14,6 +14,7 @@ interface ImageUploadProps {
   maxSizeMB?: number;
   acceptedTypes?: string[];
   className?: string;
+  compact?: boolean;
 }
 
 export const ImageUpload: React.FC<ImageUploadProps> = ({
@@ -25,7 +26,8 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
   description = "Drag and drop an image or click to browse",
   maxSizeMB = 10,
   acceptedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'],
-  className = ''
+  className = '',
+  compact = false
 }) => {
   const [uploading, setUploading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
@@ -186,7 +188,7 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
 
         {/* Upload Area */}
         <motion.div
-          className={`relative border-2 border-dashed rounded-lg p-6 transition-all cursor-pointer ${
+          className={`relative border-2 border-dashed rounded-lg ${compact ? 'p-3' : 'p-6'} transition-all cursor-pointer ${
             dragOver
               ? 'border-blue-500 bg-blue-500/10'
               : uploading
@@ -242,17 +244,17 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
                   exit={{ opacity: 0 }}
                   className="flex flex-col items-center"
                 >
-                  <div className="w-12 h-12 bg-slate-700 rounded-lg flex items-center justify-center mb-3">
+                  <div className={`${compact ? 'w-8 h-8' : 'w-12 h-12'} bg-slate-700 rounded-lg flex items-center justify-center ${compact ? 'mb-2' : 'mb-3'}`}>
                     {dragOver ? (
-                      <Upload className="w-6 h-6 text-blue-400" />
+                      <Upload className={`${compact ? 'w-4 h-4' : 'w-6 h-6'} text-blue-400`} />
                     ) : (
-                      <ImageIcon className="w-6 h-6 text-slate-400" />
+                      <ImageIcon className={`${compact ? 'w-4 h-4' : 'w-6 h-6'} text-slate-400`} />
                     )}
                   </div>
-                  <p className="text-slate-300 font-medium mb-1">
+                  <p className={`text-slate-300 font-medium ${compact ? 'text-sm mb-1' : 'mb-1'}`}>
                     {dragOver ? 'Drop image here' : description}
                   </p>
-                  <p className="text-slate-400 text-sm">
+                  <p className={`text-slate-400 ${compact ? 'text-xs' : 'text-sm'}`}>
                     Max {maxSizeMB}MB • {acceptedTypes.map(type => type.split('/')[1].toUpperCase()).join(', ')}
                   </p>
                 </motion.div>
@@ -276,7 +278,7 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
           )}
         </AnimatePresence>
 
-        <p className="text-xs text-slate-400 mt-2">
+        <p className={`text-xs text-slate-400 ${compact ? 'mt-1' : 'mt-2'}`}>
           {description && description !== label ? description : 'Supported formats: JPEG, PNG, GIF, WebP'}
         </p>
       </div>

@@ -50,6 +50,8 @@ export const useTriviaGame = ({ activity, roomId }: UseTriviaGameProps): UseTriv
 
   // Socket event listeners for trivia events
   useEffect(() => {
+    if (!supabase) return;
+
     const channel = supabase.channel(`trivia_${activity.id}`)
       .on('broadcast', { event: 'trivia_started' }, (payload) => {
         setGameState(prev => ({
@@ -57,8 +59,8 @@ export const useTriviaGame = ({ activity, roomId }: UseTriviaGameProps): UseTriv
           isActive: true,
           phase: 'countdown',
           startTime: Date.now(),
-          endTime: Date.now() + (payload.duration * 1000),
-          timeRemaining: payload.duration,
+          endTime: Date.now() + (payload.payload.duration * 1000),
+          timeRemaining: payload.payload.duration,
           correctAnswerRevealed: false
         }));
         
@@ -87,7 +89,7 @@ export const useTriviaGame = ({ activity, roomId }: UseTriviaGameProps): UseTriv
       .on('broadcast', { event: 'trivia_countdown' }, (payload) => {
         setGameState(prev => ({
           ...prev,
-          timeRemaining: payload.timeRemaining
+          timeRemaining: payload.payload.timeRemaining
         }));
       })
       .on('broadcast', { event: 'trivia_reset' }, () => {
@@ -107,6 +109,11 @@ export const useTriviaGame = ({ activity, roomId }: UseTriviaGameProps): UseTriv
   }, [activity.id, revealDelay]);
 
   const startTrivia = useCallback(async () => {
+    if (!supabase) {
+      setError('Real-time features not available');
+      return;
+    }
+
     try {
       setLoading(true);
       setError(null);
@@ -173,6 +180,11 @@ export const useTriviaGame = ({ activity, roomId }: UseTriviaGameProps): UseTriv
   }, [activity.id, activity.settings, countdownDuration]);
 
   const endTrivia = useCallback(async () => {
+    if (!supabase) {
+      setError('Real-time features not available');
+      return;
+    }
+
     try {
       setError(null);
 
@@ -220,6 +232,11 @@ export const useTriviaGame = ({ activity, roomId }: UseTriviaGameProps): UseTriv
   }, [activity.id, activity.settings, activity.options]);
 
   const revealAnswer = useCallback(async () => {
+    if (!supabase) {
+      setError('Real-time features not available');
+      return;
+    }
+
     try {
       setError(null);
 
@@ -269,17 +286,24 @@ export const useTriviaGame = ({ activity, roomId }: UseTriviaGameProps): UseTriv
     });
 
     // Broadcast reset event
-    supabase.channel(`trivia_${activity.id}`)
-      .send({
-        type: 'broadcast',
-        event: 'trivia_reset',
-        payload: { activityId: activity.id }
-      });
+    if (supabase) {
+      supabase.channel(`trivia_${activity.id}`)
+        .send({
+          type: 'broadcast',
+          event: 'trivia_reset',
+          payload: { activityId: activity.id }
+        });
+    }
 
     setError(null);
   }, [activity.id]);
 
   const updateSettings = useCallback(async (newSettings: Partial<TriviaSettings>) => {
+    if (!supabase) {
+      setError('Real-time features not available');
+      return;
+    }
+
     try {
       setLoading(true);
       setError(null);

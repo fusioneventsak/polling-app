@@ -6,7 +6,7 @@ import { roomService } from '../services/roomService';
 import { useTheme } from '../components/ThemeProvider';
 import { Users, BarChart, Clock, MessageSquare, HelpCircle, Cloud, Trophy, Target, Calendar, Activity as ActivityIcon, TrendingUp, CheckCircle, Lock, QrCode } from 'lucide-react';
 import { Enhanced3DPollVisualization } from '../components/Enhanced3DPollVisualization';
-import { Trivia3DVisualization } from '../components/Trivia3Dvisualization';
+import { Trivia3DVisualization } from '../components/Trivia3DVisualization';
 import { useTriviaGame } from '../hooks/useTriviaGame';
 import type { ActivityType, Room, Activity } from '../types';
 

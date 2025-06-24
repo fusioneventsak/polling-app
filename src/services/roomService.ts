@@ -262,7 +262,8 @@ export class RoomService {
   }
 
   // Create activity in room
-  async createActivity(roomId: string, activityData: {
+  async createActivity(activityData: {
+    room_id: string;
     title: string;
     description?: string;
     type: 'poll' | 'trivia' | 'quiz';
@@ -278,13 +279,13 @@ export class RoomService {
       console.log('RoomService: Creating activity:', activityData);
 
       // Extract options from activityData
-      const { options, ...activityFields } = activityData;
+      const { options, room_id, ...activityFields } = activityData;
 
       // Get the next activity order for this room
       const { data: maxOrderResult, error: orderError } = await supabase
         .from('activities')
         .select('activity_order')
-        .eq('room_id', roomId)
+        .eq('room_id', room_id)
         .order('activity_order', { ascending: false })
         .limit(1)
         .maybeSingle();
@@ -300,7 +301,7 @@ export class RoomService {
         .from('activities')
         .insert({
           ...activityFields,
-          room_id: roomId,
+          room_id,
           is_active: false,
           total_responses: 0,
           activity_order: nextOrder,
