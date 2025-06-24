@@ -49,13 +49,12 @@ const TriviaOptionCard: React.FC<{
   }, [isRevealed, option.is_correct, index]);
 
   const glowColor = useMemo(() => {
-    if (isRevealed && option.is_correct) {
-      return new THREE.Color('#34d399'); // Brighter green glow
-    }
-    return optionColor;
-  }, [isRevealed, option.is_correct, optionColor]);
+    const colorValue = option.is_correct ? '#34d399' : optionColor;
+    return new THREE.Color(colorValue);
+  }, [optionColor, option.is_correct]);
 
-  // Animation loop
+  const baseColor = useMemo(() => new THREE.Color("#1e293b"), []);
+  
   useFrame((state) => {
     if (meshRef.current) {
       // Gentle floating animation
@@ -72,9 +71,9 @@ const TriviaOptionCard: React.FC<{
       >
         <boxGeometry args={[4, 6, 0.5]} />
         <meshPhysicalMaterial
+          color={optionColor}
           transparent
           opacity={0.9}
-          color={optionColor}
           metalness={0.8}
           clearcoat={1}
           clearcoatRoughness={0.1}
