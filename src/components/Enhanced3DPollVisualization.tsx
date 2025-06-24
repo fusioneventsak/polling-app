@@ -49,23 +49,23 @@ const calculateFitFontSize = (text: string, spacing: number) => {
   };
 };
 
-// Shared curve calculation function with dynamic spacing
+// Shared curve calculation function with proper curve implementation
 const getCurvedPosition = (index: number, totalItems: number, baseZ: number = -8) => {
-  // Dynamic radius based on number of options for better spacing
-  const baseRadius = 30;
-  const radiusMultiplier = Math.max(1, totalItems / 3); // Increase radius for more items
+  // Ensure we always have a curve, even with few items
+  const baseRadius = 25; // Slightly smaller base radius
+  const radiusMultiplier = Math.max(1, Math.sqrt(totalItems / 2)); // More gradual scaling
   const radius = baseRadius * radiusMultiplier;
   
-  // Dynamic spread - wider arc for more options
-  const baseSpread = Math.PI / 4; // 45 degrees for 2-3 items
-  const maxSpread = Math.PI / 2.2; // Max ~82 degrees for many items
-  const spread = Math.min(maxSpread, baseSpread * Math.max(1, totalItems / 3));
+  // Better spread calculation - ensure meaningful curve
+  const minSpread = Math.PI / 6; // 30 degrees minimum for visible curve
+  const maxSpread = Math.PI / 1.8; // ~100 degrees maximum
+  const spread = minSpread + (maxSpread - minSpread) * Math.min(1, (totalItems - 1) / 6);
   
   const step = totalItems > 1 ? spread / (totalItems - 1) : 0;
   const angle = -spread / 2 + index * step;
   
-  // Dynamic depth variation - more pronounced for larger groups
-  const depthVariation = Math.max(5, totalItems * 1.2);
+  // Moderate depth variation that enhances the curve
+  const depthVariation = 3 + totalItems * 0.8;
   
   return {
     x: Math.sin(angle) * radius,
@@ -373,9 +373,9 @@ const FloorStatsDisplay: React.FC<{
       {options.map((option, index) => {
         const percentage = totalResponses > 0 ? Math.round((option.responses / totalResponses) * 100) : 0;
         
-        const minSpacing = 6.0;
-        const maxSpacing = 12.0;
-        const spacing = Math.max(minSpacing, Math.min(maxSpacing, 50 / Math.max(options.length, 1)));
+        const minSpacing = 6.0; // Back to reasonable spacing
+        const maxSpacing = 12.0; // More moderate max spacing
+        const spacing = Math.max(minSpacing, Math.min(maxSpacing, 45 / Math.max(options.length, 1))); // Tighter calculation
         
         const curvedPos = getCurvedPosition(index, options.length, 7.5);
         
@@ -514,8 +514,10 @@ const Enhanced3DScene: React.FC<{
       const targetX = 0;
       const targetY = 8;
       
+      // Dynamic camera distance based on number of options and curve size
       const baseDistance = 25;
-      const extraDistance = Math.max(0, (options.length - 2) * 2);
+      const optionMultiplier = Math.max(1, options.length / 2.5);
+      const extraDistance = optionMultiplier * 8; // More dramatic distance scaling
       const targetZ = baseDistance + extraDistance;
       
       const animationDuration = 2000;
@@ -741,8 +743,8 @@ export const Enhanced3DPollVisualization: React.FC<Enhanced3DPollVisualizationPr
             enablePan={false}
             enableZoom={true}
             enableRotate={true}
-            minDistance={15}
-            maxDistance={50}
+            minDistance={Math.max(15, options.length * 3)} // Dynamic min distance
+            maxDistance={Math.max(50, options.length * 8)} // Dynamic max distance
             minPolarAngle={Math.PI / 12}
             maxPolarAngle={Math.PI / 2.2}
             autoRotate={false}
