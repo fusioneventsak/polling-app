@@ -364,7 +364,7 @@ const Enhanced3DBar: React.FC<{
   );
 };
 
-// FIXED: Floor Stats Display - CLEAR SEPARATION from images, no overlapping
+// FIXED: Floor Stats Display - SMALLER CONTAINERS, no collisions
 const FloorStatsDisplay: React.FC<{
   options: ActivityOption[];
   totalResponses: number;
@@ -377,11 +377,11 @@ const FloorStatsDisplay: React.FC<{
       {options.map((option, index) => {
         const percentage = totalResponses > 0 ? Math.round((option.responses / totalResponses) * 100) : 0;
         
-        // FIXED: Much larger spacing to prevent any overlapping
-        const baseSpacing = 20; // Much larger
-        const spacing = Math.max(baseSpacing, Math.min(25, 150 / Math.max(options.length, 1))); 
+        // FIXED: Smaller container spacing to match smaller text
+        const baseSpacing = 12; // Reduced from 20
+        const spacing = Math.max(baseSpacing, Math.min(16, 100 / Math.max(options.length, 1))); 
         
-        const curvedPos = getCurvedPosition(index, options.length, 25); // Use larger radius
+        const curvedPos = getCurvedPosition(index, options.length, 25); // Use same radius
         
         const hue = (index / Math.max(options.length - 1, 1)) * 300;
         const barColorValue = option.is_correct 
@@ -394,9 +394,9 @@ const FloorStatsDisplay: React.FC<{
         return (
           <group key={`${option.id}-${option.responses}`}>
             <group rotation={[0, -(curvedPos.rotationY || 0), 0]}>
-              {/* Floor panel - FRONT LAYER, far from images */}
+              {/* Floor panel - MUCH SMALLER to match text size */}
               <mesh position={[curvedPos.x, 0.05, curvedPos.z + 6]} rotation={[-Math.PI / 2, 0, 0]}>
-                <planeGeometry args={[spacing * 0.8, 10]} />
+                <planeGeometry args={[spacing * 0.7, 6]} /> {/* Reduced from 10 to 6 height, 0.8 to 0.7 width */}
                 <meshStandardMaterial 
                   color={floorColor}
                   transparent
@@ -406,9 +406,9 @@ const FloorStatsDisplay: React.FC<{
                 />
               </mesh>
               
-              {/* Glow panel */}
+              {/* Glow panel - SMALLER */}
               <mesh position={[curvedPos.x, 0.04, curvedPos.z + 6]} rotation={[-Math.PI / 2, 0, 0]}>
-                <planeGeometry args={[spacing * 0.85, 10.4]} />
+                <planeGeometry args={[spacing * 0.75, 6.3]} /> {/* Reduced proportionally */}
                 <meshBasicMaterial 
                   color={barColor}
                   transparent
@@ -418,8 +418,8 @@ const FloorStatsDisplay: React.FC<{
               
               {/* Percentage text - MUCH SMALLER */}
               <Text
-                position={[curvedPos.x, 0.15, curvedPos.z + 3]}
-                fontSize={1.5} // FIXED: Much smaller (was 2.5)
+                position={[curvedPos.x, 0.15, curvedPos.z + 4.5]} {/* Adjusted position for smaller container */}
+                fontSize={1.5}
                 color={barColorValue}
                 anchorX="center"
                 anchorY="middle"
@@ -433,8 +433,8 @@ const FloorStatsDisplay: React.FC<{
               
               {/* Vote count - MUCH SMALLER */}
               <Text
-                position={[curvedPos.x, 0.12, curvedPos.z + 5]}
-                fontSize={0.8} // FIXED: Much smaller (was 1.2)
+                position={[curvedPos.x, 0.12, curvedPos.z + 6]} {/* Centered in smaller container */}
+                fontSize={0.8}
                 color="#94a3b8"
                 anchorX="center"
                 anchorY="middle"
@@ -447,13 +447,13 @@ const FloorStatsDisplay: React.FC<{
               
               {/* Option text - MUCH SMALLER */}
               <Text
-                position={[curvedPos.x, 0.12, curvedPos.z + 8]}
-                fontSize={textProps.fontSize * 0.8} // FIXED: Smaller multiplier (was 1.2)
+                position={[curvedPos.x, 0.12, curvedPos.z + 7.5]} {/* Adjusted for smaller container */}
+                fontSize={textProps.fontSize * 0.8}
                 color="#ffffff"
                 anchorX="center"
                 anchorY="middle"
                 rotation={[-Math.PI / 2, 0, 0]}
-                maxWidth={textProps.maxWidth}
+                maxWidth={textProps.maxWidth * 0.8} {/* Smaller max width */}
                 outlineWidth={Math.max(0.01, textProps.fontSize * 0.02)}
                 outlineColor="#1e293b"
                 textAlign="center"
