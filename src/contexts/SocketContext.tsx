@@ -180,7 +180,7 @@ export const SocketProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       console.log('🧹 Cleaning up global subscription');
       channel.unsubscribe();
     };
-  }, [loadRooms, broadcastRoomUpdate, broadcastActivityUpdate, broadcastResponseUpdate, rooms]);
+  }, [loadRooms, broadcastRoomUpdate, broadcastActivityUpdate, broadcastResponseUpdate]);
 
   const value = {
     isConnected,
