@@ -625,7 +625,7 @@ const Enhanced3DScene: React.FC<{
       
       <Float speed={0.3} rotationIntensity={0.01} floatIntensity={0.05}>
         <Text
-          position={[0, 10, -15]}
+          position={[0, 10, -2]}
           fontSize={titleFontSize}
           color="#ffffff"
           anchorX="center"
@@ -636,7 +636,7 @@ const Enhanced3DScene: React.FC<{
         </Text>
         
         <Text
-          position={[0.1, 9.9, -15.1]}
+          position={[0.1, 9.9, -2.1]}
           fontSize={titleFontSize}
           color={titleShadowColor}
           anchorX="center"
