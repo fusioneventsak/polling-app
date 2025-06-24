@@ -534,10 +534,10 @@ const Enhanced3DScene: React.FC<{
       const extraHeight = Math.max(0, (options.length - 3) * 2.5);
       const targetY = baseHeight + extraHeight;
       
-      // CLOSER distance for larger polls
-      const baseDistance = 24;
-      const distanceReduction = Math.max(0, (options.length - 3) * 2);
-      const targetZ = baseDistance - distanceReduction;
+      // Closer distance for ALL polls - smaller polls get closer too
+      const baseDistance = 20; // Reduced from 24 for closer view
+      const distanceAdjustment = Math.max(0, (options.length - 3) * 1.5); // Less aggressive scaling
+      const targetZ = baseDistance + distanceAdjustment; // ADD distance for larger polls (but start closer)
       
       const animationDuration = 3500; // Slightly longer for smoother feel
       const startTime = Date.now();
@@ -769,13 +769,13 @@ export const Enhanced3DPollVisualization: React.FC<Enhanced3DPollVisualizationPr
             enablePan={false}
             enableZoom={true}
             enableRotate={true}
-            minDistance={Math.max(12, 24 - options.length * 2)} // Closer minimum for larger polls
-            maxDistance={Math.max(35, options.length * 3)} // More moderate max scaling
-            minPolarAngle={Math.PI / 20} // Allow more downward angle
+            minDistance={Math.max(12, 24 - options.length * 2)}
+            maxDistance={Math.max(35, options.length * 3)}
+            minPolarAngle={Math.PI / 25} // Allow more downward angle for all polls
             maxPolarAngle={Math.PI / 2.2}
             autoRotate={false}
             rotateSpeed={0.5}
-            target={[0, 1 + Math.max(0, (options.length - 4) * 0.3), 0]} // Lower target for downward angle
+            target={[0, 0.5 + Math.max(0, (options.length - 4) * 0.2), 0]} // Lower target for downward angle
           />
         </Canvas>
       </Suspense>
