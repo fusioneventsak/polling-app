@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useState, ReactNode, useCallback, useRef } from 'react';
 import { supabase, checkSupabaseConnection, retrySupabaseOperation } from '../lib/supabase';
 import { roomService } from '../services/roomService';
 import type { Room } from '../types';
@@ -25,6 +25,14 @@ export const SocketProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const [isConnected, setIsConnected] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<'connected' | 'disconnected' | 'reconnecting'>('disconnected');
   const [rooms, setRooms] = useState<Room[]>([]);
+
+  // Use ref to store current rooms state to avoid stale closures
+  const roomsRef = useRef<Room[]>([]);
+
+  // Keep roomsRef current whenever rooms state changes
+  useEffect(() => {
+    roomsRef.current = rooms;
+  }, [rooms]);
 
   const loadRooms = useCallback(async () => {
     setConnectionStatus('reconnecting');
@@ -124,33 +132,12 @@ export const SocketProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         (payload) => {
           console.log('📝 Activity options change:', payload.eventType);
           loadRooms(); // Refresh rooms data
-          
-          // Find activity and room for broadcasting
-          const optionId = payload.new?.id || payload.old?.id;
-          const activityId = payload.new?.activity_id || payload.old?.activity_id;
-          if (activityId) {
-            // Find room ID from current rooms data
-            const room = rooms.find(r => r.activities?.some(a => a.id === activityId));
-            if (room) {
-              broadcastActivityUpdate(activityId, room.id);
-            }
-          }
         }
       )
       .on('postgres_changes',
         { event: '*', schema: 'public', table: 'participant_responses' },
         (payload) => {
           console.log('👥 Response change:', payload.eventType);
-          
-          // Broadcast to specific components (no need to reload all rooms for responses)
-          const activityId = payload.new?.activity_id || payload.old?.activity_id;
-          if (activityId) {
-            // Find room ID from current rooms data
-            const room = rooms.find(r => r.activities?.some(a => a.id === activityId));
-            if (room) {
-              broadcastResponseUpdate(activityId, room.id);
-            }
-          }
           
           // Still refresh rooms for updated counts
           loadRooms();
