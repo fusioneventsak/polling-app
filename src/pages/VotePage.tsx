@@ -165,8 +165,8 @@ export const VotePage: React.FC = () => {
 
   // Apply room theme when activity loads
   useEffect(() => {
-    if (activity?.room?.settings) {
-      applyTheme(activity.room.settings);
+    if (activity?.settings?.room_settings) {
+      applyTheme(activity.settings.room_settings);
     } else {
       resetTheme();
     }
@@ -174,7 +174,7 @@ export const VotePage: React.FC = () => {
     return () => {
       resetTheme();
     };
-  }, [activity?.room?.settings, applyTheme, resetTheme]);
+  }, [activity?.settings?.room_settings, applyTheme, resetTheme]);
 
   // SIMPLIFIED: Listen to custom events from global subscription
   useEffect(() => {
@@ -291,9 +291,9 @@ export const VotePage: React.FC = () => {
   };
 
   const themeColors = {
-    primary: activity?.room?.settings?.primaryColor || '#3b82f6',
-    accent: activity?.room?.settings?.accentColor || '#10b981',
-    background: activity?.room?.settings?.backgroundColor || '#1e293b'
+    primary: activity?.settings?.room_settings?.theme?.primary_color || '#3b82f6',
+    accent: activity?.settings?.room_settings?.theme?.accent_color || '#10b981',
+    secondary: activity?.settings?.room_settings?.theme?.secondary_color || '#06b6d4'
   };
 
   const isVotingLocked = activity?.settings?.voting_locked || false;
@@ -327,7 +327,29 @@ export const VotePage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen w-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 overflow-x-hidden">
+    <div 
+      className="min-h-screen w-screen overflow-x-hidden"
+      style={{
+        background: activity?.settings?.room_settings?.theme?.background_gradient 
+          ? `linear-gradient(to bottom right, ${activity.settings.room_settings.theme.background_gradient.replace('from-', '').replace('via-', '').replace('to-', '').split(' ').map(color => {
+              const colorMap: { [key: string]: string } = {
+                'slate-900': '#0f172a',
+                'blue-900': '#1e3a8a',
+                'purple-900': '#581c87',
+                'green-900': '#14532d',
+                'red-900': '#7f1d1d',
+                'orange-900': '#7c2d12',
+                'gray-900': '#111827',
+                'blue-950': '#172554',
+                'slate-950': '#020617',
+                'black': '#000000',
+                'slate-800': '#1e293b'
+              };
+              return colorMap[color] || color;
+            }).join(', ')})` 
+          : 'linear-gradient(to bottom right, #0f172a, #1e3a8a, #0f172a)'
+      }}
+    >
       <div className="container mx-auto px-4 py-8 max-w-4xl">
         {/* Header */}
         <div className="flex items-center gap-4 mb-8">
@@ -468,11 +490,15 @@ export const VotePage: React.FC = () => {
                     disabled={voting || isVotingLocked}
                     className={`p-6 rounded-lg border-2 transition-all duration-200 ${
                       selectedOption === option.id
-                        ? 'border-blue-500 bg-blue-500/10 scale-[0.98]'
+                        ? `scale-[0.98]`
                         : isVotingLocked
                         ? 'border-slate-600 bg-slate-800/50 opacity-50 cursor-not-allowed'
                         : 'border-slate-600 bg-slate-800/50 hover:border-slate-500 hover:bg-slate-800/70 hover:scale-[1.02] cursor-pointer'
                     } ${voting ? 'pointer-events-none' : ''}`}
+                    style={selectedOption === option.id ? {
+                      borderColor: themeColors.primary,
+                      backgroundColor: `${themeColors.primary}10`
+                    } : {}}
                   >
                     <div className="flex items-center gap-4">
                       {option.media_url && (
@@ -490,7 +516,10 @@ export const VotePage: React.FC = () => {
                       </div>
                       
                       {voting && selectedOption === option.id && (
-                        <Loader2 className="w-6 h-6 animate-spin text-blue-400" />
+                        <Loader2 
+                          className="w-6 h-6 animate-spin" 
+                          style={{ color: themeColors.primary }}
+                        />
                       )}
                     </div>
                   </motion.button>

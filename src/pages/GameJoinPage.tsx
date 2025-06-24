@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../lib/supabase';
 import { roomService } from '../services/roomService';
+import { useTheme } from '../components/ThemeProvider';
 import { Users, Target, Clock, CheckCircle, ArrowRight, Loader2, AlertCircle, Home } from 'lucide-react';
 import { Card } from '../components/Card';
 import type { Room, ActivityType } from '../types';
@@ -10,6 +11,7 @@ import type { Room, ActivityType } from '../types';
 function GameJoinPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const { applyTheme, resetTheme } = useTheme();
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -153,7 +155,21 @@ function GameJoinPage() {
   // Clean up voting status when room changes
   useEffect(() => {
     checkAndCleanVotingStatus();
+    
+    // Apply room theme when room loads
+    if (joinedRoom?.settings) {
+      applyTheme(joinedRoom.settings);
+    } else {
+      resetTheme();
+    }
   }, [checkAndCleanVotingStatus]);
+
+  // Cleanup theme on unmount
+  useEffect(() => {
+    return () => {
+      resetTheme();
+    };
+  }, [resetTheme]);
 
   const handleSubmitWithCode = async (roomCode: string) => {
     if (roomCode.length !== 4) {
@@ -242,6 +258,7 @@ function GameJoinPage() {
 
   const handleLeaveRoom = () => {
     setJoinedRoom(null);
+    resetTheme();
     localStorage.removeItem('currentRoomCode');
     if (subscriptionRef.current) {
       subscriptionRef.current.unsubscribe();
@@ -251,8 +268,38 @@ function GameJoinPage() {
   };
 
   if (joinedRoom) {
+    const themeColors = {
+      primary: joinedRoom.settings?.theme?.primary_color || '#3b82f6',
+      secondary: joinedRoom.settings?.theme?.secondary_color || '#06b6d4',
+      accent: joinedRoom.settings?.theme?.accent_color || '#8b5cf6'
+    };
+
+    const backgroundStyle = joinedRoom.settings?.theme?.background_gradient 
+      ? {
+          background: `linear-gradient(to bottom right, ${joinedRoom.settings.theme.background_gradient.replace('from-', '').replace('via-', '').replace('to-', '').split(' ').map(color => {
+            const colorMap: { [key: string]: string } = {
+              'slate-900': '#0f172a',
+              'blue-900': '#1e3a8a',
+              'purple-900': '#581c87',
+              'green-900': '#14532d',
+              'red-900': '#7f1d1d',
+              'orange-900': '#7c2d12',
+              'gray-900': '#111827',
+              'blue-950': '#172554',
+              'slate-950': '#020617',
+              'black': '#000000',
+              'slate-800': '#1e293b'
+            };
+            return colorMap[color] || color;
+          }).join(', ')})`
+        }
+      : {};
+
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900">
+      <div 
+        className="min-h-screen"
+        style={backgroundStyle.background ? backgroundStyle : { background: 'linear-gradient(to bottom right, #0f172a, #1e3a8a, #0f172a)' }}
+      >
         <div className="container mx-auto px-4 py-8">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -274,11 +321,21 @@ function GameJoinPage() {
                 animate={{ scale: 1 }}
                 className="mb-6"
               >
-                <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full mb-4">
+                <div 
+                  className="inline-flex items-center justify-center w-20 h-20 rounded-full mb-4"
+                  style={{
+                    background: `linear-gradient(to bottom right, ${themeColors.primary}, ${themeColors.accent})`
+                  }}
+                >
                   <Users className="w-10 h-10 text-white" />
                 </div>
                 <h1 className="text-4xl font-bold text-white mb-2">{joinedRoom.name}</h1>
                 <p className="text-xl text-slate-400">Room Code: {joinedRoom.code}</p>
+                {joinedRoom.settings?.branding?.organization_name && (
+                  <p className="text-lg text-slate-300 mt-2">
+                    by {joinedRoom.settings.branding.organization_name}
+                  </p>
+                )}
               </motion.div>
 
               <div className="flex items-center justify-center gap-8 text-slate-300">
@@ -382,7 +439,17 @@ function GameJoinPage() {
                           {isActive && !hasVoted && !isLocked && (
                             <button
                               onClick={() => navigate(`/vote/${activity.id}`)}
-                              className="px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors flex items-center gap-2"
+                              className="px-6 py-3 text-white rounded-lg font-medium transition-colors flex items-center gap-2"
+                              style={{
+                                backgroundColor: themeColors.accent,
+                                filter: 'brightness(1.1)'
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.filter = 'brightness(1.2)';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.filter = 'brightness(1.1)';
+                              }}
                             >
                               Vote Now
                               <ArrowRight className="w-4 h-4" />
@@ -392,7 +459,17 @@ function GameJoinPage() {
                           {isActive && hasVoted && (
                             <button
                               onClick={() => navigate(`/vote/${activity.id}`)}
-                              className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors flex items-center gap-2"
+                              className="px-6 py-3 text-white rounded-lg font-medium transition-colors flex items-center gap-2"
+                              style={{
+                                backgroundColor: themeColors.primary,
+                                filter: 'brightness(1.1)'
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.filter = 'brightness(1.2)';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.filter = 'brightness(1.1)';
+                              }}
                             >
                               View Results
                               <ArrowRight className="w-4 h-4" />
@@ -420,10 +497,15 @@ function GameJoinPage() {
                 View live results on the display page:
               </p>
               <div className="inline-block px-4 py-2 bg-slate-800/50 border border-slate-600/50 rounded-lg">
-                <code className="text-blue-400 text-sm">
+                <code className="text-sm" style={{ color: themeColors.primary }}>
                   {window.location.origin}/display/{joinedRoom.code}
                 </code>
               </div>
+              {joinedRoom.settings?.branding?.show_powered_by !== false && (
+                <p className="text-xs text-slate-500 mt-4">
+                  Powered by PollStream
+                </p>
+              )}
             </Card>
           </motion.div>
         </div>
