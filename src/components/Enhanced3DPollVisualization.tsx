@@ -219,7 +219,7 @@ const Enhanced3DBar: React.FC<{
       />
       
       {/* Volumetric Light Beam - Outer Cone */}
-      <mesh position={[position[0], 12, position[2]]} rotation={[Math.PI, 0, 0]}>
+      <mesh position={[position[0], 12, position[2]]} rotation={[0, 0, 0]}>
         <coneGeometry args={[4, 12, 8]} />
         <meshBasicMaterial
           color={barColor}
@@ -231,7 +231,7 @@ const Enhanced3DBar: React.FC<{
       </mesh>
       
       {/* Volumetric Light Beam - Inner Cone */}
-      <mesh position={[position[0], 10, position[2]]} rotation={[Math.PI, 0, 0]}>
+      <mesh position={[position[0], 10, position[2]]} rotation={[0, 0, 0]}>
         <coneGeometry args={[2.5, 10, 8]} />
         <meshBasicMaterial
           color={barColor}
@@ -243,7 +243,7 @@ const Enhanced3DBar: React.FC<{
       </mesh>
       
       {/* Volumetric Light Beam - Core */}
-      <mesh position={[position[0], 8, position[2]]} rotation={[Math.PI, 0, 0]}>
+      <mesh position={[position[0], 8, position[2]]} rotation={[0, 0, 0]}>
         <coneGeometry args={[1.5, 8, 8]} />
         <meshBasicMaterial
           color={barColor}
