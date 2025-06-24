@@ -430,6 +430,11 @@ export const DisplayPage: React.FC = () => {
               try {
                 console.log('👥 DisplayPage: Response change:', payload.eventType);
                 loadRoom();
+              }
+            }
+          )
+      }
+    }
     const setupSubscriptions = async () => {
       if (retryCount >= maxRetries) {
         console.warn(`⚠️ DisplayPage: Max retry attempts reached for room ${pollId}`);
