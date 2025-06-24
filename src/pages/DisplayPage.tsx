@@ -1,10 +1,10 @@
-// src/pages/DisplayPage.tsx - Complete Enhanced Version with Fixed WebSocket Connections
+// src/pages/DisplayPage.tsx - Complete Enhanced Version with WORKING Real-time Updates
 
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../lib/supabase';
-import { connectionManager } from '../lib/connectionManager'; // ADDED: Connection manager import
+import { connectionManager } from '../lib/connectionManager'; // CRITICAL: Using connection manager
 import { roomService } from '../services/roomService';
 import { useTheme } from '../components/ThemeProvider';
 import { Users, BarChart, Clock, MessageSquare, HelpCircle, Cloud, Trophy, Target, Calendar, Activity as ActivityIcon, TrendingUp, CheckCircle, Lock, QrCode, X } from 'lucide-react';
@@ -69,11 +69,22 @@ const ActivityDisplay = ({ currentRoom, currentTime, formatTime }: {
   const activeActivity = React.useMemo(() => {
     if (!currentRoom?.activities) return null;
     
+    console.log('🔍 Checking for active activity in room:', {
+      roomId: currentRoom.id,
+      currentActivityId: currentRoom.current_activity_id,
+      activitiesCount: currentRoom.activities.length,
+      activities: currentRoom.activities.map(a => ({
+        id: a.id,
+        title: a.title,
+        type: a.type,
+        is_active: a.is_active
+      }))
+    });
+    
     // Priority 1: Use current_activity_id from room
     if (currentRoom.current_activity_id) {
       const currentActivity = currentRoom.activities.find(a => a.id === currentRoom.current_activity_id) as Activity | undefined;
       if (currentActivity) {
-        // Debug logging
         console.log('🎯 Found current activity by ID:', {
           id: currentActivity.id,
           type: currentActivity.type,
@@ -162,13 +173,6 @@ const ActivityDisplay = ({ currentRoom, currentTime, formatTime }: {
       </div>
     );
   }
-
-  // FIXED: Explicit check for trivia type with debug logging
-  console.log('🔍 Checking activity type for display:', {
-    type: activeActivity.type,
-    isExactlyTrivia: activeActivity.type === 'trivia',
-    typeOfType: typeof activeActivity.type
-  });
 
   if (activeActivity.type === 'trivia') {
     console.log('✅ Rendering Trivia3DVisualization');
@@ -336,11 +340,12 @@ export const DisplayPage: React.FC = () => {
         return;
       }
 
-      console.log('🏠 Loaded room:', {
+      console.log('🏠 DisplayPage loaded room:', {
         id: room.id,
         code: room.code,
         activities: room.activities?.length || 0,
-        currentActivityId: room.current_activity_id
+        currentActivityId: room.current_activity_id,
+        currentActivityType: room.current_activity_type
       });
 
       setCurrentRoom(room);
@@ -365,59 +370,91 @@ export const DisplayPage: React.FC = () => {
 
     const setupSubscriptions = async () => {
       try {
-        console.log('🔄 Setting up real-time subscription for room:', pollId);
+        console.log('🔄 DisplayPage: Setting up real-time subscription for room:', pollId);
 
-        // Use connection manager instead of direct supabase channel creation
-        const channel = await connectionManager.getOrCreateChannel(`room_${pollId}`);
+        // CRITICAL: Use connection manager instead of direct supabase channel creation
+        const channelName = `display_room_${pollId}`;
+        const channel = await connectionManager.getOrCreateChannel(channelName);
 
         // Only proceed if subscription is still active (component not unmounted)
         if (!isSubscriptionActive) {
-          console.log('❌ Subscription cancelled - component unmounted');
+          console.log('❌ DisplayPage: Subscription cancelled - component unmounted');
           return;
         }
 
-        console.log('✅ Channel obtained, setting up event listeners...');
+        console.log('✅ DisplayPage: Channel obtained, setting up event listeners...');
 
-        // Subscribe to room changes
+        // Subscribe to room changes - CRITICAL for activity switching
         channel
           .on('postgres_changes', 
-            { event: '*', schema: 'public', table: 'rooms' },
+            { 
+              event: '*', 
+              schema: 'public', 
+              table: 'rooms',
+              filter: `code=eq.${pollId}` // Filter by room code for efficiency
+            },
             (payload) => {
-              console.log('🏠 Room change:', payload);
+              console.log('🏠 DisplayPage: Room change received:', {
+                eventType: payload.eventType,
+                currentActivityId: payload.new?.current_activity_id,
+                currentActivityType: payload.new?.current_activity_type
+              });
               loadRoom();
             }
           )
           .on('postgres_changes',
-            { event: '*', schema: 'public', table: 'activities' },
+            { 
+              event: '*', 
+              schema: 'public', 
+              table: 'activities'
+            },
             (payload) => {
-              console.log('🎯 Activity change:', payload);
+              console.log('🎯 DisplayPage: Activity change received:', {
+                eventType: payload.eventType,
+                activityId: payload.new?.id || payload.old?.id,
+                isActive: payload.new?.is_active,
+                roomId: payload.new?.room_id || payload.old?.room_id
+              });
+              
+              // Only reload if this activity belongs to our room
+              if (currentRoom && (payload.new?.room_id === currentRoom.id || payload.old?.room_id === currentRoom.id)) {
+                console.log('🔄 DisplayPage: Activity change is for our room, reloading...');
+                loadRoom();
+              }
+            }
+          )
+          .on('postgres_changes',
+            { 
+              event: '*', 
+              schema: 'public', 
+              table: 'activity_options'
+            },
+            (payload) => {
+              console.log('📝 DisplayPage: Option change received:', payload.eventType);
               loadRoom();
             }
           )
           .on('postgres_changes',
-            { event: '*', schema: 'public', table: 'activity_options' },
+            { 
+              event: '*', 
+              schema: 'public', 
+              table: 'participant_responses'
+            },
             (payload) => {
-              console.log('📝 Option change:', payload);
-              loadRoom();
-            }
-          )
-          .on('postgres_changes',
-            { event: '*', schema: 'public', table: 'participant_responses' },
-            (payload) => {
-              console.log('👥 Response change:', payload);
+              console.log('👥 DisplayPage: Response change received:', payload.eventType);
               loadRoom();
             }
           );
 
-        console.log('✅ DisplayPage subscriptions established');
+        console.log('✅ DisplayPage: All subscriptions established successfully');
 
       } catch (error) {
-        console.error('❌ Failed to setup DisplayPage subscriptions:', error);
+        console.error('❌ DisplayPage: Failed to setup subscriptions:', error);
         
         // Retry after delay if subscription is still active
         if (isSubscriptionActive) {
           setTimeout(() => {
-            console.log('🔄 Retrying subscription setup...');
+            console.log('🔄 DisplayPage: Retrying subscription setup...');
             setupSubscriptions();
           }, 3000);
         }
@@ -429,14 +466,14 @@ export const DisplayPage: React.FC = () => {
 
     // Cleanup function
     return () => {
-      console.log('🧹 Cleaning up DisplayPage subscriptions');
+      console.log('🧹 DisplayPage: Cleaning up subscriptions');
       isSubscriptionActive = false;
       
       if (pollId) {
-        connectionManager.cleanupChannel(`room_${pollId}`);
+        connectionManager.cleanupChannel(`display_room_${pollId}`);
       }
     };
-  }, [pollId, loadRoom]);
+  }, [pollId, loadRoom, currentRoom?.id]);
 
   const getRoomStats = () => {
     if (!currentRoom) return null;
