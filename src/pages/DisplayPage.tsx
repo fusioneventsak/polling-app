@@ -1,10 +1,12 @@
+// src/pages/DisplayPage.tsx - Complete Enhanced Version with Debug Logging
+
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../lib/supabase';
 import { roomService } from '../services/roomService';
 import { useTheme } from '../components/ThemeProvider';
-import { Users, BarChart, Clock, MessageSquare, HelpCircle, Cloud, Trophy, Target, Calendar, Activity as ActivityIcon, TrendingUp, CheckCircle, Lock, QrCode } from 'lucide-react';
+import { Users, BarChart, Clock, MessageSquare, HelpCircle, Cloud, Trophy, Target, Calendar, Activity as ActivityIcon, TrendingUp, CheckCircle, Lock, QrCode, X } from 'lucide-react';
 import { Enhanced3DPollVisualization } from '../components/Enhanced3DPollVisualization';
 import { Trivia3DVisualization } from '../components/Trivia3DVisualization';
 import { useTriviaGame } from '../hooks/useTriviaGame';
@@ -57,260 +59,7 @@ const QRCodeDisplay: React.FC<{ url: string; size?: number }> = ({ url, size = 2
   );
 };
 
-// Enhanced Poll Results Visualization Component with real-time animations
-const FixedPoll3DVisualization: React.FC<{
-  options: any[];
-  totalResponses: number;
-  themeColors: any;
-  activityTitle?: string;
-  activityMedia?: string;
-  isVotingLocked?: boolean;
-}> = ({ options, totalResponses, themeColors, activityTitle, activityMedia, isVotingLocked }) => {
-  const [animatedCounts, setAnimatedCounts] = useState<number[]>([]);
-  const [animatedPercentages, setAnimatedPercentages] = useState<number[]>([]);
-  const prevTotalResponses = useRef(totalResponses);
-
-  // Initialize animated values
-  useEffect(() => {
-    if (options.length > 0) {
-      setAnimatedCounts(options.map(opt => opt.responses || 0));
-      setAnimatedPercentages(options.map((opt, index) => 
-        totalResponses > 0 ? Math.round(((opt.responses || 0) / totalResponses) * 100) : 0
-      ));
-    }
-  }, [options.length]);
-
-  // Animate values when they change with enhanced animations
-  useEffect(() => {
-    if (totalResponses !== prevTotalResponses.current && options.length > 0) {
-      const newCounts = options.map(opt => opt.responses || 0);
-      const newPercentages = options.map(opt => 
-        totalResponses > 0 ? Math.round(((opt.responses || 0) / totalResponses) * 100) : 0
-      );
-
-      // Enhanced animation for counts
-      animatedCounts.forEach((currentCount, index) => {
-        const targetCount = newCounts[index];
-        if (currentCount !== targetCount) {
-          const duration = 1500; // 1.5 second animation
-          const steps = 60; // Smoother animation
-          const stepValue = (targetCount - currentCount) / steps;
-          
-          let step = 0;
-          const interval = setInterval(() => {
-            step++;
-            const newValue = Math.round(currentCount + (stepValue * step));
-            
-            setAnimatedCounts(prev => {
-              const updated = [...prev];
-              updated[index] = step === steps ? targetCount : newValue;
-              return updated;
-            });
-            
-            if (step === steps) {
-              clearInterval(interval);
-            }
-          }, duration / steps);
-        }
-      });
-
-      // Enhanced animation for percentages
-      animatedPercentages.forEach((currentPercentage, index) => {
-        const targetPercentage = newPercentages[index];
-        if (currentPercentage !== targetPercentage) {
-          const duration = 1500;
-          const steps = 60;
-          const stepValue = (targetPercentage - currentPercentage) / steps;
-          
-          let step = 0;
-          const interval = setInterval(() => {
-            step++;
-            const newValue = Math.round(currentPercentage + (stepValue * step));
-            
-            setAnimatedPercentages(prev => {
-              const updated = [...prev];
-              updated[index] = step === steps ? targetPercentage : newValue;
-              return updated;
-            });
-            
-            if (step === steps) {
-              clearInterval(interval);
-            }
-          }, duration / steps);
-        }
-      });
-
-      prevTotalResponses.current = totalResponses;
-    }
-  }, [totalResponses, options, animatedCounts, animatedPercentages]);
-
-  if (options.length === 0) {
-    return (
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="w-full bg-gradient-to-br from-slate-900/40 to-blue-900/20 rounded-xl border border-slate-700 p-12 text-center"
-      >
-        <Target className="w-16 h-16 mx-auto text-slate-600 mb-4" />
-        <h3 className="text-2xl font-bold text-white mb-2">No Options Available</h3>
-        <p className="text-slate-400">Options will appear here when created</p>
-      </motion.div>
-    );
-  }
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, scale: 0.9 }}
-      animate={{ opacity: 1, scale: 1 }}
-      transition={{ duration: 0.8 }}
-      className="w-full bg-gradient-to-br from-slate-900/40 to-blue-900/20 rounded-xl border border-slate-700 overflow-hidden shadow-2xl relative"
-      style={{ height: '100%', minHeight: '400px' }}
-    >
-      {/* Enhanced header with vote counter and status */}
-      <div className="absolute top-4 left-4 bg-black/40 backdrop-blur-sm rounded-lg p-3 border border-white/10">
-        <div className="text-white text-sm">
-          <motion.div 
-            key={totalResponses}
-            initial={{ scale: 1.2, color: '#22c55e' }}
-            animate={{ scale: 1, color: '#ffffff' }}
-            transition={{ duration: 0.5 }}
-            className="font-semibold"
-          >
-            {totalResponses} Total Responses
-          </motion.div>
-          <div className="text-slate-300 text-xs">{options.length} Options</div>
-        </div>
-      </div>
-
-      {/* Voting locked indicator */}
-      {isVotingLocked && (
-        <div className="absolute top-4 right-4 bg-red-900/40 backdrop-blur-sm rounded-lg p-3 border border-red-600/30">
-          <div className="flex items-center gap-2">
-            <Lock className="w-4 h-4 text-red-400" />
-            <span className="text-red-400 text-sm font-medium">Voting Locked</span>
-          </div>
-        </div>
-      )}
-
-      {/* Enhanced visualization with better animations */}
-      <div className="h-full flex flex-col p-8">
-        <div className="text-center mb-8">
-          {/* Activity Media */}
-          {activityMedia && (
-            <motion.div
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="mb-6"
-            >
-              <img
-                src={activityMedia}
-                alt="Activity media"
-                className="max-w-sm mx-auto rounded-lg shadow-lg"
-              />
-            </motion.div>
-          )}
-          
-          <h3 className="text-2xl font-bold text-white mb-2">
-            {totalResponses > 0 ? 'Live Poll Results' : (activityTitle || 'Poll Options')}
-          </h3>
-          <p className="text-slate-400">
-            {totalResponses > 0 ? 'Results update in real-time as votes come in' : 'Waiting for participants to vote...'}
-          </p>
-        </div>
-        
-        <div className="flex-1 flex items-center justify-center">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 w-full max-w-6xl">
-            {options.map((option, index) => {
-              const animatedCount = animatedCounts[index] || 0;
-              const animatedPercentage = animatedPercentages[index] || 0;
-              const maxResponses = Math.max(...options.map(opt => opt.responses || 0), 1);
-              const heightPercentage = totalResponses > 0 ? (animatedCount / maxResponses) * 100 : 0;
-
-              return (
-                <motion.div
-                  key={option.id}
-                  initial={{ opacity: 0, y: 30, scale: 0.9 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  transition={{ delay: index * 0.15, duration: 0.6 }}
-                  className="relative"
-                >
-                  {/* Enhanced 3D Card */}
-                  <div className="relative bg-gradient-to-br from-slate-800/80 to-slate-900/80 rounded-xl p-6 border border-slate-600/50 backdrop-blur-sm shadow-lg transform transition-all duration-300 hover:scale-105 hover:shadow-2xl">
-                    {/* Option Media */}
-                    {option.media_url && (
-                      <div className="mb-4">
-                        <img
-                          src={option.media_url}
-                          alt="Option media"
-                          className="w-full h-32 object-cover rounded-lg"
-                        />
-                      </div>
-                    )}
-
-                    {/* Option Label */}
-                    <div className="flex items-center gap-3 mb-4">
-                      <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold text-sm">
-                        {String.fromCharCode(65 + index)}
-                      </div>
-                      <p className="text-white font-semibold text-lg flex-1 leading-tight">
-                        {option.text}
-                      </p>
-                    </div>
-
-                    {/* Animated Progress Bar */}
-                    <div className="mb-4">
-                      <div className="flex justify-between items-center mb-2">
-                        <span className="text-slate-300 text-sm">Responses</span>
-                        <span className="text-white font-bold text-lg">
-                          {animatedPercentage}%
-                        </span>
-                      </div>
-                      <div className="w-full bg-slate-700/50 rounded-full h-3 overflow-hidden">
-                        <motion.div
-                          initial={{ width: 0 }}
-                          animate={{ width: `${animatedPercentage}%` }}
-                          transition={{ duration: 1.5, ease: "easeOut" }}
-                          className="h-full bg-gradient-to-r from-blue-500 to-purple-500 rounded-full shadow-lg"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Vote Count with Animation */}
-                    <div className="text-center">
-                      <motion.div
-                        key={animatedCount}
-                        initial={{ scale: 1.2, color: '#22c55e' }}
-                        animate={{ scale: 1, color: '#ffffff' }}
-                        transition={{ duration: 0.5 }}
-                        className="text-3xl font-bold text-white"
-                      >
-                        {animatedCount}
-                      </motion.div>
-                      <p className="text-slate-400 text-sm">votes</p>
-                    </div>
-
-                    {/* 3D Height Indicator */}
-                    <div className="absolute right-4 top-4 w-2 bg-slate-700/50 rounded-full overflow-hidden h-20">
-                      <motion.div
-                        initial={{ height: 0 }}
-                        animate={{ height: `${heightPercentage}%` }}
-                        transition={{ duration: 1.5, ease: "easeOut" }}
-                        className="w-full bg-gradient-to-t from-blue-500 to-purple-500 rounded-full"
-                        style={{ alignSelf: 'flex-end' }}
-                      />
-                    </div>
-                  </div>
-                </motion.div>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-    </motion.div>
-  );
-};
-
-// Enhanced Activity Display Component with Trivia Support
+// Enhanced Activity Display Component with Fixed Trivia Detection
 const ActivityDisplay = ({ currentRoom, currentTime, formatTime }: {
   currentRoom: Room;
   currentTime: Date;
@@ -323,19 +72,25 @@ const ActivityDisplay = ({ currentRoom, currentTime, formatTime }: {
     if (currentRoom.current_activity_id) {
       const currentActivity = currentRoom.activities.find(a => a.id === currentRoom.current_activity_id) as Activity | undefined;
       if (currentActivity) {
+        // Debug logging
+        console.log('🎯 Found current activity by ID:', {
+          id: currentActivity.id,
+          type: currentActivity.type,
+          title: currentActivity.title,
+          options: currentActivity.options?.length || 0
+        });
+        
         // Ensure options are properly formatted
-        currentActivity.options = currentActivity.options?.map((opt, index) => {
-          return {
-            id: opt.id,
-            text: opt.text,
-            media_url: opt.media_url,
-            responses: opt.responses || 0,
-            is_correct: opt.is_correct || false,
-            option_order: opt.option_order || index,
-            created_at: opt.created_at,
-            activity_id: opt.activity_id
-          };
-        }) || [];
+        currentActivity.options = currentActivity.options?.map((opt, index) => ({
+          id: opt.id,
+          text: opt.text,
+          media_url: opt.media_url,
+          responses: opt.responses || 0,
+          is_correct: opt.is_correct || false,
+          option_order: opt.option_order || index,
+          created_at: opt.created_at,
+          activity_id: opt.activity_id
+        })) || [];
         return currentActivity;
       }
     }
@@ -343,16 +98,30 @@ const ActivityDisplay = ({ currentRoom, currentTime, formatTime }: {
     // Priority 2: Fallback to any activity marked as active
     const flaggedActive = currentRoom.activities?.find(a => a.is_active) as Activity | undefined;
     if (flaggedActive) {
+      console.log('🎯 Found active activity by flag:', flaggedActive.type, flaggedActive.title);
       return flaggedActive;
     }
     
+    console.log('❌ No active activity found');
     return null;
   }, [currentRoom?.current_activity_id, currentRoom?.activities]);
 
-  // Trivia game hook (only used for trivia activities)
+  // Debug logging for activity type detection
+  React.useEffect(() => {
+    if (activeActivity) {
+      console.log('🎮 Activity detected:', {
+        type: activeActivity.type,
+        isTrivia: activeActivity.type === 'trivia',
+        title: activeActivity.title,
+        options: activeActivity.options?.length
+      });
+    }
+  }, [activeActivity]);
+
+  // Initialize trivia game hook only for trivia activities
   const triviaGame = useTriviaGame({
-    activity: activeActivity!,
-    roomId: currentRoom?.id!
+    activity: activeActivity || {} as Activity,
+    roomId: currentRoom?.id || '',
   });
 
   const getActivityIcon = (type: ActivityType) => {
@@ -393,8 +162,16 @@ const ActivityDisplay = ({ currentRoom, currentTime, formatTime }: {
     );
   }
 
-  // Render different visualizations based on activity type
+  // FIXED: Explicit check for trivia type with debug logging
+  console.log('🔍 Checking activity type for display:', {
+    type: activeActivity.type,
+    isExactlyTrivia: activeActivity.type === 'trivia',
+    typeOfType: typeof activeActivity.type
+  });
+
   if (activeActivity.type === 'trivia') {
+    console.log('✅ Rendering Trivia3DVisualization');
+    
     return (
       <div className="h-screen w-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 flex flex-col">
         {/* Trivia Header */}
@@ -457,8 +234,7 @@ const ActivityDisplay = ({ currentRoom, currentTime, formatTime }: {
             gameState={triviaGame.gameState}
             onTimerComplete={triviaGame.endTrivia}
             onTimerTick={(timeRemaining) => {
-              // Optional: Handle timer tick events
-              console.log('Time remaining:', timeRemaining);
+              console.log('⏰ Timer tick:', timeRemaining);
             }}
             countdownDuration={activeActivity.settings?.countdown_duration || 30}
             showCorrectAnswer={activeActivity.settings?.show_correct_answer !== false}
@@ -470,6 +246,8 @@ const ActivityDisplay = ({ currentRoom, currentTime, formatTime }: {
   }
 
   // Default poll/survey display (existing logic)
+  console.log('📊 Rendering default poll visualization for type:', activeActivity.type);
+  
   return (
     <div className="h-screen w-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 flex flex-col">
       {/* Standard Activity Header */}
@@ -503,34 +281,39 @@ const ActivityDisplay = ({ currentRoom, currentTime, formatTime }: {
         </div>
       </div>
 
-      {/* Standard Activity Results Visualization */}
+      {/* Poll Visualization */}
       <div className="flex-1 p-4" style={{ height: 'calc(100vh - 120px)' }}>
         <Enhanced3DPollVisualization
           options={activeActivity.options || []}
           totalResponses={activeActivity.total_responses || 0}
           themeColors={{
             primaryColor: '#3b82f6',
-            secondaryColor: '#0891b2',
-            accentColor: '#10b981'
+            secondaryColor: '#06b6d4',
+            accentColor: '#10b981',
+            backgroundGradient: 'from-slate-900 via-blue-900 to-slate-900',
+            textColor: '#ffffff'
           }}
           activityTitle={activeActivity.title}
           activityMedia={activeActivity.media_url}
-          isVotingLocked={activeActivity.settings?.voting_locked}
+          isVotingLocked={activeActivity.settings?.voting_locked || false}
         />
       </div>
     </div>
   );
 };
 
-function DisplayPage() {
-  const { pollId } = useParams();
+export const DisplayPage: React.FC = () => {
+  const { pollId } = useParams<{ pollId: string }>();
   const [currentRoom, setCurrentRoom] = useState<Room | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(new Date());
   const subscriptionRef = useRef<any>(null);
-
+  
+  // Get all activities for stats
   const allActivities = currentRoom?.activities || [];
 
+  // Time update effect
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentTime(new Date());
@@ -540,75 +323,41 @@ function DisplayPage() {
   }, []);
 
   // Load room data
-  const loadRoom = useCallback(async (forceRefresh = false) => {
-    if (!pollId || !supabase) return;
-    
+  const loadRoom = useCallback(async () => {
+    if (!pollId) return;
+
     try {
-      const { data: roomData, error } = await supabase
-        .from('rooms')
-        .select(`
-          *,
-          activities!activities_room_id_fkey(
-            *,
-            options:activity_options(
-              id,
-              text,
-              media_url,
-              is_correct,
-              responses,
-              option_order,
-              created_at,
-              activity_id
-            )
-          )
-        `)
-        .eq('code', pollId)
-        .eq('is_active', true)
-        .maybeSingle();
-
-      if (error && error.code !== 'PGRST116') {
-        console.error('DisplayPage: Error loading room:', error);
-        setCurrentRoom(null);
+      setLoading(true);
+      setError(null);
+      
+      const room = await roomService.getRoomByCode(pollId);
+      if (!room) {
+        setError('Room not found');
         return;
       }
 
-      if (!roomData) {
-        setCurrentRoom(null);
-        return;
-      }
+      console.log('🏠 Loaded room:', {
+        id: room.id,
+        code: room.code,
+        activities: room.activities?.length || 0,
+        currentActivityId: room.current_activity_id
+      });
 
-      // Transform and validate the data structure
-      const transformedRoom = {
-        ...roomData,
-        activities: roomData.activities?.map((activity: any) => ({
-          ...activity,
-          options: activity.options?.map((option: any) => ({
-            id: option.id,
-            text: option.text,
-            media_url: option.media_url, // Ensure this field is preserved
-            is_correct: option.is_correct || false,
-            responses: option.responses || 0,
-            option_order: option.option_order || 0,
-            created_at: option.created_at,
-            activity_id: option.activity_id
-          })).sort((a: any, b: any) => a.option_order - b.option_order) || []
-        })).sort((a: any, b: any) => a.activity_order - b.activity_order) || []
-      };
-
-      setCurrentRoom(transformedRoom);
-    } catch (error) {
-      console.error('DisplayPage: Error in loadRoom:', error);
+      setCurrentRoom(room);
+    } catch (err) {
+      console.error('Failed to load room:', err);
+      setError('Failed to load room');
     } finally {
       setLoading(false);
     }
   }, [pollId]);
 
-  // Load room on mount
+  // Initial load
   useEffect(() => {
     loadRoom();
   }, [loadRoom]);
 
-  // Set up real-time subscriptions
+  // Real-time subscriptions with enhanced logging
   useEffect(() => {
     if (!pollId || !supabase) return;
 
@@ -617,56 +366,45 @@ function DisplayPage() {
       subscriptionRef.current.unsubscribe();
     }
 
-    const channel = supabase
-      .channel(`display-page-${pollId}`)
-      .on('postgres_changes',
-        { 
-          event: '*', 
-          schema: 'public', 
-          table: 'rooms',
-          filter: `code=eq.${pollId}`
-        },
-        async (payload) => {
-          await loadRoom(true);
-        }
-      )
-      .on('postgres_changes',
-        { 
-          event: '*', 
-          schema: 'public', 
-          table: 'activities'
-        },
-        async (payload) => {
-          await loadRoom(true);
-        }
-      )
-      .on('postgres_changes',
-        { 
-          event: '*', 
-          schema: 'public', 
-          table: 'activity_options'
-        },
-        async (payload) => {
-          await loadRoom(true);
-        }
-      )
-      .on('postgres_changes',
-        { 
-          event: '*', 
-          schema: 'public', 
-          table: 'participant_responses'
-        },
-        async (payload) => {
-          await loadRoom(true);
-        }
-      );
+    console.log('🔄 Setting up real-time subscription for room:', pollId);
 
-    subscriptionRef.current = channel;
-    channel.subscribe((status, err) => {
-      if (err) {
-        console.error('DisplayPage: Subscription error:', err);
-      }
-    });
+    // Subscribe to room changes
+    subscriptionRef.current = supabase
+      .channel(`room_${pollId}`)
+      .on('postgres_changes', 
+        { event: '*', schema: 'public', table: 'rooms' },
+        (payload) => {
+          console.log('🏠 Room change:', payload);
+          loadRoom();
+        }
+      )
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'activities' },
+        (payload) => {
+          console.log('🎯 Activity change:', payload);
+          loadRoom();
+        }
+      )
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'activity_options' },
+        (payload) => {
+          console.log('📝 Option change:', payload);
+          loadRoom();
+        }
+      )
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'participant_responses' },
+        (payload) => {
+          console.log('👥 Response change:', payload);
+          loadRoom();
+        }
+      )
+      .subscribe((status, err) => {
+        console.log('📡 Subscription status:', status);
+        if (err) {
+          console.error('DisplayPage: Subscription error:', err);
+        }
+      });
 
     return () => {
       if (subscriptionRef.current) {
@@ -675,32 +413,6 @@ function DisplayPage() {
       }
     };
   }, [pollId, loadRoom]);
-
-  const getActivityIcon = (type: ActivityType) => {
-    switch (type) {
-      case 'poll':
-        return Target;
-      case 'trivia':
-        return HelpCircle;
-      case 'quiz':
-        return MessageSquare;
-      default:
-        return Target;
-    }
-  };
-
-  const getActivityTypeLabel = (type: ActivityType) => {
-    switch (type) {
-      case 'poll':
-        return 'Poll';
-      case 'trivia':
-        return 'Trivia';
-      case 'quiz':
-        return 'Quiz';
-      default:
-        return 'Activity';
-    }
-  };
 
   const getRoomStats = () => {
     if (!currentRoom) return null;
@@ -803,114 +515,132 @@ function DisplayPage() {
                     <Users className="w-8 h-8 text-blue-400" />
                     <div>
                       <p className="text-2xl font-bold text-white">{stats.participants}</p>
-                      <p className="text-slate-400">Participants</p>
+                      <p className="text-slate-400 text-sm">Participants</p>
                     </div>
                   </div>
                 </div>
-
+                
                 <div className="bg-slate-800/50 backdrop-blur-sm rounded-lg p-6 border border-slate-700/50">
                   <div className="flex items-center gap-3">
-                    <Target className="w-8 h-8 text-green-400" />
+                    <ActivityIcon className="w-8 h-8 text-green-400" />
                     <div>
                       <p className="text-2xl font-bold text-white">{stats.activities}</p>
-                      <p className="text-slate-400">Activities</p>
+                      <p className="text-slate-400 text-sm">Activities</p>
                     </div>
                   </div>
                 </div>
-
+                
                 <div className="bg-slate-800/50 backdrop-blur-sm rounded-lg p-6 border border-slate-700/50">
                   <div className="flex items-center gap-3">
-                    <BarChart className="w-8 h-8 text-purple-400" />
-                    <div>
-                      <p className="text-2xl font-bold text-white">{stats.totalResponses}</p>
-                      <p className="text-slate-400">Total Responses</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-slate-800/50 backdrop-blur-sm rounded-lg p-6 border border-slate-700/50">
-                  <div className="flex items-center gap-3">
-                    <CheckCircle className="w-8 h-8 text-orange-400" />
+                    <CheckCircle className="w-8 h-8 text-purple-400" />
                     <div>
                       <p className="text-2xl font-bold text-white">{stats.completedActivities}</p>
-                      <p className="text-slate-400">Completed</p>
+                      <p className="text-slate-400 text-sm">Completed</p>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="bg-slate-800/50 backdrop-blur-sm rounded-lg p-6 border border-slate-700/50">
+                  <div className="flex items-center gap-3">
+                    <TrendingUp className="w-8 h-8 text-orange-400" />
+                    <div>
+                      <p className="text-2xl font-bold text-white">{stats.totalResponses}</p>
+                      <p className="text-slate-400 text-sm">Total Responses</p>
                     </div>
                   </div>
                 </div>
               </motion.div>
 
-              {/* Activities Preview */}
+              {/* Activities List */}
               <motion.div
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.3 }}
-                className="bg-slate-800/50 backdrop-blur-sm rounded-lg p-6 border border-slate-700/50"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.4 }}
+                className="bg-slate-800/50 backdrop-blur-sm rounded-lg border border-slate-700/50 overflow-hidden"
               >
-                <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-                  <ActivityIcon className="w-5 h-5" />
-                  Activities Overview
-                </h3>
-                
-                {allActivities.length > 0 ? (
-                  <div className="space-y-3 max-h-60 overflow-y-auto">
-                    {allActivities.map((activity, index) => {
-                      const Icon = getActivityIcon(activity.type);
-                      const participationRate = stats.participants > 0 
-                        ? Math.round(((activity.total_responses || 0) / stats.participants) * 100)
-                        : 0;
-
-                      return (
-                        <motion.div
-                          key={activity.id}
-                          initial={{ opacity: 0, x: 10 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          transition={{ delay: 0.4 + (index * 0.05) }}
-                          className="flex items-center justify-between p-3 bg-slate-900/30 rounded border border-slate-600/30"
-                        >
-                          <div className="flex items-center gap-3 flex-1">
-                            <Icon className="w-4 h-4 text-blue-400" />
-                            <div className="flex-1 min-w-0">
-                              <p className="text-white font-medium truncate">{activity.title}</p>
-                              <p className="text-slate-400 text-xs">
-                                {activity.total_responses || 0} responses • {participationRate}% participation
-                              </p>
+                <div className="p-6">
+                  <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+                    <BarChart className="w-5 h-5" />
+                    Recent Activities
+                  </h3>
+                  
+                  {allActivities.length > 0 ? (
+                    <div className="space-y-3 max-h-64 overflow-y-auto">
+                      {allActivities.slice(0, 5).map((activity, index) => {
+                        const isActive = activity.is_active || activity.id === currentRoom.current_activity_id;
+                        const participationRate = activity.total_responses > 0 
+                          ? Math.round((activity.total_responses / Math.max(currentRoom.participants, 1)) * 100)
+                          : 0;
+                        
+                        return (
+                          <motion.div
+                            key={activity.id}
+                            initial={{ opacity: 0, x: -20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: 0.5 + index * 0.1 }}
+                            className={`p-4 rounded-lg border transition-all ${
+                              isActive 
+                                ? 'bg-blue-900/30 border-blue-600/50' 
+                                : 'bg-slate-700/30 border-slate-600/50'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-3">
+                                {isActive && (
+                                  <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                                )}
+                                <div>
+                                  <h4 className="font-medium text-white truncate">
+                                    {activity.title}
+                                  </h4>
+                                  <p className="text-sm text-slate-400 capitalize">
+                                    {activity.type} • {activity.total_responses || 0} responses
+                                  </p>
+                                </div>
+                              </div>
+                              
+                              {activity.total_responses > 0 && (
+                                <div className="text-right">
+                                  <p className="text-sm font-medium text-white">
+                                    {participationRate}%
+                                  </p>
+                                  <div className="w-16 h-1 bg-slate-600 rounded-full mt-1">
+                                    <div 
+                                      className="h-full bg-blue-400 rounded-full transition-all duration-1000"
+                                      style={{ 
+                                        width: `${Math.min(100, participationRate)}%` 
+                                      }}
+                                    />
+                                  </div>
+                                </div>
+                              )}
                             </div>
-                          </div>
-                          {participationRate > 0 && (
-                            <div className="w-16 bg-slate-700/50 rounded-full h-2 ml-3">
-                              <div 
-                                className="bg-blue-500 h-2 rounded-full transition-all duration-500"
-                                style={{ 
-                                  width: `${Math.min(100, participationRate)}%` 
-                                }}
-                              />
-                            </div>
-                          )}
-                        </motion.div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div className="text-center py-8">
-                    <Target className="w-12 h-12 mx-auto text-slate-600 mb-3" />
-                    <p className="text-slate-400 mb-1">No Activities Yet</p>
-                    <p className="text-slate-500 text-sm">Activities will appear here when they are created</p>
-                  </div>
-                )}
+                          </motion.div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8">
+                      <Target className="w-12 h-12 mx-auto text-slate-600 mb-3" />
+                      <p className="text-slate-400 mb-1">No Activities Yet</p>
+                      <p className="text-slate-500 text-sm">Activities will appear here when they are created</p>
+                    </div>
+                  )}
+                </div>
               </motion.div>
-            </div>
-          </motion.div>
 
-          {/* Waiting Message */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.5 }}
-            className="text-center mt-8"
-          >
-            <div className="inline-flex items-center gap-3 px-6 py-3 bg-blue-900/30 border border-blue-600/50 rounded-full">
-              <div className="w-3 h-3 bg-blue-500 rounded-full animate-pulse"></div>
-              <span className="text-blue-200 text-lg">Waiting for activity to start...</span>
+              {/* Waiting Message */}
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.5 }}
+                className="text-center mt-8"
+              >
+                <div className="inline-flex items-center gap-3 px-6 py-3 bg-blue-900/30 border border-blue-600/50 rounded-full">
+                  <div className="w-3 h-3 bg-blue-500 rounded-full animate-pulse"></div>
+                  <span className="text-blue-200 text-lg">Waiting for activity to start...</span>
+                </div>
+              </motion.div>
             </div>
           </motion.div>
         </div>
@@ -922,8 +652,26 @@ function DisplayPage() {
     return (
       <div className="h-screen w-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 flex items-center justify-center">
         <div className="text-center">
-          <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-white text-lg">Loading room display...</p>
+          <div className="w-20 h-20 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-6"></div>
+          <h2 className="text-2xl font-bold text-white mb-2">Loading...</h2>
+          <p className="text-slate-400">Connecting to room {pollId}</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="h-screen w-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
+            <X className="w-8 h-8 text-red-400" />
+          </div>
+          <h2 className="text-2xl font-bold text-white mb-2">Room Not Found</h2>
+          <p className="text-slate-400 mb-6">{error}</p>
+          <p className="text-sm text-slate-500">
+            Please check the room code and try again.
+          </p>
         </div>
       </div>
     );
@@ -931,11 +679,10 @@ function DisplayPage() {
 
   if (!currentRoom) {
     return (
-      <div className="h-screen w-screen bg-gradient-to-br from-slate-900 via-red-900 to-slate-900 flex items-center justify-center">
+      <div className="h-screen w-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 flex items-center justify-center">
         <div className="text-center">
-          <div className="w-16 h-16 border-4 border-red-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <h1 className="text-2xl font-bold text-white mb-2">Room Not Found</h1>
-          <p className="text-red-300">Unable to find room with code: {pollId}</p>
+          <h2 className="text-2xl font-bold text-white mb-2">Room Not Available</h2>
+          <p className="text-slate-400">Please try again later.</p>
         </div>
       </div>
     );
@@ -946,14 +693,12 @@ function DisplayPage() {
     return <Dashboard />;
   }
 
-  // Show active activity with enhanced real-time results using ActivityDisplay component
+  // Show active activity display
   return (
-    <ActivityDisplay 
+    <ActivityDisplay
       currentRoom={currentRoom}
       currentTime={currentTime}
       formatTime={formatTime}
     />
   );
-}
-
-export { DisplayPage };
+};
