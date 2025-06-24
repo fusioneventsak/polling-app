@@ -297,10 +297,6 @@ export const ActivityEditor: React.FC<ActivityEditorProps> = ({
     setOptions(prev => prev.map((opt, i) => i === index ? { ...opt, mediaUrl } : opt));
   };
 
-  const updateOptionMedia = (index: number, mediaUrl: string) => {
-    setOptions(prev => prev.map((opt, i) => i === index ? { ...opt, mediaUrl } : opt));
-  };
-
   const markAsCorrect = (index: number) => {
     setOptions(prev => prev.map((opt, i) => ({
       ...opt,
