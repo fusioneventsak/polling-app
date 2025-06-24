@@ -6,7 +6,7 @@ import { useSocket } from '../contexts/SocketContext';
 export const ConnectionStatus: React.FC = () => {
   const { connectionStatus, isConnected } = useSocket();
 
-  if (connectionStatus === 'connected') {
+  if (connectionStatus === 'connected' && isConnected) {
     return null; // Don't show anything when connected
   }
 

@@ -64,12 +64,18 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
         return;
       }
       
-      const connectionOk = await checkSupabaseConnection();
-      setIsConnected(connectionOk);
-      setConnectionStatus(connectionOk ? 'connected' : 'disconnected');
-      
-      if (connectionOk) {
-        await loadRooms();
+      try {
+        const connectionOk = await checkSupabaseConnection();
+        setIsConnected(connectionOk);
+        setConnectionStatus(connectionOk ? 'connected' : 'disconnected');
+        
+        if (connectionOk) {
+          await loadRooms();
+        }
+      } catch (error) {
+        console.error('Failed to initialize connection:', error);
+        setIsConnected(false);
+        setConnectionStatus('disconnected');
       }
     };
     
@@ -79,21 +85,33 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
     const connectionMonitor = setInterval(async () => {
       if (!supabase) return;
       
-      const connectionOk = await checkSupabaseConnection();
-      const wasConnected = isConnected;
-      
-      setIsConnected(connectionOk);
-      setConnectionStatus(connectionOk ? 'connected' : 'disconnected');
-      
-      // If connection was restored, reload rooms
-      if (!wasConnected && connectionOk) {
-        console.log('SocketContext: Connection restored, reloading rooms');
-        await loadRooms();
+      try {
+        const connectionOk = await checkSupabaseConnection();
+        const wasConnected = isConnected;
+        
+        setIsConnected(connectionOk);
+        setConnectionStatus(connectionOk ? 'connected' : 'disconnected');
+        
+        // If connection was restored, reload rooms
+        if (!wasConnected && connectionOk) {
+          console.log('SocketContext: Connection restored, reloading rooms');
+          await loadRooms();
+        }
+      } catch (error) {
+        console.warn('Connection monitor error:', error);
+        setIsConnected(false);
+        setConnectionStatus('disconnected');
       }
     }, 15000); // Check every 15 seconds
     // Create a unique channel for global updates
     const channelName = `global-updates-${Date.now()}`;
-    const globalChannel = supabase?.channel(channelName);
+    const globalChannel = supabase?.channel(channelName, {
+      config: {
+        presence: {
+          key: 'user_id'
+        }
+      }
+    });
     
     if (globalChannel) {
       // Subscribe to all room changes
@@ -131,10 +149,20 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
           if (err) {
             console.error('Global subscription error:', err);
             setConnectionStatus('disconnected');
+            // Retry connection after a delay
+            setTimeout(() => {
+              if (supabase) {
+                console.log('Retrying Supabase connection...');
+                initializeConnection();
+              }
+            }, 5000);
           }
           if (status === 'SUBSCRIBED') {
             console.log('✅ Global real-time subscriptions active');
             setConnectionStatus('connected');
+          } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+            console.warn('Supabase channel error or timeout:', status);
+            setConnectionStatus('disconnected');
           }
         });
     }

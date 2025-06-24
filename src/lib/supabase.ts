@@ -15,6 +15,8 @@ export const supabase = supabaseUrl && supabaseAnonKey
         params: {
           eventsPerSecond: 10,
         },
+        heartbeatIntervalMs: 30000,
+        reconnectAfterMs: (tries) => Math.min(tries * 1000, 10000),
       },
       auth: {
         persistSession: true,
