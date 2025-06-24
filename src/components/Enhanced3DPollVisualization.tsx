@@ -49,28 +49,28 @@ const calculateFitFontSize = (text: string, spacing: number) => {
   };
 };
 
-// Shared curve calculation function with subtle curve
+// Shared curve calculation function with better spacing and curve
 const getCurvedPosition = (index: number, totalItems: number, baseZ: number = -8) => {
-  // Smaller radius for subtle curve
-  const baseRadius = 20; // Increased for gentler curve
-  const radiusMultiplier = Math.max(1, Math.sqrt(totalItems / 4)); // Less aggressive scaling
+  // Larger radius for more spacing
+  const baseRadius = 30; // Increased for better spacing
+  const radiusMultiplier = Math.max(1, Math.sqrt(totalItems / 2)); // More scaling for larger groups
   const radius = baseRadius * radiusMultiplier;
   
-  // Subtle curve - much smaller angle spread
-  const minSpread = Math.PI / 8; // 22.5 degrees minimum (was 60)
-  const maxSpread = Math.PI / 4; // 45 degrees maximum (was 150)
-  const spread = minSpread + (maxSpread - minSpread) * Math.min(1, (totalItems - 1) / 6);
+  // Better curve - more spread for proper spacing
+  const minSpread = Math.PI / 4; // 45 degrees minimum for visible curve
+  const maxSpread = Math.PI / 1.5; // ~120 degrees maximum for nice amphitheater
+  const spread = minSpread + (maxSpread - minSpread) * Math.min(1, (totalItems - 1) / 4);
   
   const step = totalItems > 1 ? spread / (totalItems - 1) : 0;
   const angle = -spread / 2 + index * step;
   
-  // Minimal depth variation for subtle curve
-  const depthVariation = 2 + totalItems * 0.5; // Much smaller depth change
+  // Moderate depth variation to enhance the curve
+  const depthVariation = 4 + totalItems * 0.8;
   
   return {
     x: Math.sin(angle) * radius,
     z: baseZ - Math.cos(angle) * depthVariation, // Curve toward audience
-    rotationY: angle * 0.3 // Reduced rotation intensity
+    rotationY: angle * 0.5 // Increased rotation for better curve definition
   };
 };
 
@@ -379,9 +379,9 @@ const FloorStatsDisplay: React.FC<{
       {options.map((option, index) => {
         const percentage = totalResponses > 0 ? Math.round((option.responses / totalResponses) * 100) : 0;
         
-        const minSpacing = 4.0; // Tighter minimum spacing
-        const maxSpacing = 8.0; // Tighter maximum spacing
-        const spacing = Math.max(minSpacing, Math.min(maxSpacing, 35 / Math.max(options.length, 1))); // Closer together
+        const minSpacing = 6.0; // Maintained for text readability
+        const maxSpacing = 14.0; // Increased for better spacing
+        const spacing = Math.max(minSpacing, Math.min(maxSpacing, 50 / Math.max(options.length, 1))); // Better calculation
         
         const curvedPos = getCurvedPosition(index, options.length, 7.5);
         
@@ -526,9 +526,9 @@ const Enhanced3DScene: React.FC<{
       const targetX = 0;
       const targetY = 8;
       
-      // Closer camera for more intimate view of curved layout
-      const baseDistance = 20; // Closer base distance
-      const extraDistance = Math.max(0, (options.length - 2) * 2); // Less scaling
+      // Dynamic camera distance for better viewing of spaced curve
+      const baseDistance = 28; // Pulled back for better view
+      const extraDistance = Math.max(0, (options.length - 2) * 4); // More scaling for spacing
       const targetZ = baseDistance + extraDistance;
       
       const animationDuration = 2000;
@@ -754,8 +754,8 @@ export const Enhanced3DPollVisualization: React.FC<Enhanced3DPollVisualizationPr
             enablePan={false}
             enableZoom={true}
             enableRotate={true}
-            minDistance={12} // Closer minimum
-            maxDistance={35} // Closer maximum
+            minDistance={20} // Adjusted for spaced layout
+            maxDistance={Math.max(50, options.length * 6)} // Dynamic scaling
             minPolarAngle={Math.PI / 12}
             maxPolarAngle={Math.PI / 2.2}
             autoRotate={false}
