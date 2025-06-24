@@ -49,7 +49,7 @@ const calculateFitFontSize = (text: string, spacing: number) => {
   };
 };
 
-// Shared curve calculation function with proper curve implementation
+// Shared curve calculation function with proper curve toward audience
 const getCurvedPosition = (index: number, totalItems: number, baseZ: number = -8) => {
   // Ensure we always have a curve, even with few items
   const baseRadius = 25; // Slightly smaller base radius
@@ -64,12 +64,12 @@ const getCurvedPosition = (index: number, totalItems: number, baseZ: number = -8
   const step = totalItems > 1 ? spread / (totalItems - 1) : 0;
   const angle = -spread / 2 + index * step;
   
-  // Moderate depth variation that enhances the curve
+  // FIXED: Curve toward audience by reversing the Z calculation
   const depthVariation = 3 + totalItems * 0.8;
   
   return {
     x: Math.sin(angle) * radius,
-    z: baseZ + Math.cos(angle) * depthVariation
+    z: baseZ - Math.cos(angle) * depthVariation // NEGATIVE cosine for forward curve
   };
 };
 
@@ -514,10 +514,9 @@ const Enhanced3DScene: React.FC<{
       const targetX = 0;
       const targetY = 8;
       
-      // Dynamic camera distance based on number of options and curve size
+      // More moderate camera distance scaling
       const baseDistance = 25;
-      const optionMultiplier = Math.max(1, options.length / 2.5);
-      const extraDistance = optionMultiplier * 8; // More dramatic distance scaling
+      const extraDistance = Math.max(0, (options.length - 2) * 3); // More moderate scaling
       const targetZ = baseDistance + extraDistance;
       
       const animationDuration = 2000;
@@ -743,8 +742,8 @@ export const Enhanced3DPollVisualization: React.FC<Enhanced3DPollVisualizationPr
             enablePan={false}
             enableZoom={true}
             enableRotate={true}
-            minDistance={Math.max(15, options.length * 3)} // Dynamic min distance
-            maxDistance={Math.max(50, options.length * 8)} // Dynamic max distance
+            minDistance={18}
+            maxDistance={Math.max(45, options.length * 4)}
             minPolarAngle={Math.PI / 12}
             maxPolarAngle={Math.PI / 2.2}
             autoRotate={false}
