@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Users, Play, Square, Trash2, Edit3, MoreVertical, ExternalLink, BarChart3, Clock, Target, Lock, Unlock, RotateCcw } from 'lucide-react';
+import { Plus, Users, Play, Square, Trash2, Edit3, MoreVertical, ExternalLink, BarChart3, Clock, Target, Lock, Unlock, RotateCcw, Settings } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card } from '../components/Card';
 import { Button } from '../components/Button';
 import { RoomSettings } from '../components/RoomSettings';
 import { ActivityEditor } from '../components/ActivityEditor';
+import { TriviaGameControls } from '../components/TriviaGameControls';
 import { roomService } from '../services/roomService';
 import { supabase } from '../lib/supabase';
 import type { Room, Activity, CreateRoomData, CreateActivityData } from '../types';
@@ -29,6 +30,172 @@ export const AdminPage: React.FC = () => {
     loading?: boolean;
   } | null>(null);
   const [deletingActivities, setDeletingActivities] = useState<Set<string>>(new Set());
+
+  // Activity Controls Section Component
+  const ActivityControlsSection = () => {
+    const currentActivity = selectedRoom?.activities?.find(a => a.is_active);
+    
+    if (!currentActivity || !selectedRoom) {
+      return (
+        <Card className="p-6">
+          <div className="text-center">
+            <div className="p-3 bg-slate-700 rounded-full w-fit mx-auto mb-4">
+              <Target className="w-8 h-8 text-slate-400" />
+            </div>
+            <h3 className="text-lg font-semibold text-white mb-2">No Active Activity</h3>
+            <p className="text-slate-400 mb-4">
+              Create and activate an activity to see controls here
+            </p>
+            <Button onClick={() => setShowCreateActivity(true)}>
+              <Plus className="w-4 h-4" />
+              Create Activity
+            </Button>
+          </div>
+        </Card>
+      );
+    }
+
+    // Render trivia-specific controls
+    if (currentActivity.type === 'trivia') {
+      return (
+        <TriviaGameControls
+          activity={currentActivity}
+          roomId={selectedRoom.id}
+          participantCount={selectedRoom.participants}
+          onSettingsClick={() => setEditingActivity(currentActivity)}
+        />
+      );
+    }
+
+    // Default poll/survey controls
+    return (
+      <Card className="p-6">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-blue-600 rounded-lg">
+              {React.createElement(getActivityIcon(currentActivity.type), { 
+                className: "w-6 h-6 text-white" 
+              })}
+            </div>
+            <div>
+              <h3 className="text-xl font-bold text-white">Activity Controls</h3>
+              <p className="text-sm text-slate-400">{currentActivity.title}</p>
+            </div>
+          </div>
+          
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={() => setEditingActivity(currentActivity)}
+          >
+            <Settings className="w-4 h-4" />
+            Settings
+          </Button>
+        </div>
+
+        {/* Activity Stats */}
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
+          <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-600">
+            <div className="flex items-center gap-2 mb-2">
+              <Users className="w-4 h-4 text-blue-400" />
+              <span className="text-xs text-slate-400 font-medium">RESPONSES</span>
+            </div>
+            <div className="text-2xl font-bold text-white">
+              {currentActivity.total_responses || 0}
+            </div>
+          </div>
+
+          <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-600">
+            <div className="flex items-center gap-2 mb-2">
+              <Target className="w-4 h-4 text-green-400" />
+              <span className="text-xs text-slate-400 font-medium">OPTIONS</span>
+            </div>
+            <div className="text-2xl font-bold text-white">
+              {currentActivity.options?.length || 0}
+            </div>
+          </div>
+
+          <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-600">
+            <div className="flex items-center gap-2 mb-2">
+              <Clock className="w-4 h-4 text-yellow-400" />
+              <span className="text-xs text-slate-400 font-medium">STATUS</span>
+            </div>
+            <div className="text-sm font-bold text-white">
+              {currentActivity.is_active ? 'Active' : 'Inactive'}
+            </div>
+          </div>
+        </div>
+
+        {/* Vote Locking Controls */}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between p-4 bg-slate-800/50 rounded-lg border border-slate-600">
+            <div className="flex items-center gap-3">
+              {currentActivity.settings?.voting_locked ? (
+                <Lock className="w-5 h-5 text-red-400" />
+              ) : (
+                <Unlock className="w-5 h-5 text-green-400" />
+              )}
+              <div>
+                <h4 className="font-medium text-white">Voting Control</h4>
+                <p className="text-sm text-slate-400">
+                  {currentActivity.settings?.voting_locked 
+                    ? 'Voting is currently locked - participants cannot vote'
+                    : 'Voting is open - participants can submit responses'
+                  }
+                </p>
+              </div>
+            </div>
+            <Button
+              onClick={() => handleToggleVoteLock(currentActivity)}
+              variant={currentActivity.settings?.voting_locked ? "success" : "danger"}
+              size="sm"
+              loading={loading}
+            >
+              {currentActivity.settings?.voting_locked ? (
+                <>
+                  <Unlock className="w-4 h-4" />
+                  Unlock Votes
+                </>
+              ) : (
+                <>
+                  <Lock className="w-4 h-4" />
+                  Lock Votes
+                </>
+              )}
+            </Button>
+          </div>
+
+          {/* Response Summary for regular activities */}
+          {currentActivity.total_responses > 0 && (
+            <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-600">
+              <h4 className="text-white font-medium mb-3 flex items-center gap-2">
+                <BarChart3 className="w-4 h-4" />
+                Response Summary
+              </h4>
+              <div className="space-y-2">
+                {currentActivity.options?.map((option, index) => {
+                  const percentage = currentActivity.total_responses > 0 
+                    ? Math.round((option.responses / currentActivity.total_responses) * 100) 
+                    : 0;
+                  
+                  return (
+                    <div key={option.id} className="flex items-center justify-between">
+                      <span className="text-sm text-white truncate flex-1">
+                        {option.text}
+                      </span>
+                      <div className="text-sm text-slate-300 ml-4">
+                        {option.responses} ({percentage}%)
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      </Card>
+    );
+  };
 
   // Consolidated real-time subscriptions with improved connection management
   useEffect(() => {
@@ -500,9 +667,9 @@ export const AdminPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900">
       <div className="container mx-auto px-4 py-8">
-        <div className="flex flex-col lg:flex-row gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Left Sidebar - Room List */}
-          <div className="lg:w-80">
+          <div className="lg:col-span-1">
             <Card className="p-6">
               <div className="flex items-center justify-between mb-6">
                 <h1 className="text-2xl font-bold text-white">Room Manager</h1>
@@ -598,8 +765,8 @@ export const AdminPage: React.FC = () => {
             </Card>
           </div>
 
-          {/* Main Content - Activity Management */}
-          <div className="flex-1">
+          {/* Middle Column - Activity Management */}
+          <div className="lg:col-span-1">
             {selectedRoom ? (
               <Card className="p-6">
                 <div className="flex items-center justify-between mb-6">
@@ -778,6 +945,11 @@ export const AdminPage: React.FC = () => {
                 <p className="text-slate-400">Choose a room from the list to view and manage its activities</p>
               </Card>
             )}
+          </div>
+
+          {/* Right Column - Activity Controls */}
+          <div className="lg:col-span-1">
+            <ActivityControlsSection />
           </div>
         </div>
       </div>
