@@ -6,6 +6,8 @@ import { roomService } from '../services/roomService';
 import { useTheme } from '../components/ThemeProvider';
 import { Users, BarChart, Clock, MessageSquare, HelpCircle, Cloud, Trophy, Target, Calendar, Activity as ActivityIcon, TrendingUp, CheckCircle, Lock, QrCode } from 'lucide-react';
 import { Enhanced3DPollVisualization } from '../components/Enhanced3DPollVisualization';
+import { Trivia3DVisualization } from '../components/Trivia3Dvisualization';
+import { useTriviaGame } from '../hooks/useTriviaGame';
 import type { ActivityType, Room, Activity } from '../types';
 
 // QR Code Generator Component (inline to avoid import issues)
@@ -308,13 +310,12 @@ const FixedPoll3DVisualization: React.FC<{
   );
 };
 
-function DisplayPage() {
-  const { pollId } = useParams();
-  const [currentRoom, setCurrentRoom] = useState<Room | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [currentTime, setCurrentTime] = useState(new Date());
-  const subscriptionRef = useRef<any>(null);
-
+// Enhanced Activity Display Component with Trivia Support
+const ActivityDisplay = ({ currentRoom, currentTime, formatTime }: {
+  currentRoom: Room;
+  currentTime: Date;
+  formatTime: (date: Date) => string;
+}) => {
   const activeActivity = React.useMemo(() => {
     if (!currentRoom?.activities) return null;
     
@@ -327,7 +328,7 @@ function DisplayPage() {
           return {
             id: opt.id,
             text: opt.text,
-            media_url: opt.media_url, // Ensure this is preserved
+            media_url: opt.media_url,
             responses: opt.responses || 0,
             is_correct: opt.is_correct || false,
             option_order: opt.option_order || index,
@@ -339,7 +340,7 @@ function DisplayPage() {
       }
     }
     
-    // Priority 2: Fallback to any activity marked as active (in case of data inconsistency)
+    // Priority 2: Fallback to any activity marked as active
     const flaggedActive = currentRoom.activities?.find(a => a.is_active) as Activity | undefined;
     if (flaggedActive) {
       return flaggedActive;
@@ -347,6 +348,186 @@ function DisplayPage() {
     
     return null;
   }, [currentRoom?.current_activity_id, currentRoom?.activities]);
+
+  // Trivia game hook (only used for trivia activities)
+  const triviaGame = useTriviaGame({
+    activity: activeActivity!,
+    roomId: currentRoom?.id!
+  });
+
+  const getActivityIcon = (type: ActivityType) => {
+    switch (type) {
+      case 'poll':
+        return Target;
+      case 'trivia':
+        return HelpCircle;
+      case 'quiz':
+        return MessageSquare;
+      default:
+        return Target;
+    }
+  };
+
+  const getActivityTypeLabel = (type: ActivityType) => {
+    switch (type) {
+      case 'poll':
+        return 'Poll';
+      case 'trivia':
+        return 'Trivia';
+      case 'quiz':
+        return 'Quiz';
+      default:
+        return 'Activity';
+    }
+  };
+
+  if (!activeActivity || !currentRoom) {
+    return (
+      <div className="h-screen w-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-20 h-20 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-6"></div>
+          <h2 className="text-2xl font-bold text-white mb-2">No Active Activity</h2>
+          <p className="text-slate-400">Waiting for the host to start an activity...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Render different visualizations based on activity type
+  if (activeActivity.type === 'trivia') {
+    return (
+      <div className="h-screen w-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 flex flex-col">
+        {/* Trivia Header */}
+        <div className="p-6 text-center border-b border-slate-700/50">
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex items-center justify-center gap-4 mb-4"
+          >
+            <div className="p-3 bg-gradient-to-br from-purple-600 to-blue-600 rounded-xl">
+              <HelpCircle className="w-8 h-8 text-white" />
+            </div>
+            <div className="text-left">
+              <h1 className="text-3xl font-bold text-white">{activeActivity.title}</h1>
+              <p className="text-sm text-slate-400">Trivia Question</p>
+            </div>
+          </motion.div>
+          
+          <div className="flex items-center justify-center gap-6 text-slate-300 text-sm">
+            <div className="flex items-center gap-2">
+              <Users className="w-4 h-4" />
+              <span>{currentRoom.participants} participants</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Clock className="w-4 h-4" />
+              <span>{formatTime(currentTime)}</span>
+            </div>
+            <div className="text-slate-400">
+              <span className="font-mono font-bold text-purple-400">{currentRoom.code}</span>
+            </div>
+            {/* Game Phase Indicator */}
+            <div className="flex items-center gap-2">
+              <div className={`w-2 h-2 rounded-full ${
+                triviaGame.gameState.phase === 'answering' ? 'bg-green-400 animate-pulse' : 
+                triviaGame.gameState.phase === 'revealing' ? 'bg-yellow-400' :
+                'bg-slate-400'
+              }`}></div>
+              <span className="capitalize text-xs">
+                {triviaGame.gameState.phase === 'answering' ? 'Answering Time' : 
+                 triviaGame.gameState.phase === 'revealing' ? 'Revealing Answer' :
+                 triviaGame.gameState.phase === 'completed' ? 'Complete' : 'Waiting'}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Trivia 3D Visualization */}
+        <div className="flex-1 p-4" style={{ height: 'calc(100vh - 120px)' }}>
+          <Trivia3DVisualization
+            options={activeActivity.options || []}
+            totalResponses={activeActivity.total_responses || 0}
+            themeColors={{
+              primary: '#8b5cf6',
+              secondary: '#3b82f6',
+              accent: '#10b981',
+              background: '#1e293b'
+            }}
+            activityTitle={activeActivity.title}
+            activityMedia={activeActivity.media_url}
+            gameState={triviaGame.gameState}
+            onTimerComplete={triviaGame.endTrivia}
+            onTimerTick={(timeRemaining) => {
+              // Optional: Handle timer tick events
+              console.log('Time remaining:', timeRemaining);
+            }}
+            countdownDuration={activeActivity.settings?.countdown_duration || 30}
+            showCorrectAnswer={activeActivity.settings?.show_correct_answer !== false}
+            pointsPerCorrect={activeActivity.settings?.points_per_correct || 10}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  // Default poll/survey display (existing logic)
+  return (
+    <div className="h-screen w-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 flex flex-col">
+      {/* Standard Activity Header */}
+      <div className="p-6 text-center border-b border-slate-700/50">
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex items-center justify-center gap-4 mb-4"
+        >
+          <div className="p-3 bg-gradient-to-br from-blue-600 to-cyan-600 rounded-xl">
+            {React.createElement(getActivityIcon(activeActivity.type), { className: "w-8 h-8 text-white" })}
+          </div>
+          <div className="text-left">
+            <h1 className="text-3xl font-bold text-white">{activeActivity.title}</h1>
+            <p className="text-sm text-slate-400">{getActivityTypeLabel(activeActivity.type)}</p>
+          </div>
+        </motion.div>
+        
+        <div className="flex items-center justify-center gap-6 text-slate-300 text-sm">
+          <div className="flex items-center gap-2">
+            <Users className="w-4 h-4" />
+            <span>{currentRoom.participants} participants</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Clock className="w-4 h-4" />
+            <span>{formatTime(currentTime)}</span>
+          </div>
+          <div className="text-slate-400">
+            <span className="font-mono font-bold text-blue-400">{currentRoom.code}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Standard Activity Results Visualization */}
+      <div className="flex-1 p-4" style={{ height: 'calc(100vh - 120px)' }}>
+        <Enhanced3DPollVisualization
+          options={activeActivity.options || []}
+          totalResponses={activeActivity.total_responses || 0}
+          themeColors={{
+            primaryColor: '#3b82f6',
+            secondaryColor: '#0891b2',
+            accentColor: '#10b981'
+          }}
+          activityTitle={activeActivity.title}
+          activityMedia={activeActivity.media_url}
+          isVotingLocked={activeActivity.settings?.voting_locked}
+        />
+      </div>
+    </div>
+  );
+};
+
+function DisplayPage() {
+  const { pollId } = useParams();
+  const [currentRoom, setCurrentRoom] = useState<Room | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [currentTime, setCurrentTime] = useState(new Date());
+  const subscriptionRef = useRef<any>(null);
 
   const allActivities = currentRoom?.activities || [];
 
@@ -761,71 +942,17 @@ function DisplayPage() {
   }
 
   // Show dashboard with QR code when no activity is active
-  if (!activeActivity) {
+  if (!currentRoom?.current_activity_id && !currentRoom?.activities?.some(a => a.is_active)) {
     return <Dashboard />;
   }
 
-  // Show active activity with enhanced real-time results
+  // Show active activity with enhanced real-time results using ActivityDisplay component
   return (
-    <div className="h-screen w-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 overflow-hidden">
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={activeActivity.id}
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          exit={{ opacity: 0, scale: 0.95 }}
-          transition={{ duration: 0.3 }}
-          className="h-full"
-        >
-          {/* Enhanced Header */}
-          <div className="p-3 border-b border-slate-700/50 bg-slate-800/30 backdrop-blur-sm">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="flex items-center gap-3">
-                  {React.createElement(getActivityIcon(activeActivity.type), {
-                    className: "w-6 h-6 text-blue-400"
-                  })}
-                  <div>
-                    <h1 className="text-xl font-bold text-white">{activeActivity.title}</h1>
-                    <p className="text-sm text-slate-400">{getActivityTypeLabel(activeActivity.type)}</p>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="flex items-center gap-4 text-slate-300 text-sm">
-                <div className="flex items-center gap-2">
-                  <Users className="w-4 h-4" />
-                  <span>{currentRoom.participants} participants</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Clock className="w-4 h-4" />
-                  <span>{formatTime(currentTime)}</span>
-                </div>
-                <div className="text-slate-400">
-                  <span className="font-mono font-bold text-blue-400">{currentRoom.code}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Activity Results Visualization - CLEAN, NO DEBUG OVERLAY */}
-          <div className="flex-1 p-4" style={{ height: 'calc(100vh - 120px)' }}>
-            <Enhanced3DPollVisualization
-              options={activeActivity.options || []}
-              totalResponses={activeActivity.total_responses || 0}
-              themeColors={{
-                primary: '#3b82f6',
-                accent: '#10b981',
-                background: '#1e293b'
-              }}
-              activityTitle={activeActivity.title}
-              activityMedia={activeActivity.media_url}
-              isVotingLocked={activeActivity.settings?.voting_locked}
-            />
-          </div>
-        </motion.div>
-      </AnimatePresence>
-    </div>
+    <ActivityDisplay 
+      currentRoom={currentRoom}
+      currentTime={currentTime}
+      formatTime={formatTime}
+    />
   );
 }
 
