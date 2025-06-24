@@ -338,13 +338,9 @@ const Enhanced3DBar: React.FC<{
           responses={responses}
         />
         
-        // FIXED: Larger bars and proper scaling
-        const meshRef = useRef<THREE.Mesh>(null);
-        const glowRef = useRef<THREE.Mesh>(null);
-        
-        // FIXED: Better bar dimensions
+        {/* FIXED: Larger base platform */}
         <mesh position={[position[0], 0.1, position[2]]}>
-          <cylinderGeometry args={[1.2, 1.2, 0.2]} /> {/* Larger base */}
+          <cylinderGeometry args={[1.2, 1.2, 0.2]} />
           <meshStandardMaterial 
             color={baseColor}
             metalness={0.8}
@@ -352,8 +348,9 @@ const Enhanced3DBar: React.FC<{
           />
         </mesh>
         
+        {/* FIXED: Larger main bar */}
         <mesh ref={meshRef} position={[position[0], 0.2, position[2]]} scale={[1, 0.2, 1]}>
-          <cylinderGeometry args={[1.0, 1.0, 1]} /> {/* Larger bar */}
+          <cylinderGeometry args={[1.0, 1.0, 1]} />
           <meshStandardMaterial 
             color={barColor}
             metalness={0.4}
@@ -363,9 +360,10 @@ const Enhanced3DBar: React.FC<{
           />
         </mesh>
         
+        {/* FIXED: Larger glow effect */}
         {responses > 0 && (
           <mesh ref={glowRef} position={[position[0], 0.2, position[2]]} scale={[1.3, 0.2, 1.3]}>
-            <cylinderGeometry args={[1.1, 1.1, 1]} /> {/* Larger glow */}
+            <cylinderGeometry args={[1.1, 1.1, 1]} />
             <meshBasicMaterial 
               color={glowColor}
               transparent
