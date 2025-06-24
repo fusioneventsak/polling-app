@@ -1,5 +1,7 @@
-import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+// src/contexts/SocketContext.tsx
+import React, { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react';
 import { supabase, checkSupabaseConnection, retrySupabaseOperation } from '../lib/supabase';
+import { connectionManager } from '../lib/connectionManager';
 import { roomService } from '../services/roomService';
 import type { Room, Activity } from '../types';
 
@@ -23,8 +25,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
   const [rooms, setRooms] = useState<Room[]>([]);
   const [currentRoom, setCurrentRoom] = useState<Room | null>(null);
 
-  const loadRooms = async () => {
-    setConnectionStatus('reconnecting');
+  const loadRooms = useCallback(async () => {
     try {
       // Check connection first
       const connectionOk = await checkSupabaseConnection();
@@ -48,13 +49,15 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
       setIsConnected(false);
       setRooms([]);
     }
-  };
+  }, []);
 
-  const refreshRooms = async () => {
+  const refreshRooms = useCallback(async () => {
     await loadRooms();
-  };
+  }, [loadRooms]);
 
   useEffect(() => {
+    let connectionMonitor: NodeJS.Timeout | null = null;
+
     // Initialize connection
     const initializeConnection = async () => {
       if (!supabase) {
@@ -65,12 +68,17 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
       }
       
       try {
+        setConnectionStatus('reconnecting');
         const connectionOk = await checkSupabaseConnection();
-        setIsConnected(connectionOk);
-        setConnectionStatus(connectionOk ? 'connected' : 'disconnected');
         
         if (connectionOk) {
           await loadRooms();
+          await setupGlobalSubscriptions();
+          setIsConnected(true);
+          setConnectionStatus('connected');
+        } else {
+          setIsConnected(false);
+          setConnectionStatus('disconnected');
         }
       } catch (error) {
         console.error('Failed to initialize connection:', error);
@@ -78,11 +86,70 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
         setConnectionStatus('disconnected');
       }
     };
+
+    const setupGlobalSubscriptions = async () => {
+      if (!supabase) return;
+
+      try {
+        console.log('🔌 Setting up global subscriptions...');
+        
+        const channel = await connectionManager.getOrCreateChannel('global-updates', {
+          presence: { key: 'user_id' }
+        });
+
+        // Subscribe to all table changes
+        channel
+          .on('postgres_changes', 
+            { event: '*', schema: 'public', table: 'rooms' },
+            (payload) => {
+              console.log('🏠 Room change received:', payload);
+              loadRooms();
+            }
+          )
+          .on('postgres_changes',
+            { event: '*', schema: 'public', table: 'activities' },
+            (payload) => {
+              console.log('🎯 Activity change received:', payload);
+              loadRooms();
+            }
+          )
+          .on('postgres_changes',
+            { event: '*', schema: 'public', table: 'activity_options' },
+            (payload) => {
+              console.log('📝 Activity options change received:', payload);
+              loadRooms();
+            }
+          )
+          .on('postgres_changes',
+            { event: '*', schema: 'public', table: 'participant_responses' },
+            (payload) => {
+              console.log('👥 Response change received:', payload);
+              loadRooms();
+            }
+          );
+
+        console.log('✅ Global subscriptions established');
+        setConnectionStatus('connected');
+        
+      } catch (error) {
+        console.error('❌ Failed to setup global subscriptions:', error);
+        setConnectionStatus('disconnected');
+        
+        // Retry after delay
+        setTimeout(() => {
+          if (supabase) {
+            console.log('🔄 Retrying global subscription setup...');
+            setupGlobalSubscriptions();
+          }
+        }, 5000);
+      }
+    };
     
+    // Start initialization
     initializeConnection();
 
     // Set up periodic connection monitoring
-    const connectionMonitor = setInterval(async () => {
+    connectionMonitor = setInterval(async () => {
       if (!supabase) return;
       
       try {
@@ -90,12 +157,16 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
         const wasConnected = isConnected;
         
         setIsConnected(connectionOk);
-        setConnectionStatus(connectionOk ? 'connected' : 'disconnected');
         
-        // If connection was restored, reload rooms
         if (!wasConnected && connectionOk) {
-          console.log('SocketContext: Connection restored, reloading rooms');
+          console.log('🔄 Connection restored, reinitializing...');
+          setConnectionStatus('reconnecting');
+          await setupGlobalSubscriptions();
           await loadRooms();
+          setConnectionStatus('connected');
+        } else if (!connectionOk && wasConnected) {
+          console.warn('❌ Connection lost');
+          setConnectionStatus('disconnected');
         }
       } catch (error) {
         console.warn('Connection monitor error:', error);
@@ -103,76 +174,16 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
         setConnectionStatus('disconnected');
       }
     }, 15000); // Check every 15 seconds
-    // Create a unique channel for global updates
-    const channelName = `global-updates-${Date.now()}`;
-    const globalChannel = supabase?.channel(channelName, {
-      config: {
-        presence: {
-          key: 'user_id'
-        }
-      }
-    });
-    
-    if (globalChannel) {
-      // Subscribe to all room changes
-      globalChannel
-        .on('postgres_changes', 
-          { event: '*', schema: 'public', table: 'rooms' },
-          (payload) => {
-            console.log('Room change received:', payload);
-            loadRooms();
-          }
-        )
-        .on('postgres_changes',
-          { event: '*', schema: 'public', table: 'activities' },
-          (payload) => {
-            console.log('Activity change received:', payload);
-            loadRooms();
-          }
-        )
-        .on('postgres_changes',
-          { event: '*', schema: 'public', table: 'activity_options' },
-          (payload) => {
-            console.log('Activity options change received:', payload);
-            loadRooms();
-          }
-        )
-        .on('postgres_changes',
-          { event: '*', schema: 'public', table: 'participant_responses' },
-          (payload) => {
-            console.log('Response change received:', payload);
-            loadRooms();
-          }
-        )
-        .subscribe((status, err) => {
-          console.log('Global subscription status:', status);
-          if (err) {
-            console.error('Global subscription error:', err);
-            setConnectionStatus('disconnected');
-            // Retry connection after a delay
-            setTimeout(() => {
-              if (supabase) {
-                console.log('Retrying Supabase connection...');
-                initializeConnection();
-              }
-            }, 5000);
-          }
-          if (status === 'SUBSCRIBED') {
-            console.log('✅ Global real-time subscriptions active');
-            setConnectionStatus('connected');
-          } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-            console.warn('Supabase channel error or timeout:', status);
-            setConnectionStatus('disconnected');
-          }
-        });
-    }
 
     return () => {
-      console.log('Cleaning up global subscriptions');
-      clearInterval(connectionMonitor);
-      globalChannel?.unsubscribe();
+      console.log('🧹 Cleaning up SocketContext...');
+      if (connectionMonitor) {
+        clearInterval(connectionMonitor);
+      }
+      // Clean up all channels when context unmounts
+      connectionManager.cleanupAllChannels();
     };
-  }, []);
+  }, [loadRooms]);
 
   const value = {
     isConnected,
