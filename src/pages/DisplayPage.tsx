@@ -3,7 +3,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Clock, Users, BarChart3, Wifi, WifiOff } from 'lucide-react';
-import { Poll3DVisualization } from '../components/Poll3DVisualization';
+import { Enhanced3DPollVisualization } from '../components/Enhanced3DPollVisualization';
 import { roomService } from '../services/roomService';
 import { useSocket } from '../contexts/SocketContext';
 import type { Room, Activity } from '../types';
@@ -59,40 +59,40 @@ const ActivityDisplay: React.FC<{
   };
 
   return (
-    <div className={`space-y-6 ${className}`}>
+    <div className={`space-y-0 ${className}`}>
       {/* Activity header with real-time updates */}
       <motion.div 
-        className="text-center"
+        className="text-center py-4"
         key={`header-${renderKey}`}
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
       >
-        <h1 className="text-3xl font-bold text-white mb-2">
+        <h1 className="text-2xl font-bold text-white mb-1">
           {activity.title}
         </h1>
         {activity.description && (
-          <p className="text-slate-300">{activity.description}</p>
+          <p className="text-slate-300 text-sm">{activity.description}</p>
         )}
         <motion.div 
-          className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-cyan-500/20 rounded-full border border-cyan-500/30"
+          className="mt-2 inline-flex items-center gap-2 px-3 py-1 bg-cyan-500/20 rounded-full border border-cyan-500/30 text-xs"
           animate={{ 
             boxShadow: activity.is_active 
-              ? "0 0 20px rgba(6, 182, 212, 0.3)" 
-              : "0 0 10px rgba(100, 116, 139, 0.2)" 
+              ? "0 0 15px rgba(6, 182, 212, 0.3)" 
+              : "0 0 8px rgba(100, 116, 139, 0.2)" 
           }}
           transition={{ duration: 0.5 }}
         >
-          <div className={`w-2 h-2 rounded-full ${activity.is_active ? 'bg-green-400' : 'bg-slate-400'}`} />
-          <span className="text-sm font-medium text-white">
+          <div className={`w-1.5 h-1.5 rounded-full ${activity.is_active ? 'bg-green-400' : 'bg-slate-400'}`} />
+          <span className="font-medium text-white">
             {activity.is_active ? 'Live Poll' : 'Poll Ended'}
           </span>
         </motion.div>
       </motion.div>
 
-      {/* FIXED: 3D Visualization with proper props */}
-      <div className="h-[600px] w-full">
-        <Poll3DVisualization
+      {/* MAXIMIZED: 3D Visualization takes full space below header */}
+      <div className="h-[calc(100vh-80px)] w-full">
+        <Enhanced3DPollVisualization
           key={`viz-${renderKey}`} // FIXED: Force re-render on data changes
           options={activity.options || []}
           totalResponses={activity.total_responses || 0}
@@ -416,35 +416,10 @@ export const DisplayPage: React.FC = () => {
         </div>
       </motion.div>
 
-      {/* FIXED: Enhanced stats grid */}
-      <motion.div 
-        className="max-w-7xl mx-auto px-6 py-6"
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.2 }}
-      >
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-          <StatsCard
-            title="Active Participants"
-            value={currentRoom.participants || 0}
-            icon={<Users className="w-5 h-5" />}
-            delay={0.1}
-          />
-          <StatsCard
-            title="Total Activities"
-            value={allActivities.length}
-            icon={<BarChart3 className="w-5 h-5" />}
-            delay={0.2}
-          />
-          <StatsCard
-            title="Total Responses"
-            value={allActivities.reduce((sum, activity) => sum + (activity.total_responses || 0), 0)}
-            icon={<Clock className="w-5 h-5" />}
-            delay={0.3}
-          />
-        </div>
-
-        {/* FIXED: Activity display with proper real-time updates */}
+      {/* REMOVED: Stats grid for maximum canvas space */}
+      
+      {/* MAXIMIZED: Activity display with full screen canvas */}
+      <div className="h-[calc(100vh-140px)]">
         <AnimatePresence mode="wait">
           {activeActivity ? (
             <motion.div
@@ -453,10 +428,12 @@ export const DisplayPage: React.FC = () => {
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
               transition={{ duration: 0.5 }}
+              className="h-full"
             >
               <ActivityDisplay
                 activity={activeActivity}
                 isVotingLocked={activeActivity.settings?.voting_locked || false}
+                className="h-full"
               />
             </motion.div>
           ) : (
@@ -466,17 +443,19 @@ export const DisplayPage: React.FC = () => {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
               transition={{ duration: 0.5 }}
-              className="text-center py-16"
+              className="h-full flex items-center justify-center"
             >
-              <div className="w-16 h-16 bg-slate-700/50 rounded-full flex items-center justify-center mx-auto mb-4">
-                <BarChart3 className="w-8 h-8 text-slate-400" />
+              <div className="text-center">
+                <div className="w-16 h-16 bg-slate-700/50 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <BarChart3 className="w-8 h-8 text-slate-400" />
+                </div>
+                <h3 className="text-xl font-semibold text-white mb-2">No Active Poll</h3>
+                <p className="text-slate-400">Waiting for the next activity to begin...</p>
               </div>
-              <h3 className="text-xl font-semibold text-white mb-2">No Active Poll</h3>
-              <p className="text-slate-400">Waiting for the next activity to begin...</p>
             </motion.div>
           )}
         </AnimatePresence>
-      </motion.div>
+      </div>
     </div>
   );
 };
