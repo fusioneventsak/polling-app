@@ -305,9 +305,10 @@ export const DisplayPage: React.FC = () => {
       return;
     }
 
-    const activeActivity = React.useMemo(() => {
-      if (!currentRoom?.activities) return null;
-      
+    // Find active activity without using useMemo inside useEffect
+    let activeActivity: Activity | null = null;
+    
+    if (currentRoom?.activities) {
       // Priority 1: Use current_activity_id from room
       if (currentRoom.current_activity_id) {
         const currentActivity = currentRoom.activities.find(a => a.id === currentRoom.current_activity_id) as Activity | undefined;
@@ -331,20 +332,23 @@ export const DisplayPage: React.FC = () => {
             created_at: opt.created_at,
             activity_id: opt.activity_id
           })) || [];
-          return currentActivity;
+          activeActivity = currentActivity;
         }
       }
       
       // Priority 2: Fallback to any activity marked as active
-      const flaggedActive = currentRoom.activities?.find(a => a.is_active) as Activity | undefined;
-      if (flaggedActive) {
-        console.log('🎯 Found active activity by flag:', flaggedActive.type, flaggedActive.title);
-        return flaggedActive;
+      if (!activeActivity) {
+        const flaggedActive = currentRoom.activities?.find(a => a.is_active) as Activity | undefined;
+        if (flaggedActive) {
+          console.log('🎯 Found active activity by flag:', flaggedActive.type, flaggedActive.title);
+          activeActivity = flaggedActive;
+        }
       }
-      
+    }
+    
+    if (!activeActivity) {
       console.log('❌ No active activity found');
-      return null;
-    }, [currentRoom?.current_activity_id, currentRoom?.activities]);
+    }
 
     setDisplayActiveActivity(activeActivity);
   }, [currentRoom?.current_activity_id, currentRoom?.activities]);
