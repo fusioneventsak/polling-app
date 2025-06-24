@@ -205,6 +205,55 @@ const Enhanced3DBar: React.FC<{
 
   return (
     <group>
+      {/* Volumetric Light - Spotlight */}
+      <spotLight
+        position={[position[0], 15, position[2]]}
+        target-position={[position[0], 0, position[2]]}
+        color={barColor}
+        intensity={responses > 0 ? 2.5 : 0.5}
+        angle={Math.PI / 6}
+        penumbra={0.3}
+        distance={20}
+        decay={2}
+        castShadow={false}
+      />
+      
+      {/* Volumetric Light Beam - Outer Cone */}
+      <mesh position={[position[0], 12, position[2]]} rotation={[Math.PI, 0, 0]}>
+        <coneGeometry args={[4, 12, 8]} />
+        <meshBasicMaterial
+          color={barColor}
+          transparent
+          opacity={responses > 0 ? 0.08 : 0.02}
+          side={THREE.DoubleSide}
+          depthWrite={false}
+        />
+      </mesh>
+      
+      {/* Volumetric Light Beam - Inner Cone */}
+      <mesh position={[position[0], 10, position[2]]} rotation={[Math.PI, 0, 0]}>
+        <coneGeometry args={[2.5, 10, 8]} />
+        <meshBasicMaterial
+          color={barColor}
+          transparent
+          opacity={responses > 0 ? 0.15 : 0.05}
+          side={THREE.DoubleSide}
+          depthWrite={false}
+        />
+      </mesh>
+      
+      {/* Volumetric Light Beam - Core */}
+      <mesh position={[position[0], 8, position[2]]} rotation={[Math.PI, 0, 0]}>
+        <coneGeometry args={[1.5, 8, 8]} />
+        <meshBasicMaterial
+          color={barColor}
+          transparent
+          opacity={responses > 0 ? 0.25 : 0.08}
+          side={THREE.DoubleSide}
+          depthWrite={false}
+        />
+      </mesh>
+      
       <mesh position={[position[0], 0.05, position[2]]}>
         <cylinderGeometry args={[3.2, 3.2, 0.25]} />
         <meshStandardMaterial 
