@@ -1,4 +1,4 @@
-// src/contexts/SocketContext.tsx
+// src/contexts/SocketContext.tsx - Updated with better error handling
 import React, { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react';
 import { supabase, checkSupabaseConnection, retrySupabaseOperation } from '../lib/supabase';
 import { connectionManager } from '../lib/connectionManager';
@@ -27,7 +27,6 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
 
   const loadRooms = useCallback(async () => {
     try {
-      // Check connection first
       const connectionOk = await checkSupabaseConnection();
       if (!connectionOk) {
         console.warn('SocketContext: Supabase connection not available');
@@ -57,6 +56,8 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
 
   useEffect(() => {
     let connectionMonitor: NodeJS.Timeout | null = null;
+    let setupAttempts = 0;
+    const maxSetupAttempts = 3;
 
     // Initialize connection
     const initializeConnection = async () => {
@@ -90,12 +91,14 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
     const setupGlobalSubscriptions = async () => {
       if (!supabase) return;
 
+      setupAttempts++;
+      
       try {
-        console.log('🔌 Setting up global subscriptions...');
+        console.log(`🔌 Setting up global subscriptions (attempt ${setupAttempts})...`);
         
-        const channel = await connectionManager.getOrCreateChannel('global-updates', {
-          presence: { key: 'user_id' }
-        });
+        // Use a simple unique channel name
+        const channelName = 'global-updates';
+        const channel = await connectionManager.getOrCreateChannel(channelName);
 
         // Subscribe to all table changes
         channel
@@ -130,18 +133,26 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
 
         console.log('✅ Global subscriptions established');
         setConnectionStatus('connected');
+        setupAttempts = 0; // Reset attempts on success
         
       } catch (error) {
         console.error('❌ Failed to setup global subscriptions:', error);
         setConnectionStatus('disconnected');
         
-        // Retry after delay
-        setTimeout(() => {
-          if (supabase) {
-            console.log('🔄 Retrying global subscription setup...');
-            setupGlobalSubscriptions();
-          }
-        }, 5000);
+        // Retry with exponential backoff, but only if we haven't exceeded max attempts
+        if (setupAttempts < maxSetupAttempts) {
+          const retryDelay = Math.min(setupAttempts * 3000, 10000); // 3s, 6s, 9s...
+          console.log(`🔄 Retrying global subscription setup in ${retryDelay}ms (attempt ${setupAttempts + 1}/${maxSetupAttempts})...`);
+          
+          setTimeout(() => {
+            if (supabase) {
+              setupGlobalSubscriptions();
+            }
+          }, retryDelay);
+        } else {
+          console.warn('❌ Max global subscription setup attempts reached. Continuing without real-time updates.');
+          setupAttempts = 0; // Reset for potential future attempts
+        }
       }
     };
     
@@ -161,6 +172,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
         if (!wasConnected && connectionOk) {
           console.log('🔄 Connection restored, reinitializing...');
           setConnectionStatus('reconnecting');
+          setupAttempts = 0; // Reset attempts when connection is restored
           await setupGlobalSubscriptions();
           await loadRooms();
           setConnectionStatus('connected');
@@ -173,15 +185,15 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
         setIsConnected(false);
         setConnectionStatus('disconnected');
       }
-    }, 15000); // Check every 15 seconds
+    }, 30000); // Check every 30 seconds
 
     return () => {
       console.log('🧹 Cleaning up SocketContext...');
       if (connectionMonitor) {
         clearInterval(connectionMonitor);
       }
-      // Clean up all channels when context unmounts
-      connectionManager.cleanupAllChannels();
+      // Clean up global channels
+      connectionManager.cleanupChannel('global-updates');
     };
   }, [loadRooms]);
 
