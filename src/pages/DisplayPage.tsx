@@ -3,7 +3,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Clock, Users, BarChart3, Wifi, WifiOff } from 'lucide-react';
-import { Enhanced3DPollVisualization } from '../components/Enhanced3DPollVisualization';
+import { Poll3DVisualization } from '../components/Poll3DVisualization';
 import { roomService } from '../services/roomService';
 import { useSocket } from '../contexts/SocketContext';
 import type { Room, Activity } from '../types';
@@ -92,7 +92,7 @@ const ActivityDisplay: React.FC<{
 
       {/* FIXED: 3D Visualization with proper props */}
       <div className="h-[600px] w-full">
-        <Enhanced3DPollVisualization
+        <Poll3DVisualization
           key={`viz-${renderKey}`} // FIXED: Force re-render on data changes
           options={activity.options || []}
           totalResponses={activity.total_responses || 0}
