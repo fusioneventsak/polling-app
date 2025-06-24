@@ -17,6 +17,7 @@ interface Poll3DVisualizationProps {
   activityTitle?: string;
   activityMedia?: string;
   isVotingLocked?: boolean;
+  backgroundGradient?: string;
   className?: string;
 }
 
@@ -340,6 +341,7 @@ export const Poll3DVisualization: React.FC<Poll3DVisualizationProps> = ({
   activityTitle,
   activityMedia,
   isVotingLocked,
+  backgroundGradient,
   className = '' 
 }) => {
   console.log('Poll3DVisualization props:', { options, totalResponses, themeColors, activityTitle });
@@ -367,20 +369,57 @@ export const Poll3DVisualization: React.FC<Poll3DVisualizationProps> = ({
     );
   }
 
+  // Convert Tailwind gradient classes to CSS gradient
+  const getBackgroundStyle = () => {
+    if (!backgroundGradient) {
+      return 'linear-gradient(to bottom right, rgba(15, 23, 42, 0.4), rgba(30, 58, 138, 0.2))';
+    }
+
+    const colorMap: { [key: string]: string } = {
+      'slate-900': 'rgba(15, 23, 42, 0.4)',
+      'blue-900': 'rgba(30, 58, 138, 0.2)',
+      'purple-900': 'rgba(88, 28, 135, 0.4)',
+      'green-900': 'rgba(20, 83, 45, 0.4)',
+      'red-900': 'rgba(127, 29, 29, 0.4)',
+      'orange-900': 'rgba(124, 45, 18, 0.4)',
+      'gray-900': 'rgba(17, 24, 39, 0.4)',
+      'blue-950': 'rgba(23, 37, 84, 0.4)',
+      'slate-950': 'rgba(2, 6, 23, 0.4)',
+      'black': 'rgba(0, 0, 0, 0.4)',
+      'slate-800': 'rgba(30, 41, 59, 0.4)'
+    };
+
+    const colors = backgroundGradient
+      .replace('from-', '')
+      .replace('via-', '')
+      .replace('to-', '')
+      .split(' ')
+      .map(color => colorMap[color] || color)
+      .join(', ');
+
+    return `linear-gradient(to bottom right, ${colors})`;
+  };
+
   // ORIGINAL: Return with exact same styling and structure
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.9 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.8 }}
-      className={`w-full bg-gradient-to-br from-slate-900/40 to-blue-900/20 rounded-xl border border-slate-700 overflow-hidden shadow-2xl relative ${className}`}
+      className={`w-full rounded-xl border border-slate-700 overflow-hidden shadow-2xl relative ${className}`}
       style={{ height: '100%', minHeight: '400px' }}
     >
+      <div 
+        className="absolute inset-0"
+        style={{
+          background: getBackgroundStyle()
+        }}
+      />
       <Canvas
         camera={{ position: [0, 8, 16], fov: 75 }}
         gl={{ antialias: true, alpha: true }}
         dpr={[1, 2]}
-        style={{ background: 'transparent' }}
+        style={{ background: 'transparent', position: 'relative', zIndex: 1 }}
       >
         <Scene
           options={options}

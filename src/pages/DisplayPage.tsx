@@ -102,6 +102,7 @@ const ActivityDisplay: React.FC<{
           activityTitle={activity.title}
           activityMedia={activity.media_url}
           isVotingLocked={isVotingLocked}
+          backgroundGradient={currentRoom?.settings?.theme?.background_gradient}
           className="h-full w-full"
         />
       </div>

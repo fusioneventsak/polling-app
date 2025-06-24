@@ -17,6 +17,7 @@ interface Enhanced3DPollVisualizationProps {
   activityTitle?: string;
   activityMedia?: string;
   isVotingLocked?: boolean;
+  backgroundGradient?: string;
   className?: string;
 }
 
@@ -701,6 +702,7 @@ export const Enhanced3DPollVisualization: React.FC<Enhanced3DPollVisualizationPr
   activityTitle,
   activityMedia,
   isVotingLocked,
+  backgroundGradient,
   className = ''
 }) => {
   const [renderKey, setRenderKey] = useState(0); // REAL-TIME FIX: Force re-render key
@@ -714,12 +716,46 @@ export const Enhanced3DPollVisualization: React.FC<Enhanced3DPollVisualizationPr
     return <LoadingFallback />;
   }
 
+  // Convert Tailwind gradient classes to CSS gradient
+  const getBackgroundStyle = () => {
+    if (!backgroundGradient) {
+      return 'linear-gradient(to bottom right, #0f172a, #1e3a8a, #0f172a)';
+    }
+
+    const colorMap: { [key: string]: string } = {
+      'slate-900': '#0f172a',
+      'blue-900': '#1e3a8a',
+      'purple-900': '#581c87',
+      'green-900': '#14532d',
+      'red-900': '#7f1d1d',
+      'orange-900': '#7c2d12',
+      'gray-900': '#111827',
+      'blue-950': '#172554',
+      'slate-950': '#020617',
+      'black': '#000000',
+      'slate-800': '#1e293b'
+    };
+
+    const colors = backgroundGradient
+      .replace('from-', '')
+      .replace('via-', '')
+      .replace('to-', '')
+      .split(' ')
+      .map(color => colorMap[color] || color)
+      .join(', ');
+
+    return `linear-gradient(to bottom right, ${colors})`;
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.8 }}
-      className={`w-full h-full bg-gradient-to-br from-slate-900/90 via-slate-800/80 to-slate-900/90 rounded-xl border border-slate-700/50 overflow-hidden shadow-2xl relative ${className}`}
+      className={`w-full h-full rounded-xl border border-slate-700/50 overflow-hidden shadow-2xl relative ${className}`}
+      style={{
+        background: getBackgroundStyle()
+      }}
     >
       {/* ORIGINAL: Voting locked indicator */}
       {isVotingLocked && (

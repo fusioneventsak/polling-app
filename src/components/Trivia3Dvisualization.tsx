@@ -18,6 +18,7 @@ interface Trivia3DVisualizationProps {
   countdownDuration?: number;
   showCorrectAnswer?: boolean;
   pointsPerCorrect?: number;
+  backgroundGradient?: string;
 }
 
 // Enhanced 3D Option Card Component for Trivia
@@ -326,13 +327,48 @@ export const Trivia3DVisualization: React.FC<Trivia3DVisualizationProps> = ({
   onTimerTick,
   countdownDuration = 30,
   showCorrectAnswer = true,
-  pointsPerCorrect = 10
+  pointsPerCorrect = 10,
+  backgroundGradient
 }) => {
+  // Convert Tailwind gradient classes to CSS gradient
+  const getBackgroundStyle = () => {
+    if (!backgroundGradient) {
+      return 'linear-gradient(to bottom right, #0f172a, #1e3a8a, #581c87)';
+    }
+
+    const colorMap: { [key: string]: string } = {
+      'slate-900': '#0f172a',
+      'blue-900': '#1e3a8a',
+      'purple-900': '#581c87',
+      'green-900': '#14532d',
+      'red-900': '#7f1d1d',
+      'orange-900': '#7c2d12',
+      'gray-900': '#111827',
+      'blue-950': '#172554',
+      'slate-950': '#020617',
+      'black': '#000000',
+      'slate-800': '#1e293b'
+    };
+
+    const colors = backgroundGradient
+      .replace('from-', '')
+      .replace('via-', '')
+      .replace('to-', '')
+      .split(' ')
+      .map(color => colorMap[color] || color)
+      .join(', ');
+
+    return `linear-gradient(to bottom right, ${colors})`;
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="relative w-full h-full bg-gradient-to-br from-slate-900 via-blue-900 to-purple-900 overflow-hidden"
+      className="relative w-full h-full overflow-hidden"
+      style={{
+        background: getBackgroundStyle()
+      }}
     >
       {/* 3D Canvas */}
       <Canvas
