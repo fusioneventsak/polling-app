@@ -131,30 +131,30 @@ const ActivityDisplay = ({ currentRoom, currentTime, formatTime, displayActiveAc
     console.log('✅ Rendering Trivia3DVisualization');
     
     return (
-      <div className="h-screen w-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 flex flex-col">
+      <div className="h-screen w-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 flex flex-col overflow-hidden">
         {/* Trivia Header */}
-        <div className="p-6 text-center border-b border-slate-700/50">
+        <div className="p-3 text-center border-b border-slate-700/50 flex-shrink-0">
           <motion.div
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="flex items-center justify-center gap-4 mb-4"
+            className="flex items-center justify-center gap-3 mb-2"
           >
-            <div className="p-3 bg-gradient-to-br from-purple-600 to-blue-600 rounded-xl">
-              <HelpCircle className="w-8 h-8 text-white" />
+            <div className="p-2 bg-gradient-to-br from-purple-600 to-blue-600 rounded-lg">
+              <HelpCircle className="w-6 h-6 text-white" />
             </div>
             <div className="text-left">
-              <h1 className="text-3xl font-bold text-white">{activeActivity.title}</h1>
-              <p className="text-sm text-slate-400">Trivia Question</p>
+              <h1 className="text-xl font-bold text-white">{activeActivity.title}</h1>
+              <p className="text-xs text-slate-400">Trivia Question</p>
             </div>
           </motion.div>
           
-          <div className="flex items-center justify-center gap-6 text-slate-300 text-sm">
+          <div className="flex items-center justify-center gap-4 text-slate-300 text-xs">
             <div className="flex items-center gap-2">
-              <Users className="w-4 h-4" />
+              <Users className="w-3 h-3" />
               <span>{currentRoom.participants} participants</span>
             </div>
             <div className="flex items-center gap-2">
-              <Clock className="w-4 h-4" />
+              <Clock className="w-3 h-3" />
               <span>{formatTime(currentTime)}</span>
             </div>
             <div className="text-slate-400">
@@ -177,7 +177,7 @@ const ActivityDisplay = ({ currentRoom, currentTime, formatTime, displayActiveAc
         </div>
 
         {/* Trivia 3D Visualization */}
-        <div className="flex-1 p-4" style={{ height: 'calc(100vh - 120px)' }}>
+        <div className="flex-1 overflow-hidden" style={{ height: 'calc(100vh - 80px)' }}>
           <Trivia3DVisualization
             options={activeActivity.options || []}
             totalResponses={activeActivity.total_responses || 0}
@@ -207,30 +207,30 @@ const ActivityDisplay = ({ currentRoom, currentTime, formatTime, displayActiveAc
   console.log('📊 Rendering default poll visualization for type:', activeActivity.type);
   
   return (
-    <div className="h-screen w-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 flex flex-col">
+    <div className="h-screen w-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 flex flex-col overflow-hidden">
       {/* Standard Activity Header */}
-      <div className="p-6 text-center border-b border-slate-700/50">
+      <div className="p-3 text-center border-b border-slate-700/50 flex-shrink-0">
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="flex items-center justify-center gap-4 mb-4"
+          className="flex items-center justify-center gap-3 mb-2"
         >
-          <div className="p-3 bg-gradient-to-br from-blue-600 to-cyan-600 rounded-xl">
-            {React.createElement(getActivityIcon(activeActivity.type), { className: "w-8 h-8 text-white" })}
+          <div className="p-2 bg-gradient-to-br from-blue-600 to-cyan-600 rounded-lg">
+            {React.createElement(getActivityIcon(activeActivity.type), { className: "w-6 h-6 text-white" })}
           </div>
           <div className="text-left">
-            <h1 className="text-3xl font-bold text-white">{activeActivity.title}</h1>
-            <p className="text-sm text-slate-400">{getActivityTypeLabel(activeActivity.type)}</p>
+            <h1 className="text-xl font-bold text-white">{activeActivity.title}</h1>
+            <p className="text-xs text-slate-400">{getActivityTypeLabel(activeActivity.type)}</p>
           </div>
         </motion.div>
         
-        <div className="flex items-center justify-center gap-6 text-slate-300 text-sm">
+        <div className="flex items-center justify-center gap-4 text-slate-300 text-xs">
           <div className="flex items-center gap-2">
-            <Users className="w-4 h-4" />
+            <Users className="w-3 h-3" />
             <span>{currentRoom.participants} participants</span>
           </div>
           <div className="flex items-center gap-2">
-            <Clock className="w-4 h-4" />
+            <Clock className="w-3 h-3" />
             <span>{formatTime(currentTime)}</span>
           </div>
           <div className="text-slate-400">
@@ -240,7 +240,7 @@ const ActivityDisplay = ({ currentRoom, currentTime, formatTime, displayActiveAc
       </div>
 
       {/* Poll Visualization */}
-      <div className="flex-1 p-4" style={{ height: 'calc(100vh - 120px)' }}>
+      <div className="flex-1 overflow-hidden" style={{ height: 'calc(100vh - 80px)' }}>
         <Enhanced3DPollVisualization
           options={activeActivity.options || []}
           totalResponses={activeActivity.total_responses || 0}
@@ -472,27 +472,27 @@ export const DisplayPage: React.FC = () => {
     return (
       <div className="h-screen w-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 flex flex-col">
         {/* Header */}
-        <div className="p-8 text-center border-b border-slate-700/50">
+        <div className="p-4 text-center border-b border-slate-700/50 flex-shrink-0">
           <motion.h1 
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="text-4xl font-bold text-white mb-2"
+            className="text-2xl font-bold text-white mb-2"
           >
             {currentRoom.name}
           </motion.h1>
-          <div className="flex items-center justify-center gap-6 text-slate-300">
-            <span className="text-lg">Room Code: <span className="font-mono font-bold text-blue-400">{currentRoom.code}</span></span>
-            <span className="text-lg">{formatTime(currentTime)}</span>
+          <div className="flex items-center justify-center gap-4 text-slate-300 text-sm">
+            <span>Room Code: <span className="font-mono font-bold text-blue-400">{currentRoom.code}</span></span>
+            <span>{formatTime(currentTime)}</span>
           </div>
         </div>
 
-        <div className="flex-1 p-8">
+        <div className="flex-1 p-4 overflow-hidden">
           {/* Main Content - QR Code Section */}
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
-            className="grid grid-cols-1 lg:grid-cols-2 gap-12 h-full items-center"
+            className="grid grid-cols-1 lg:grid-cols-2 gap-8 h-full items-center"
           >
             {/* QR Code Section */}
             <div className="text-center">
@@ -500,13 +500,13 @@ export const DisplayPage: React.FC = () => {
                 initial={{ opacity: 0, scale: 0.8 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ delay: 0.3 }}
-                className="mb-8"
+                className="mb-6"
               >
                 <h2 className="text-3xl font-bold text-white mb-6">
                   Join the Room
                 </h2>
                 <div className="flex justify-center mb-6">
-                  <QRCodeDisplay url={joinUrl} size={300} />
+                  <QRCodeDisplay url={joinUrl} size={250} />
                 </div>
                 <div className="bg-slate-800/50 backdrop-blur-sm rounded-lg p-6 border border-slate-700/50 max-w-md mx-auto">
                   <p className="text-slate-300 mb-4">
@@ -533,7 +533,7 @@ export const DisplayPage: React.FC = () => {
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: 0.2 }}
-                className="grid grid-cols-2 gap-6 mb-8"
+                className="grid grid-cols-2 gap-4 mb-6"
               >
                 <div className="bg-slate-800/50 backdrop-blur-sm rounded-lg p-6 border border-slate-700/50">
                   <div className="flex items-center gap-3">
@@ -590,7 +590,7 @@ export const DisplayPage: React.FC = () => {
                   </h3>
                   
                   {allActivities.length > 0 ? (
-                    <div className="space-y-3 max-h-64 overflow-y-auto">
+                    <div className="space-y-3 max-h-48 overflow-y-auto">
                       {allActivities.slice(0, 5).map((activity, index) => {
                         const isActive = activity.is_active || activity.id === currentRoom.current_activity_id;
                         const participationRate = activity.total_responses > 0 
@@ -659,11 +659,11 @@ export const DisplayPage: React.FC = () => {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.5 }}
-                className="text-center mt-8"
+                className="text-center mt-6"
               >
                 <div className="inline-flex items-center gap-3 px-6 py-3 bg-blue-900/30 border border-blue-600/50 rounded-full">
                   <div className="w-3 h-3 bg-blue-500 rounded-full animate-pulse"></div>
-                  <span className="text-blue-200 text-lg">Waiting for activity to start...</span>
+                  <span className="text-blue-200">Waiting for activity to start...</span>
                 </div>
               </motion.div>
             </div>

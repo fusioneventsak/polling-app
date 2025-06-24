@@ -344,12 +344,17 @@ export const Trivia3DVisualization: React.FC<Trivia3DVisualizationProps> = ({
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="relative w-full h-full bg-gradient-to-br from-slate-900 via-blue-900 to-purple-900 rounded-xl overflow-hidden"
+      className="relative w-full h-full bg-gradient-to-br from-slate-900 via-blue-900 to-purple-900 overflow-hidden"
     >
       {/* 3D Canvas */}
       <Canvas
         camera={{ position: [0, 0, 12], fov: 60 }}
-        style={{ background: 'transparent' }}
+        style={{ 
+          background: 'transparent',
+          width: '100%',
+          height: '100%',
+          display: 'block'
+        }}
         gl={{ antialias: true, alpha: true }}
       >
         <Suspense fallback={null}>
@@ -364,13 +369,13 @@ export const Trivia3DVisualization: React.FC<Trivia3DVisualizationProps> = ({
 
       {/* Countdown Timer Overlay */}
       {(gameState.phase === 'countdown' || gameState.phase === 'answering') && (
-        <div className="absolute top-8 right-8">
+        <div className="absolute top-4 right-4">
           <TriviaCountdownTimer
             duration={countdownDuration}
             isActive={gameState.isActive && gameState.phase === 'answering'}
             onTimeUp={onTimerComplete}
             onTick={onTimerTick}
-            size="md"
+            size="sm"
             autoStart={gameState.phase === 'answering'}
           />
         </div>
@@ -379,7 +384,7 @@ export const Trivia3DVisualization: React.FC<Trivia3DVisualizationProps> = ({
       {/* Game Info Panel */}
       <div className="absolute top-4 left-4 bg-black/40 backdrop-blur-sm rounded-lg p-4 border border-white/10">
         <div className="text-white">
-          <div className="text-sm font-medium mb-2">Trivia Game</div>
+          <div className="text-xs font-medium mb-2">Trivia Game</div>
           <div className="text-xs text-slate-300 space-y-1">
             <div>Phase: <span className="capitalize text-blue-400">{gameState.phase}</span></div>
             <div>Responses: <span className="text-green-400">{totalResponses}</span></div>
@@ -397,7 +402,7 @@ export const Trivia3DVisualization: React.FC<Trivia3DVisualizationProps> = ({
             exit={{ y: -100, opacity: 0 }}
             className="absolute top-0 left-0 right-0 bg-gradient-to-r from-green-600 to-green-500 text-white text-center py-4 px-8 shadow-lg"
           >
-            <div className="text-lg font-bold">
+            <div className="text-sm font-bold">
               Answer Revealed! 
               {showCorrectAnswer && (
                 <span className="ml-2">

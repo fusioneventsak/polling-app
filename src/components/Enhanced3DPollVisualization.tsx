@@ -659,10 +659,8 @@ export const Enhanced3DPollVisualization: React.FC<Enhanced3DPollVisualizationPr
       transition={{ duration: 0.8 }}
       className={`w-full h-full bg-gradient-to-br from-slate-900/40 to-blue-900/20 rounded-xl border border-slate-700 overflow-hidden shadow-2xl relative ${className}`}
       style={{ 
-        height: '100%', 
-        minHeight: '900px',
+        height: '100%',
         width: '100%',
-        minWidth: '100%',
         position: 'relative'
       }}
     >
@@ -671,7 +669,7 @@ export const Enhanced3DPollVisualization: React.FC<Enhanced3DPollVisualizationPr
           <img
             src={activityMedia}
             alt="Activity media"
-            className="w-32 h-24 object-cover rounded-lg border border-white/20 shadow-lg"
+            className="w-24 h-18 object-cover rounded-lg border border-white/20 shadow-lg"
           />
         </div>
       )}
@@ -698,11 +696,7 @@ export const Enhanced3DPollVisualization: React.FC<Enhanced3DPollVisualizationPr
             background: 'transparent',
             width: '100%',
             height: '100%',
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0
+            display: 'block'
           }}
           shadows
           gl={{ 
