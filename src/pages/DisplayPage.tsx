@@ -93,7 +93,7 @@ const ActivityDisplay = ({ currentRoom, currentTime, formatTime, displayActiveAc
                  triviaGame.gameState.phase === 'completed' ? 'Complete' : 'Waiting'}
               </span>
             </div>
-          </div>
+          </motion.div>
         </div>
 
         {/* Trivia 3D Visualization */}
