@@ -216,7 +216,13 @@ export class RoomService {
         .from('rooms')
         .update(updates)
         .eq('id', id)
-        .select()
+        .select(`
+          *,
+          activities!activities_room_id_fkey(
+            *,
+            options:activity_options(*)
+          )
+        `)
         .single();
 
       if (error) {
@@ -224,7 +230,13 @@ export class RoomService {
       }
 
       console.log('RoomService: Room updated successfully');
-      return room;
+      return {
+        ...room,
+        activities: room.activities?.sort((a, b) => a.activity_order - b.activity_order).map(activity => ({
+          ...activity,
+          options: activity.activity_options?.sort((a, b) => a.option_order - b.option_order) || []
+        })) || []
+      };
     }, 'updateRoom');
   }
 

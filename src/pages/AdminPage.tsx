@@ -45,6 +45,7 @@ export const AdminPage: React.FC = () => {
   const [showCreateRoom, setShowCreateRoom] = useState(false);
   const [editingActivity, setEditingActivity] = useState<Activity | null>(null);
   const [showCreateActivity, setShowCreateActivity] = useState(false);
+  const [editingRoom, setEditingRoom] = useState<Room | null>(null);
   const [deleteConfirmation, setDeleteConfirmation] = useState<{
     type: 'room' | 'activity';
     id: string;
@@ -386,6 +387,28 @@ export const AdminPage: React.FC = () => {
     } catch (err) {
       setError('Failed to create room');
       console.error('Error creating room:', err);
+    }
+  };
+
+  const handleEditRoom = async (roomData: any) => {
+    try {
+      if (!editingRoom) return;
+      
+      const updatedRoom = await roomService.updateRoom(editingRoom.id, roomData);
+      
+      // Update the room in state
+      setRooms(prev => prev.map(room => 
+        room.id === editingRoom.id ? updatedRoom : room
+      ));
+      
+      if (selectedRoom?.id === editingRoom.id) {
+        setSelectedRoom(updatedRoom);
+      }
+      
+      setEditingRoom(null);
+    } catch (err) {
+      setError('Failed to update room');
+      console.error('Error updating room:', err);
     }
   };
 
@@ -753,6 +776,17 @@ export const AdminPage: React.FC = () => {
                             size="sm"
                             onClick={(e) => {
                               e.stopPropagation();
+                              setEditingRoom(room);
+                            }}
+                            className="text-slate-400 hover:text-white"
+                          >
+                            <Edit3 className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
                               openDisplayPage(room.code);
                             }}
                             className="text-slate-400 hover:text-white"
@@ -988,6 +1022,14 @@ export const AdminPage: React.FC = () => {
           <RoomSettings
             onSave={handleCreateRoom}
             onCancel={() => setShowCreateRoom(false)}
+          />
+        )}
+
+        {editingRoom && (
+          <RoomSettings
+            room={editingRoom}
+            onSave={handleEditRoom}
+            onCancel={() => setEditingRoom(null)}
           />
         )}
 

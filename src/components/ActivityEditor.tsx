@@ -297,6 +297,10 @@ export const ActivityEditor: React.FC<ActivityEditorProps> = ({
     setOptions(prev => prev.map((opt, i) => i === index ? { ...opt, mediaUrl } : opt));
   };
 
+  const updateOptionMedia = (index: number, mediaUrl: string) => {
+    setOptions(prev => prev.map((opt, i) => i === index ? { ...opt, mediaUrl } : opt));
+  };
+
   const markAsCorrect = (index: number) => {
     setOptions(prev => prev.map((opt, i) => ({
       ...opt,
@@ -341,7 +345,7 @@ export const ActivityEditor: React.FC<ActivityEditorProps> = ({
         },
         options: validOptions.map((opt, index) => ({
           text: opt.text.trim(),
-          media_url: opt.mediaUrl || undefined,
+          media_url: opt.mediaUrl || null,
           is_correct: opt.isCorrect,
           option_order: index
         }))
@@ -513,6 +517,22 @@ export const ActivityEditor: React.FC<ActivityEditorProps> = ({
                       disabled={saving}
                     />
                     
+                    {/* Option Image Upload */}
+                    <div className="mt-3">
+                      <ImageUpload
+                        roomCode="temp"
+                        currentImageUrl={option.mediaUrl}
+                        onImageUploaded={(url) => updateOptionMedia(index, url)}
+                        onImageRemoved={() => updateOptionMedia(index, '')}
+                        label={`Add image for option ${index + 1}`}
+                        description="Visual content can make options more engaging"
+                        maxSizeMB={2}
+                        compact={true}
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center gap-2">
                     {(type === 'trivia' || type === 'quiz') && (
                       <Button
                         variant={option.isCorrect ? "success" : "ghost"}

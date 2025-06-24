@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from './Button';
 import { Card } from './Card';
 import { ImageUpload } from './ImageUpload';
+import { roomService } from '../services/roomService';
 import { 
   Settings, 
   Palette, 
@@ -133,7 +134,11 @@ export const RoomSettings: React.FC<RoomSettingsProps> = ({ room, onSave, onCanc
     try {
       if (room) {
         // Update existing room
-        await onSave({ settings });
+        await onSave({ 
+          name, 
+          description, 
+          settings 
+        });
       } else {
         // Create new room
         const roomCode = generateRoomCode();
