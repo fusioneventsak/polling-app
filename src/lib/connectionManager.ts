@@ -1,17 +1,15 @@
-// src/lib/connectionManager.ts
+// src/lib/connectionManager.ts - Simplified version to avoid transport issues
 import { RealtimeChannel } from '@supabase/supabase-js';
 import { supabase } from './supabase';
 
 class ConnectionManager {
   private channels: Map<string, RealtimeChannel> = new Map();
   private connectionPromises: Map<string, Promise<RealtimeChannel>> = new Map();
-  private isReconnecting = false;
-  private reconnectTimer: NodeJS.Timeout | null = null;
 
   async getOrCreateChannel(channelName: string, config?: any): Promise<RealtimeChannel> {
-    // Check if we already have a connected channel
+    // Check if we already have a channel (don't check state to avoid transport issues)
     const existingChannel = this.channels.get(channelName);
-    if (existingChannel && existingChannel.state === 'joined') {
+    if (existingChannel) {
       console.log(`♻️ Reusing existing channel: ${channelName}`);
       return existingChannel;
     }
@@ -50,59 +48,56 @@ class ConnectionManager {
 
     console.log(`🔌 Creating new channel: ${channelName}`);
     
-    const channel = supabase.channel(channelName, {
-      config: {
-        presence: { key: 'user_id' },
-        ...config
-      }
-    });
+    // Create channel with minimal config to avoid transport issues
+    const channel = supabase.channel(channelName);
 
     return new Promise((resolve, reject) => {
+      let hasResolved = false;
+      
       const timeout = setTimeout(() => {
-        console.error(`⏰ Channel subscription timeout: ${channelName}`);
-        reject(new Error(`Channel subscription timeout: ${channelName}`));
-      }, 10000); // 10 second timeout
-
-      channel.subscribe((status, err) => {
-        console.log(`📡 Channel ${channelName} status: ${status}`);
-        
-        if (status === 'SUBSCRIBED') {
-          clearTimeout(timeout);
-          console.log(`✅ Channel connected: ${channelName}`);
-          resolve(channel);
-        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-          clearTimeout(timeout);
-          console.error(`❌ Channel error for ${channelName}:`, status, err);
-          reject(new Error(`Channel subscription failed: ${status}`));
-        } else if (status === 'CLOSED') {
-          console.warn(`🔌 Channel closed: ${channelName}`);
-          this.handleChannelClosed(channelName);
+        if (!hasResolved) {
+          hasResolved = true;
+          console.error(`⏰ Channel subscription timeout: ${channelName}`);
+          reject(new Error(`Channel subscription timeout: ${channelName}`));
         }
-      });
+      }, 15000); // Increased timeout to 15 seconds
+
+      try {
+        channel.subscribe((status, err) => {
+          console.log(`📡 Channel ${channelName} status: ${status}`);
+          
+          if (hasResolved) return; // Prevent multiple resolutions
+          
+          if (status === 'SUBSCRIBED') {
+            hasResolved = true;
+            clearTimeout(timeout);
+            console.log(`✅ Channel connected: ${channelName}`);
+            resolve(channel);
+          } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+            hasResolved = true;
+            clearTimeout(timeout);
+            console.error(`❌ Channel error for ${channelName}:`, status, err);
+            reject(new Error(`Channel subscription failed: ${status}`));
+          } else if (status === 'CLOSED') {
+            console.warn(`🔌 Channel closed: ${channelName}`);
+            this.handleChannelClosed(channelName);
+          }
+        });
+      } catch (error) {
+        if (!hasResolved) {
+          hasResolved = true;
+          clearTimeout(timeout);
+          console.error(`❌ Channel subscription error for ${channelName}:`, error);
+          reject(error);
+        }
+      }
     });
   }
 
   private handleChannelClosed(channelName: string) {
+    console.log(`🔄 Handling closed channel: ${channelName}`);
     this.channels.delete(channelName);
     this.connectionPromises.delete(channelName);
-    
-    // Trigger reconnection if not already reconnecting
-    if (!this.isReconnecting) {
-      this.scheduleReconnect();
-    }
-  }
-
-  private scheduleReconnect() {
-    if (this.reconnectTimer) {
-      clearTimeout(this.reconnectTimer);
-    }
-
-    this.isReconnecting = true;
-    this.reconnectTimer = setTimeout(() => {
-      this.isReconnecting = false;
-      console.log('🔄 Attempting to reconnect closed channels...');
-      // You can implement reconnection logic here if needed
-    }, 5000);
   }
 
   async cleanupChannel(channelName: string): Promise<void> {
@@ -127,22 +122,15 @@ class ConnectionManager {
     await Promise.all(cleanupPromises);
     this.channels.clear();
     this.connectionPromises.clear();
-    
-    if (this.reconnectTimer) {
-      clearTimeout(this.reconnectTimer);
-      this.reconnectTimer = null;
-    }
   }
 
   getChannelStatus(channelName: string): string {
     const channel = this.channels.get(channelName);
-    return channel ? channel.state : 'not_created';
+    return channel ? 'exists' : 'not_created';
   }
 
   listActiveChannels(): string[] {
-    return Array.from(this.channels.entries())
-      .filter(([, channel]) => channel.state === 'joined')
-      .map(([name]) => name);
+    return Array.from(this.channels.keys());
   }
 }
 
