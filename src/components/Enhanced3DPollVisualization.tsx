@@ -524,7 +524,11 @@ const Enhanced3DScene: React.FC<{
     
     const animateCamera = () => {
       const targetX = 0;
-      const targetY = 8;
+      
+      // Dynamic camera height based on number of options
+      const baseHeight = 8;
+      const extraHeight = Math.max(0, (options.length - 3) * 1.5); // Raise camera for more options
+      const targetY = baseHeight + extraHeight;
       
       // Closer camera for better readability
       const baseDistance = 24; // Closer than 28 for readable text
@@ -544,6 +548,10 @@ const Enhanced3DScene: React.FC<{
         camera.position.x = startPos.x + (targetX - startPos.x) * easeProgress;
         camera.position.y = startPos.y + (targetY - startPos.y) * easeProgress;
         camera.position.z = startPos.z + (targetZ - startPos.z) * easeProgress;
+        
+        // Dynamic look-at target for better framing
+        const lookAtY = 2 + Math.max(0, (options.length - 4) * 0.5);
+        camera.lookAt(0, lookAtY, 0);
         
         if (progress < 1) {
           requestAnimationFrame(animate);
