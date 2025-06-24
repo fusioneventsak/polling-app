@@ -180,7 +180,7 @@ const ActivityDisplay = ({ currentRoom, currentTime, formatTime }: {
         <div className="flex-1 p-4" style={{ height: 'calc(100vh - 120px)' }}>
           <Trivia3DVisualization
             options={activeActivity.options || []}
-            totalResponses={displayActiveActivity?.total_responses || 0}
+            totalResponses={activeActivity.total_responses || 0}
             themeColors={{
               primary: '#8b5cf6',
               secondary: '#3b82f6',
@@ -243,7 +243,7 @@ const ActivityDisplay = ({ currentRoom, currentTime, formatTime }: {
       <div className="flex-1 p-4" style={{ height: 'calc(100vh - 120px)' }}>
         <Enhanced3DPollVisualization
           options={activeActivity.options || []}
-          totalResponses={displayActiveActivity?.total_responses || 0}
+          totalResponses={activeActivity.total_responses || 0}
           themeColors={{
             primaryColor: '#3b82f6',
             secondaryColor: '#06b6d4',
