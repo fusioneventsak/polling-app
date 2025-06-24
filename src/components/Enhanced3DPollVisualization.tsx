@@ -137,7 +137,7 @@ const StandingImagePlane: React.FC<{
 // Volumetric Light Beam Component with realistic atmospheric scattering
 const VolumetricLightBeam: React.FC<{
   position: [number, number, number];
-  color: string;
+  color: string; // Always expect string, convert to THREE.Color internally
   intensity: number;
   responses: number;
 }> = ({ position, color, intensity, responses }) => {
@@ -153,7 +153,7 @@ const VolumetricLightBeam: React.FC<{
       beamRef.current.children.forEach((child, index) => {
         if (child instanceof THREE.Mesh) {
           const material = child.material as THREE.MeshBasicMaterial;
-          if (material.opacity !== undefined) {
+          if (material && material.opacity !== undefined) {
             // Subtle pulsing based on responses
             const baseOpacity = responses > 0 ? 0.15 : 0.03;
             const pulse = Math.sin(time * 2 + index * 0.5) * 0.02;
@@ -280,16 +280,11 @@ const Enhanced3DBar: React.FC<{
   const [animatedHeight, setAnimatedHeight] = useState(0.2);
   
   // Create THREE.Color objects to prevent undefined value errors
-  const barColor = useMemo(() => {
-    const colorValue = isCorrect ? '#10b981' : color;
-    return new THREE.Color(colorValue);
-  }, [color, isCorrect]);
-
-  const glowColor = useMemo(() => {
-    const colorValue = isCorrect ? '#34d399' : color;
-    return new THREE.Color(colorValue);
-  }, [color, isCorrect]);
-
+  const barColorValue = isCorrect ? '#10b981' : color;
+  const glowColorValue = isCorrect ? '#34d399' : color;
+  
+  const barColor = useMemo(() => new THREE.Color(barColorValue), [barColorValue]);
+  const glowColor = useMemo(() => new THREE.Color(glowColorValue), [glowColorValue]);
   const baseColor = useMemo(() => new THREE.Color("#1e293b"), []);
   
   useFrame((state) => {
@@ -326,13 +321,12 @@ const Enhanced3DBar: React.FC<{
     }
   });
 
-
   return (
     <group>
-      {/* Volumetric Light Beam */}
+      {/* Volumetric Light Beam - Pass string color, not THREE.Color */}
       <VolumetricLightBeam
         position={position}
-        color={barColor}
+        color={barColorValue} // Pass string instead of THREE.Color object
         intensity={responses > 0 ? 1.2 : 0.4}
         responses={responses}
       />
@@ -560,7 +554,6 @@ const StandingImagesDisplay: React.FC<{
         const glowColorValue = option.is_correct 
           ? '#10b981' 
           : `hsl(${200 + hue}, ${saturation}%, ${lightness}%)`;
-        const glowColor = useMemo(() => new THREE.Color(glowColorValue), [glowColorValue]);
         
         return (
           <group key={option.id}>
