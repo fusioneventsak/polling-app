@@ -5,6 +5,8 @@ import { supabase } from './supabase';
 class ConnectionManager {
   private channels: Map<string, RealtimeChannel> = new Map();
   private subscriptionStates: Map<string, 'idle' | 'subscribing' | 'subscribed' | 'error'> = new Map();
+  private retryAttempts: Map<string, number> = new Map();
+  private maxRetries = 3;
 
   async getOrCreateChannel(channelName: string): Promise<RealtimeChannel | null> {
     return this.getChannel(channelName);
@@ -12,7 +14,7 @@ class ConnectionManager {
 
   async getChannel(channelName: string): Promise<RealtimeChannel | null> {
     if (!supabase) {
-      console.error('❌ Supabase client not available');
+      console.warn('⚠️ Supabase client not available');
       return null;
     }
 
@@ -25,9 +27,16 @@ class ConnectionManager {
 
     // Create new channel
     console.log(`🔌 Creating new channel: ${channelName}`);
-    const channel = supabase.channel(channelName);
+    const channel = supabase.channel(channelName, {
+      config: {
+        presence: {
+          key: channelName
+        }
+      }
+    });
     this.channels.set(channelName, channel);
     this.subscriptionStates.set(channelName, 'idle');
+    this.retryAttempts.set(channelName, 0);
     
     return channel;
   }
@@ -35,9 +44,21 @@ class ConnectionManager {
   async subscribe(channelName: string): Promise<boolean> {
     const channel = this.channels.get(channelName);
     const currentState = this.subscriptionStates.get(channelName);
+    const attempts = this.retryAttempts.get(channelName) || 0;
 
     if (!channel) {
-      console.error(`❌ Channel ${channelName} not found`);
+      console.warn(`⚠️ Channel ${channelName} not found, creating...`);
+      const newChannel = await this.getChannel(channelName);
+      if (!newChannel) {
+        console.error(`❌ Failed to create channel ${channelName}`);
+        return false;
+      }
+      return this.subscribe(channelName);
+    }
+
+    // Check retry limit
+    if (attempts >= this.maxRetries) {
+      console.warn(`⚠️ Max retry attempts reached for channel ${channelName}`);
       return false;
     }
 
@@ -49,13 +70,14 @@ class ConnectionManager {
 
     console.log(`📡 Subscribing to channel: ${channelName}`);
     this.subscriptionStates.set(channelName, 'subscribing');
+    this.retryAttempts.set(channelName, attempts + 1);
 
     return new Promise((resolve) => {
       const timeout = setTimeout(() => {
-        console.error(`⏰ Subscription timeout for ${channelName}`);
+        console.warn(`⏰ Subscription timeout for ${channelName} (attempt ${attempts + 1})`);
         this.subscriptionStates.set(channelName, 'error');
         resolve(false);
-      }, 10000);
+      }, 15000); // Increased timeout
 
       channel.subscribe((status, err) => {
         console.log(`📡 Channel ${channelName} status: ${status}`);
@@ -63,17 +85,19 @@ class ConnectionManager {
         if (status === 'SUBSCRIBED') {
           clearTimeout(timeout);
           this.subscriptionStates.set(channelName, 'subscribed');
+          this.retryAttempts.set(channelName, 0); // Reset on success
           console.log(`✅ Channel ${channelName} subscribed successfully`);
           resolve(true);
         } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
           clearTimeout(timeout);
           this.subscriptionStates.set(channelName, 'error');
-          console.error(`❌ Channel ${channelName} error:`, status, err);
+          console.warn(`⚠️ Channel ${channelName} error:`, status, err);
           resolve(false);
         } else if (status === 'CLOSED') {
-          console.warn(`🔌 Channel ${channelName} closed`);
+          console.log(`🔌 Channel ${channelName} closed`);
           this.subscriptionStates.set(channelName, 'idle');
           this.channels.delete(channelName);
+          this.retryAttempts.delete(channelName);
         }
       });
     });
@@ -94,6 +118,7 @@ class ConnectionManager {
       }
       this.channels.delete(channelName);
       this.subscriptionStates.delete(channelName);
+      this.retryAttempts.delete(channelName);
     }
   }
 
@@ -101,6 +126,7 @@ class ConnectionManager {
     console.log('🧹 Cleaning up all channels...');
     const cleanupPromises = Array.from(this.channels.keys()).map(name => this.cleanup(name));
     await Promise.all(cleanupPromises);
+    this.retryAttempts.clear();
   }
 
   listChannels(): { name: string; state: string }[] {

@@ -94,48 +94,68 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
       setupAttempts++;
       
       try {
-        console.log(`🔌 SocketContext: Setting up global subscriptions (attempt ${setupAttempts})...`);
+        console.log(`🔌 SocketContext: Setting up global subscriptions (attempt ${setupAttempts}/${maxSetupAttempts})...`);
         
         const channelName = 'global-updates';
         
         // Get channel
         const channel = await connectionManager.getChannel(channelName);
         if (!channel) {
-          throw new Error('Failed to get global channel');
+          console.warn('⚠️ Failed to get global channel, real-time features may be limited');
+          setConnectionStatus('disconnected');
+          return;
         }
 
-        // Add event listeners
+        // Add event listeners with error handling
+        console.log('📡 SocketContext: Adding postgres_changes listeners...');
         channel
           .on('postgres_changes', 
             { event: '*', schema: 'public', table: 'rooms' },
             (payload) => {
-              console.log('🏠 SocketContext: Room change received:', payload);
-              loadRooms();
+              try {
+                console.log('🏠 SocketContext: Room change received:', payload.eventType);
+                loadRooms();
+              } catch (error) {
+                console.warn('⚠️ Error handling room change:', error);
+              }
             }
           )
           .on('postgres_changes',
             { event: '*', schema: 'public', table: 'activities' },
             (payload) => {
-              console.log('🎯 SocketContext: Activity change received:', payload);
-              loadRooms();
+              try {
+                console.log('🎯 SocketContext: Activity change received:', payload.eventType);
+                loadRooms();
+              } catch (error) {
+                console.warn('⚠️ Error handling activity change:', error);
+              }
             }
           )
           .on('postgres_changes',
             { event: '*', schema: 'public', table: 'activity_options' },
             (payload) => {
-              console.log('📝 SocketContext: Activity options change received:', payload);
-              loadRooms();
+              try {
+                console.log('📝 SocketContext: Activity options change received:', payload.eventType);
+                loadRooms();
+              } catch (error) {
+                console.warn('⚠️ Error handling activity options change:', error);
+              }
             }
           )
           .on('postgres_changes',
             { event: '*', schema: 'public', table: 'participant_responses' },
             (payload) => {
-              console.log('👥 SocketContext: Response change received:', payload);
-              loadRooms();
+              try {
+                console.log('👥 SocketContext: Response change received:', payload.eventType);
+                loadRooms();
+              } catch (error) {
+                console.warn('⚠️ Error handling response change:', error);
+              }
             }
           );
 
         // Subscribe
+        console.log('🔌 SocketContext: Attempting subscription...');
         const subscribed = await connectionManager.subscribe(channelName);
         
         if (subscribed) {
@@ -143,17 +163,17 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
           setConnectionStatus('connected');
           setupAttempts = 0; // Reset attempts on success
         } else {
-          throw new Error('Subscription failed');
+          throw new Error(`Subscription failed for ${channelName}`);
         }
         
       } catch (error) {
-        console.error('❌ SocketContext: Failed to setup global subscriptions:', error);
+        console.warn(`⚠️ SocketContext: Failed to setup global subscriptions (attempt ${setupAttempts}):`, error.message || error);
         setConnectionStatus('disconnected');
         
         // Retry with exponential backoff, but only if we haven't exceeded max attempts
         if (setupAttempts < maxSetupAttempts) {
-          const retryDelay = Math.min(setupAttempts * 3000, 10000);
-          console.log(`🔄 SocketContext: Retrying global subscription setup in ${retryDelay}ms (attempt ${setupAttempts + 1}/${maxSetupAttempts})...`);
+          const retryDelay = Math.min(setupAttempts * 5000, 15000);
+          console.log(`🔄 SocketContext: Retrying global subscription in ${retryDelay}ms...`);
           
           setTimeout(() => {
             if (supabase) {
@@ -161,7 +181,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
             }
           }, retryDelay);
         } else {
-          console.warn('❌ SocketContext: Max global subscription setup attempts reached. Continuing without real-time updates.');
+          console.warn('⚠️ SocketContext: Max global subscription attempts reached. App will work with manual refresh.');
           setupAttempts = 0; // Reset for potential future attempts
         }
       }
