@@ -433,51 +433,6 @@ export const DisplayPage: React.FC = () => {
               }
             }
           );
-                eventType: payload.eventType,
-                currentActivityId: payload.new?.current_activity_id
-              });
-              loadRoom();
-            }
-          )
-          .on('postgres_changes',
-            { 
-              event: '*', 
-              schema: 'public', 
-              table: 'activities'
-            },
-            (payload) => {
-              if (!isActive) return;
-              console.log('🎯 DisplayPage: Activity change:', {
-                eventType: payload.eventType,
-                activityId: payload.new?.id || payload.old?.id,
-                isActive: payload.new?.is_active,
-                roomId: payload.new?.room_id || payload.old?.room_id
-              });
-              
-              // Only reload if this belongs to our room
-              if (currentRoom && (payload.new?.room_id === currentRoom.id || payload.old?.room_id === currentRoom.id)) {
-                console.log('🔄 DisplayPage: Reloading for our room...');
-                loadRoom();
-              }
-            }
-          )
-          .on('postgres_changes',
-            { event: '*', schema: 'public', table: 'activity_options' },
-            (payload) => {
-              if (!isActive) return;
-              console.log('📝 DisplayPage: Options change:', payload.eventType);
-              loadRoom();
-            }
-          )
-          .on('postgres_changes',
-            { event: '*', schema: 'public', table: 'participant_responses' },
-            (payload) => {
-              if (!isActive) return;
-              console.log('👥 DisplayPage: Response change:', payload.eventType);
-              loadRoom();
-            }
-          );
-
 
         // Step 3: Subscribe to channel
         console.log('🔌 DisplayPage: Subscribing to channel...');
@@ -489,7 +444,6 @@ export const DisplayPage: React.FC = () => {
         } else {
           throw new Error('Subscription failed');
         }
-
 
       } catch (error) {
         console.warn(`⚠️ DisplayPage: Setup error (attempt ${retryCount}):`, error.message || error);
