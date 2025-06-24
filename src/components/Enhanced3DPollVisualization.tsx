@@ -20,37 +20,37 @@ interface Enhanced3DPollVisualizationProps {
   className?: string;
 }
 
-// FINAL: Amphitheater curve TOWARD camera for all options
-const getCurvedPosition = (index: number, totalCount: number, radius: number = 28) => {
+// FIXED: Much more spacing for 4+ options to prevent curve collisions
+const getCurvedPosition = (index: number, totalCount: number, radius: number = 35) => {
   // For small counts, use straight line with MASSIVE spacing
   if (totalCount <= 2) {
     const spacing = 25;
     const totalWidth = (totalCount - 1) * spacing;
     const startX = -totalWidth / 2;
-    return { x: startX + index * spacing, z: 2, rotationY: 0 }; // FORWARD toward camera
+    return { x: startX + index * spacing, z: 2, rotationY: 0 };
   }
   
   // For 3 options, curve TOWARD camera
   if (totalCount === 3) {
     const positions = [
-      { x: -25, z: 0, rotationY: 0.2 },   // CURVE FORWARD
-      { x: 0, z: 3, rotationY: 0 },       // CENTER FORWARD
-      { x: 25, z: 0, rotationY: -0.2 }    // CURVE FORWARD
+      { x: -30, z: 0, rotationY: 0.2 },   // WIDER spacing
+      { x: 0, z: 3, rotationY: 0 },       
+      { x: 30, z: 0, rotationY: -0.2 }    
     ];
     return positions[index];
   }
   
-  // For 4+ options, AMPHITHEATER CURVE TOWARD CAMERA
-  const adjustedRadius = Math.max(radius, totalCount * 5);
-  const maxAngle = Math.min(Math.PI * 1.1, totalCount * 0.35);
+  // For 4+ options, MUCH LARGER amphitheater to prevent collisions
+  const adjustedRadius = Math.max(radius, totalCount * 8); // MUCH bigger multiplier (8 vs 5)
+  const maxAngle = Math.min(Math.PI * 1.0, totalCount * 0.28); // Slightly tighter arc
   const angleStep = maxAngle / Math.max(totalCount - 1, 1);
   const startAngle = -maxAngle / 2;
   const angle = startAngle + index * angleStep;
   
   return {
     x: Math.sin(angle) * adjustedRadius,
-    z: Math.cos(angle) * adjustedRadius * 0.4 + 5, // CURVE TOWARD CAMERA (+5 instead of -2)
-    rotationY: angle * 0.3
+    z: Math.cos(angle) * adjustedRadius * 0.3 + 5, // Same forward curve
+    rotationY: angle * 0.25 // Reduced rotation for better alignment
   };
 };
 
@@ -381,7 +381,7 @@ const FloorStatsDisplay: React.FC<{
         const baseSpacing = 16; // Increased from 10
         const spacing = Math.max(baseSpacing, Math.min(20, 120 / Math.max(options.length, 1))); // Much larger calculation 
         
-        const curvedPos = getCurvedPosition(index, options.length, 28);
+        const curvedPos = getCurvedPosition(index, options.length, 35);
         
         const hue = (index / Math.max(options.length - 1, 1)) * 300;
         const barColorValue = option.is_correct 
@@ -481,7 +481,7 @@ const StandingImagesDisplay: React.FC<{
         }
         
         // FIXED: Use same radius and positioning as other elements
-        const curvedPos = getCurvedPosition(index, options.length, 28);
+        const curvedPos = getCurvedPosition(index, options.length, 35);
         
         const hue = (index / Math.max(options.length - 1, 1)) * 300;
         const glowColorValue = option.is_correct 
@@ -525,10 +525,10 @@ const Enhanced3DScene: React.FC<{
   const floorColor = useMemo(() => new THREE.Color("#1a1a1a"), []);
   const titleShadowColor = useMemo(() => new THREE.Color("#1e293b"), []);
   
-  // FIXED: Camera distance scales properly with option count + guaranteed fly-in
+  // FIXED: Much further camera distance for 4+ options to prevent crowding
   useEffect(() => {
-    const startDistance = 80; // Further back starting position
-    const startHeight = 35;
+    const startDistance = 90; // Even further back starting position
+    const startHeight = 40;
     
     // ALWAYS start from far away for dramatic fly-in
     camera.position.set(0, startHeight, startDistance);
@@ -537,17 +537,19 @@ const Enhanced3DScene: React.FC<{
     const animateCamera = () => {
       const targetX = 0;
       
-      // FIXED: Camera scales properly with option count
-      const baseHeight = 15;
-      const extraHeight = Math.max(0, (options.length - 3) * 1.5); // More height for more options
+      // FIXED: Much more distance scaling for 4+ options
+      const baseHeight = 16;
+      const extraHeight = Math.max(0, (options.length - 3) * 2); // More height scaling
       const targetY = baseHeight + extraHeight;
       
-      // FIXED: Much further distance for polls with many options
-      const baseDistance = 25;
-      const distanceAdjustment = Math.max(0, (options.length - 3) * 4); // Much more distance per option
+      // FIXED: MUCH more distance for polls with 4+ options
+      const baseDistance = 30;
+      const distanceAdjustment = options.length >= 4 
+        ? Math.max(0, (options.length - 3) * 8) // MUCH more distance (8 vs 4)
+        : Math.max(0, (options.length - 3) * 3); // Normal scaling for 2-3 options
       const targetZ = baseDistance + distanceAdjustment;
       
-      const animationDuration = 4000; // Longer for more dramatic effect
+      const animationDuration = 4000;
       const startTime = Date.now();
       const startPos = camera.position.clone();
       
@@ -557,16 +559,16 @@ const Enhanced3DScene: React.FC<{
         
         // Smooth cinematic easing
         const easeProgress = progress < 0.6 
-          ? Math.pow(progress, 0.3) // Slow start
-          : 1 - 0.4 * Math.pow(1 - progress, 4); // Smooth deceleration
+          ? Math.pow(progress, 0.3)
+          : 1 - 0.4 * Math.pow(1 - progress, 4);
         
         camera.position.x = startPos.x + (targetX - startPos.x) * easeProgress;
         camera.position.y = startPos.y + (targetY - startPos.y) * easeProgress;
         camera.position.z = startPos.z + (targetZ - startPos.z) * easeProgress;
         
         // Look at center of amphitheater
-        const lookAtY = 2;
-        camera.lookAt(0, lookAtY, 0);
+        const lookAtY = 3;
+        camera.lookAt(0, lookAtY, 2);
         
         if (progress < 1) {
           requestAnimationFrame(animate);
@@ -577,7 +579,7 @@ const Enhanced3DScene: React.FC<{
     };
     
     // ALWAYS trigger fly-in animation
-    const timer = setTimeout(animateCamera, 200); // Slight delay for better effect
+    const timer = setTimeout(animateCamera, 200);
     return () => clearTimeout(timer);
   }, [camera, options.length]);
   
@@ -622,7 +624,7 @@ const Enhanced3DScene: React.FC<{
           ? Math.max((option.responses / maxResponses) * maxHeight, 0.5)
           : 1.2; // Larger minimum height
         
-        const curvedPos = getCurvedPosition(index, options.length, 28);
+        const curvedPos = getCurvedPosition(index, options.length, 35);
         
         const hue = (index / Math.max(options.length - 1, 1)) * 300;
         const barColorValue = option.is_correct 
@@ -763,13 +765,13 @@ export const Enhanced3DPollVisualization: React.FC<Enhanced3DPollVisualizationPr
             enablePan={false}
             enableZoom={true}
             enableRotate={true}
-            minDistance={Math.max(15, 28 - options.length * 1)} // FIXED: Closer min for small polls
-            maxDistance={Math.max(45, options.length * 6)} // FIXED: Much further max for big polls
+            minDistance={Math.max(18, 35 - options.length * 1.5)} // FIXED: Reasonable min distance
+            maxDistance={Math.max(50, options.length * 10)} // FIXED: MUCH further max for big polls
             minPolarAngle={Math.PI / 40}
             maxPolarAngle={Math.PI / 2.0}
             autoRotate={false}
             rotateSpeed={0.4}
-            target={[0, 2, 2]} // Look at amphitheater center
+            target={[0, 3, 2]} // Look at amphitheater center
           />
         </Canvas>
       </Suspense>
