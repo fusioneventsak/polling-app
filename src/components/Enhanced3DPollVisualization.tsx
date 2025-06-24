@@ -529,15 +529,15 @@ const Enhanced3DScene: React.FC<{
     const animateCamera = () => {
       const targetX = 0;
       
-      // Dynamic camera height based on number of options
+      // Higher camera for larger polls with more dramatic scaling
       const baseHeight = 8;
-      const extraHeight = Math.max(0, (options.length - 3) * 1.5); // Raise camera for more options
+      const extraHeight = Math.max(0, (options.length - 3) * 2.5); // Increased from 1.5
       const targetY = baseHeight + extraHeight;
       
-      // Dynamic distance for optimal viewing
+      // CLOSER distance for larger polls (counter-intuitive but better framing)
       const baseDistance = 24;
-      const extraDistance = Math.max(0, (options.length - 2) * 3);
-      const targetZ = baseDistance + extraDistance;
+      const distanceReduction = Math.max(0, (options.length - 3) * 2); // Get closer for more options
+      const targetZ = baseDistance - distanceReduction; // SUBTRACT distance for larger polls
       
       const animationDuration = 3000; // Longer animation for dramatic effect
       const startTime = Date.now();
@@ -556,8 +556,8 @@ const Enhanced3DScene: React.FC<{
         camera.position.y = startPos.y + (targetY - startPos.y) * easeProgress;
         camera.position.z = startPos.z + (targetZ - startPos.z) * easeProgress;
         
-        // Dynamic look-at target for better framing
-        const lookAtY = 2 + Math.max(0, (options.length - 4) * 0.5);
+        // More pronounced downward angle for larger polls
+        const lookAtY = 1 + Math.max(0, (options.length - 4) * 0.3); // Lower lookAt for more downward angle
         camera.lookAt(0, lookAtY, 0);
         
         if (progress < 1) {
@@ -769,13 +769,13 @@ export const Enhanced3DPollVisualization: React.FC<Enhanced3DPollVisualizationPr
             enablePan={false}
             enableZoom={true}
             enableRotate={true}
-            minDistance={16} // Closer for readability
-            maxDistance={Math.max(40, options.length * 4)} // Reduced scaling
-            minPolarAngle={Math.PI / 16} // Slightly higher angle for better overview
+            minDistance={Math.max(12, 24 - options.length * 2)} // Closer minimum for larger polls
+            maxDistance={Math.max(35, options.length * 3)} // More moderate max scaling
+            minPolarAngle={Math.PI / 20} // Allow more downward angle
             maxPolarAngle={Math.PI / 2.2}
             autoRotate={false}
             rotateSpeed={0.5}
-            target={[0, 2 + Math.max(0, (options.length - 4) * 0.5), 0]} // Dynamic target
+            target={[0, 1 + Math.max(0, (options.length - 4) * 0.3), 0]} // Lower target for downward angle
           />
         </Canvas>
       </Suspense>
