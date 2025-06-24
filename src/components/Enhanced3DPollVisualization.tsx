@@ -519,27 +519,27 @@ const Enhanced3DScene: React.FC<{
   const titleShadowColor = useMemo(() => new THREE.Color("#1e293b"), []);
   
   useEffect(() => {
-    // Always start camera from far away for dramatic entrance
+    // Always start camera from far away and high for dramatic entrance
     const startDistance = 80; // Far away starting position
-    const startHeight = 25; // High starting position
+    const startHeight = 35; // Higher starting position for all polls
     
     camera.position.set(0, startHeight, startDistance);
-    camera.lookAt(0, 2, 0);
+    camera.lookAt(0, 0, 0); // Look at center initially
     
     const animateCamera = () => {
       const targetX = 0;
       
-      // Higher camera for larger polls with more dramatic scaling
-      const baseHeight = 8;
-      const extraHeight = Math.max(0, (options.length - 3) * 2.5); // Increased from 1.5
+      // Higher camera for all polls with downward angle
+      const baseHeight = 12; // Raised from 8 for all polls
+      const extraHeight = Math.max(0, (options.length - 3) * 2.5);
       const targetY = baseHeight + extraHeight;
       
-      // CLOSER distance for larger polls (counter-intuitive but better framing)
+      // CLOSER distance for larger polls
       const baseDistance = 24;
-      const distanceReduction = Math.max(0, (options.length - 3) * 2); // Get closer for more options
-      const targetZ = baseDistance - distanceReduction; // SUBTRACT distance for larger polls
+      const distanceReduction = Math.max(0, (options.length - 3) * 2);
+      const targetZ = baseDistance - distanceReduction;
       
-      const animationDuration = 3000; // Longer animation for dramatic effect
+      const animationDuration = 3500; // Slightly longer for smoother feel
       const startTime = Date.now();
       const startPos = camera.position.clone();
       
@@ -547,17 +547,17 @@ const Enhanced3DScene: React.FC<{
         const elapsed = Date.now() - startTime;
         const progress = Math.min(elapsed / animationDuration, 1);
         
-        // Smooth easing with slight bounce at the end
-        const easeProgress = progress < 0.8 
-          ? 1 - Math.pow(1 - progress, 3) // Ease out cubic for first 80%
-          : 1 - 0.1 * Math.sin((progress - 0.8) * Math.PI * 5); // Subtle bounce for last 20%
+        // Smoother easing curve for more cinematic feel
+        const easeProgress = progress < 0.7 
+          ? Math.pow(progress, 0.4) // Slow start with power curve
+          : 1 - 0.3 * Math.pow(1 - progress, 3); // Smooth deceleration
         
         camera.position.x = startPos.x + (targetX - startPos.x) * easeProgress;
         camera.position.y = startPos.y + (targetY - startPos.y) * easeProgress;
         camera.position.z = startPos.z + (targetZ - startPos.z) * easeProgress;
         
-        // More pronounced downward angle for larger polls
-        const lookAtY = 1 + Math.max(0, (options.length - 4) * 0.3); // Lower lookAt for more downward angle
+        // Smooth transition to downward angle for all polls
+        const lookAtY = 0.5 + Math.max(0, (options.length - 4) * 0.2); // Lower target for downward angle
         camera.lookAt(0, lookAtY, 0);
         
         if (progress < 1) {
