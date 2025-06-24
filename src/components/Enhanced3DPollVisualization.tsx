@@ -41,6 +41,9 @@ const StandingImagePlane: React.FC<{
   const [texture, setTexture] = useState<THREE.Texture | null>(null);
   const [loadError, setLoadError] = useState(false);
   
+  // Create THREE.Color objects for glow materials
+  const glowColorObj = useMemo(() => new THREE.Color(glowColor), [glowColor]);
+  
   useEffect(() => {
     if (!imageUrl || imageUrl.trim() === '') {
       setTexture(null);
@@ -110,7 +113,7 @@ const StandingImagePlane: React.FC<{
       <mesh position={[position[0], imageY, position[2] - 0.01]} rotation={[-tiltAngle, 0, 0]} renderOrder={9}>
         <planeGeometry args={[imageWidth + 0.2, imageHeight + 0.2]} />
         <meshBasicMaterial 
-          color={glowColor}
+          color={glowColorObj}
           transparent
           opacity={0.3}
           depthWrite={false}
@@ -121,7 +124,7 @@ const StandingImagePlane: React.FC<{
       <mesh position={[position[0], imageY, position[2] - 0.02]} rotation={[-tiltAngle, 0, 0]} renderOrder={8}>
         <planeGeometry args={[imageWidth + 0.4, imageHeight + 0.4]} />
         <meshBasicMaterial 
-          color={glowColor}
+          color={glowColorObj}
           transparent
           opacity={0.1}
           depthWrite={false}
@@ -139,6 +142,9 @@ const VolumetricLightBeam: React.FC<{
   responses: number;
 }> = ({ position, color, intensity, responses }) => {
   const beamRef = useRef<THREE.Group>(null);
+  
+  // Create THREE.Color objects to prevent undefined value errors
+  const threeColor = useMemo(() => new THREE.Color(color), [color]);
   
   useFrame((state) => {
     if (beamRef.current) {
@@ -164,7 +170,7 @@ const VolumetricLightBeam: React.FC<{
       <spotLight
         position={[position[0], 18, position[2]]}
         target-position={[position[0], 0, position[2]]}
-        color={color}
+        color={threeColor}
         intensity={responses > 0 ? intensity * 3 : intensity * 0.8}
         angle={Math.PI / 8}
         penumbra={0.4}
@@ -189,7 +195,7 @@ const VolumetricLightBeam: React.FC<{
           >
             <cylinderGeometry args={[radius, radius + 0.2, height, 16]} />
             <meshBasicMaterial
-              color={color}
+              color={threeColor}
               transparent
               opacity={Math.max(0.001, opacity)}
               side={THREE.DoubleSide}
@@ -217,10 +223,10 @@ const VolumetricLightBeam: React.FC<{
           >
             <sphereGeometry args={[0.02]} />
             <meshBasicMaterial
-              color={color}
+              color={threeColor}
               transparent
               opacity={0.6}
-              emissive={color}
+              emissive={threeColor}
               emissiveIntensity={0.3}
             />
           </mesh>
@@ -234,7 +240,7 @@ const VolumetricLightBeam: React.FC<{
       >
         <circleGeometry args={[3, 32]} />
         <meshBasicMaterial
-          color={color}
+          color={threeColor}
           transparent
           opacity={responses > 0 ? 0.15 : 0.05}
           blending={THREE.AdditiveBlending}
@@ -272,6 +278,19 @@ const Enhanced3DBar: React.FC<{
   const meshRef = useRef<THREE.Mesh>(null);
   const glowRef = useRef<THREE.Mesh>(null);
   const [animatedHeight, setAnimatedHeight] = useState(0.2);
+  
+  // Create THREE.Color objects to prevent undefined value errors
+  const barColor = useMemo(() => {
+    const colorValue = isCorrect ? '#10b981' : color;
+    return new THREE.Color(colorValue);
+  }, [color, isCorrect]);
+
+  const glowColor = useMemo(() => {
+    const colorValue = isCorrect ? '#34d399' : color;
+    return new THREE.Color(colorValue);
+  }, [color, isCorrect]);
+
+  const baseColor = useMemo(() => new THREE.Color("#1e293b"), []);
   
   useFrame((state) => {
     const targetHeight = Math.max(height, 0.2);
@@ -330,7 +349,7 @@ const Enhanced3DBar: React.FC<{
       <mesh position={[position[0], 0.05, position[2]]}>
         <cylinderGeometry args={[3.2, 3.2, 0.25]} />
         <meshStandardMaterial 
-          color="#1e293b"
+          color={baseColor}
           metalness={0.8}
           roughness={0.2}
         />
@@ -394,6 +413,10 @@ const FloorStatsDisplay: React.FC<{
   options: ActivityOption[];
   totalResponses: number;
 }> = ({ options, totalResponses }) => {
+  // Create THREE.Color objects for floor materials
+  const floorColor = useMemo(() => new THREE.Color("#0f172a"), []);
+  const shadowColor = useMemo(() => new THREE.Color("#000000"), []);
+
   return (
     <group>
       {options.map((option, index) => {
@@ -408,9 +431,10 @@ const FloorStatsDisplay: React.FC<{
         
         // Dynamic colors based on option
         const hue = (index / Math.max(options.length - 1, 1)) * 300;
-        const barColor = option.is_correct 
+        const barColorValue = option.is_correct 
           ? '#10b981' 
           : `hsl(${200 + hue}, 75%, 60%)`;
+        const barColor = useMemo(() => new THREE.Color(barColorValue), [barColorValue]);
         
         // Calculate font size to fit entire text
         const textProps = calculateFitFontSize(option.text, spacing);
@@ -421,7 +445,7 @@ const FloorStatsDisplay: React.FC<{
             <mesh position={[xPosition, 0.05, 7.5]} rotation={[-Math.PI / 2, 0, 0]}>
               <planeGeometry args={[spacing * 0.85, 4]} />
               <meshStandardMaterial 
-                color="#0f172a"
+                color={floorColor}
                 transparent
                 opacity={0.9}
                 metalness={0.3}
@@ -443,12 +467,12 @@ const FloorStatsDisplay: React.FC<{
             <Text
               position={[xPosition, 0.15, 6]}
               fontSize={2.2}
-              color={barColor}
+              color={barColorValue}
               anchorX="center"
               anchorY="middle"
               rotation={[-Math.PI / 2, 0, 0]}
               outlineWidth={0.08}
-              outlineColor="#000000"
+              outlineColor={shadowColor}
               fillOpacity={1}
             >
               {percentage}%
@@ -458,7 +482,7 @@ const FloorStatsDisplay: React.FC<{
             <Text
               position={[xPosition + 0.1, 0.1, 6.1]}
               fontSize={2.2}
-              color="#000000"
+              color={shadowColor}
               anchorX="center"
               anchorY="middle"
               rotation={[-Math.PI / 2, 0, 0]}
@@ -542,9 +566,10 @@ const StandingImagesDisplay: React.FC<{
         const saturation = 75;
         const lightness = 60;
         
-        const glowColor = option.is_correct 
+        const glowColorValue = option.is_correct 
           ? '#10b981' 
           : `hsl(${200 + hue}, ${saturation}%, ${lightness}%)`;
+        const glowColor = useMemo(() => new THREE.Color(glowColorValue), [glowColorValue]);
         
         return (
           <group key={option.id}>
@@ -552,7 +577,7 @@ const StandingImagesDisplay: React.FC<{
               imageUrl={option.media_url}
               position={[xPosition, 0, 4]}
               fallbackText={`Option ${String.fromCharCode(65 + index)}`}
-              glowColor={glowColor}
+              glowColor={glowColorValue}
             />
           </group>
         );
@@ -571,6 +596,13 @@ const Enhanced3DScene: React.FC<{
   const { camera } = useThree();
   const maxResponses = Math.max(...options.map(opt => opt.responses), 1);
   const maxHeight = 4;
+  
+  // Create THREE.Color objects for scene materials
+  const floorColor = useMemo(() => new THREE.Color("#000000"), []);
+  const accentColor = useMemo(() => new THREE.Color(themeColors.accentColor), [themeColors.accentColor]);
+  const secondaryColor = useMemo(() => new THREE.Color(themeColors.secondaryColor), [themeColors.secondaryColor]);
+  const whiteColor = useMemo(() => new THREE.Color("#ffffff"), []);
+  const titleShadowColor = useMemo(() => new THREE.Color("#1e293b"), []);
   
   useEffect(() => {
     camera.position.set(0, 15, 40);
@@ -645,14 +677,14 @@ const Enhanced3DScene: React.FC<{
         intensity={1.2} 
         angle={Math.PI / 3}
         penumbra={0.3}
-        color="#ffffff"
+        color={whiteColor}
         castShadow
       />
       
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow>
         <planeGeometry args={[100, 100]} />
         <meshStandardMaterial 
-          color="#000000" 
+          color={floorColor} 
           transparent 
           opacity={1.0}
           metalness={0.95}
@@ -681,7 +713,7 @@ const Enhanced3DScene: React.FC<{
         const saturation = 75;
         const lightness = 60;
         
-        const barColor = option.is_correct 
+        const barColorValue = option.is_correct 
           ? '#10b981' 
           : `hsl(${200 + hue}, ${saturation}%, ${lightness}%)`;
         
@@ -690,7 +722,7 @@ const Enhanced3DScene: React.FC<{
             key={option.id}
             position={[startX + index * spacing, 0, -8]}
             height={height}
-            color={barColor}
+            color={barColorValue}
             label={option.text}
             percentage={percentage}
             responses={option.responses}
@@ -717,7 +749,7 @@ const Enhanced3DScene: React.FC<{
         <Text
           position={[0.1, 11.9, -15.1]}
           fontSize={titleFontSize}
-          color="#1e293b"
+          color={titleShadowColor}
           anchorX="center"
           anchorY="middle"
           maxWidth={25}
