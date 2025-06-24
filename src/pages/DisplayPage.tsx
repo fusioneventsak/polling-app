@@ -1,5 +1,10 @@
 // Replace the subscription useEffect in DisplayPage.tsx with this:
 
+import { supabase } from '../lib/supabase';
+import { connectionManager } from '../lib/connectionManager';
+import { roomService } from '../services/roomService';
+import { useTheme } from '../components/ThemeProvider';
+
   // FIXED: Real-time subscriptions using connection manager - prevents multiple subscriptions
   useEffect(() => {
     if (!pollId || !supabase) return;
