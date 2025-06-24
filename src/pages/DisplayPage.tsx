@@ -60,47 +60,9 @@ const ActivityDisplay = ({ currentRoom, currentTime, formatTime }: {
   currentRoom: Room;
   currentTime: Date;
   formatTime: (date: Date) => string;
+  displayActiveActivity: Activity | null;
 }) => {
-  const activeActivity = React.useMemo(() => {
-    if (!currentRoom?.activities) return null;
-    
-    // Priority 1: Use current_activity_id from room
-    if (currentRoom.current_activity_id) {
-      const currentActivity = currentRoom.activities.find(a => a.id === currentRoom.current_activity_id) as Activity | undefined;
-      if (currentActivity) {
-        // Debug logging
-        console.log('🎯 Found current activity by ID:', {
-          id: currentActivity.id,
-          type: currentActivity.type,
-          title: currentActivity.title,
-          options: currentActivity.options?.length || 0
-        });
-        
-        // Ensure options are properly formatted
-        currentActivity.options = currentActivity.options?.map((opt, index) => ({
-          id: opt.id,
-          text: opt.text,
-          media_url: opt.media_url,
-          responses: opt.responses || 0,
-          is_correct: opt.is_correct || false,
-          option_order: opt.option_order || index,
-          created_at: opt.created_at,
-          activity_id: opt.activity_id
-        })) || [];
-        return currentActivity;
-      }
-    }
-    
-    // Priority 2: Fallback to any activity marked as active
-    const flaggedActive = currentRoom.activities?.find(a => a.is_active) as Activity | undefined;
-    if (flaggedActive) {
-      console.log('🎯 Found active activity by flag:', flaggedActive.type, flaggedActive.title);
-      return flaggedActive;
-    }
-    
-    console.log('❌ No active activity found');
-    return null;
-  }, [currentRoom?.current_activity_id, currentRoom?.activities]);
+  const activeActivity = displayActiveActivity;
 
   // Debug logging for activity type detection
   React.useEffect(() => {
@@ -218,7 +180,7 @@ const ActivityDisplay = ({ currentRoom, currentTime, formatTime }: {
         <div className="flex-1 p-4" style={{ height: 'calc(100vh - 120px)' }}>
           <Trivia3DVisualization
             options={activeActivity.options || []}
-            totalResponses={activeActivity.total_responses || 0}
+            totalResponses={displayActiveActivity?.total_responses || 0}
             themeColors={{
               primary: '#8b5cf6',
               secondary: '#3b82f6',
@@ -281,7 +243,7 @@ const ActivityDisplay = ({ currentRoom, currentTime, formatTime }: {
       <div className="flex-1 p-4" style={{ height: 'calc(100vh - 120px)' }}>
         <Enhanced3DPollVisualization
           options={activeActivity.options || []}
-          totalResponses={activeActivity.total_responses || 0}
+          totalResponses={displayActiveActivity?.total_responses || 0}
           themeColors={{
             primaryColor: '#3b82f6',
             secondaryColor: '#06b6d4',
@@ -302,6 +264,7 @@ export const DisplayPage: React.FC = () => {
   const { pollId } = useParams<{ pollId: string }>();
   const { rooms, isConnected, connectionStatus } = useSocket();
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [displayActiveActivity, setDisplayActiveActivity] = useState<Activity | null>(null);
   
   // Derive currentRoom from the global rooms state
   const currentRoom = useMemo(() => {
@@ -334,6 +297,143 @@ export const DisplayPage: React.FC = () => {
 
     return () => clearInterval(timer);
   }, []);
+
+  // Initialize and update displayActiveActivity when room or current activity changes
+  useEffect(() => {
+    if (!currentRoom) {
+      setDisplayActiveActivity(null);
+      return;
+    }
+
+    const activeActivity = React.useMemo(() => {
+      if (!currentRoom?.activities) return null;
+      
+      // Priority 1: Use current_activity_id from room
+      if (currentRoom.current_activity_id) {
+        const currentActivity = currentRoom.activities.find(a => a.id === currentRoom.current_activity_id) as Activity | undefined;
+        if (currentActivity) {
+          // Debug logging
+          console.log('🎯 Found current activity by ID:', {
+            id: currentActivity.id,
+            type: currentActivity.type,
+            title: currentActivity.title,
+            options: currentActivity.options?.length || 0
+          });
+          
+          // Ensure options are properly formatted
+          currentActivity.options = currentActivity.options?.map((opt, index) => ({
+            id: opt.id,
+            text: opt.text,
+            media_url: opt.media_url,
+            responses: opt.responses || 0,
+            is_correct: opt.is_correct || false,
+            option_order: opt.option_order || index,
+            created_at: opt.created_at,
+            activity_id: opt.activity_id
+          })) || [];
+          return currentActivity;
+        }
+      }
+      
+      // Priority 2: Fallback to any activity marked as active
+      const flaggedActive = currentRoom.activities?.find(a => a.is_active) as Activity | undefined;
+      if (flaggedActive) {
+        console.log('🎯 Found active activity by flag:', flaggedActive.type, flaggedActive.title);
+        return flaggedActive;
+      }
+      
+      console.log('❌ No active activity found');
+      return null;
+    }, [currentRoom?.current_activity_id, currentRoom?.activities]);
+
+    setDisplayActiveActivity(activeActivity);
+  }, [currentRoom?.current_activity_id, currentRoom?.activities]);
+
+  // Listen for granular activity data changes
+  useEffect(() => {
+    if (!displayActiveActivity?.id) return;
+
+    console.log('🎧 DisplayPage: Setting up granular event listeners for activity:', displayActiveActivity.id);
+
+    const handleActivityDataChange = (event: CustomEvent<{ 
+      id: string; 
+      room_id: string; 
+      total_responses: number; 
+      is_active: boolean; 
+      settings?: any; 
+      title?: string; 
+      description?: string; 
+      media_url?: string; 
+    }>) => {
+      console.log('🎯 DisplayPage: Activity data change received:', event.detail);
+      
+      if (event.detail.id === displayActiveActivity.id) {
+        setDisplayActiveActivity(prev => {
+          if (!prev) return null;
+          
+          return {
+            ...prev,
+            total_responses: event.detail.total_responses,
+            is_active: event.detail.is_active,
+            settings: event.detail.settings || prev.settings,
+            title: event.detail.title || prev.title,
+            description: event.detail.description || prev.description,
+            media_url: event.detail.media_url || prev.media_url
+          };
+        });
+      }
+    };
+
+    const handleOptionDataChange = (event: CustomEvent<{ 
+      id: string; 
+      activity_id: string; 
+      responses: number; 
+      is_correct: boolean; 
+      text: string; 
+      media_url?: string; 
+      option_order: number; 
+    }>) => {
+      console.log('📝 DisplayPage: Option data change received:', event.detail);
+      
+      if (event.detail.activity_id === displayActiveActivity.id) {
+        setDisplayActiveActivity(prev => {
+          if (!prev || !prev.options) return prev;
+          
+          const updatedOptions = prev.options.map(option => {
+            if (option.id === event.detail.id) {
+              return {
+                ...option,
+                responses: event.detail.responses,
+                is_correct: event.detail.is_correct,
+                text: event.detail.text,
+                media_url: event.detail.media_url || option.media_url
+              };
+            }
+            return option;
+          });
+          
+          // Recalculate total responses from options
+          const totalResponses = updatedOptions.reduce((sum, opt) => sum + opt.responses, 0);
+          
+          return {
+            ...prev,
+            options: updatedOptions,
+            total_responses: totalResponses
+          };
+        });
+      }
+    };
+
+    // Add event listeners
+    window.addEventListener('activity-data-changed', handleActivityDataChange);
+    window.addEventListener('option-data-changed', handleOptionDataChange);
+
+    return () => {
+      console.log('🧹 DisplayPage: Cleaning up granular event listeners');
+      window.removeEventListener('activity-data-changed', handleActivityDataChange);
+      window.removeEventListener('option-data-changed', handleOptionDataChange);
+    };
+  }, [displayActiveActivity?.id]);
 
   const getRoomStats = () => {
     if (!currentRoom) return null;
@@ -587,18 +687,6 @@ export const DisplayPage: React.FC = () => {
     );
   }
 
-  if (connectionStatus === 'reconnecting') {
-    return (
-      <div className="h-screen w-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-20 h-20 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-6"></div>
-          <h2 className="text-2xl font-bold text-white mb-2">Reconnecting...</h2>
-          <p className="text-slate-400">Restoring connection to room {pollId}</p>
-        </div>
-      </div>
-    );
-  }
-
   if (!currentRoom) {
     return (
       <div className="h-screen w-screen bg-gradient-to-br from-slate-900 via-red-900 to-slate-900 flex items-center justify-center">
@@ -627,6 +715,7 @@ export const DisplayPage: React.FC = () => {
       currentRoom={currentRoom}
       currentTime={currentTime}
       formatTime={formatTime}
+      displayActiveActivity={displayActiveActivity}
     />
   );
 };

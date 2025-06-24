@@ -18,6 +18,8 @@ declare global {
     'room-updated': CustomEvent<{ roomId: string; roomCode?: string }>;
     'activity-updated': CustomEvent<{ activityId: string; roomId: string; isActive?: boolean }>;
     'responses-updated': CustomEvent<{ activityId: string; roomId: string }>;
+    'activity-data-changed': CustomEvent<{ id: string; room_id: string; total_responses: number; is_active: boolean; settings?: any; title?: string; description?: string; media_url?: string }>;
+    'option-data-changed': CustomEvent<{ id: string; activity_id: string; responses: number; is_correct: boolean; text: string; media_url?: string; option_order: number }>;
   }
 }
 
@@ -116,14 +118,36 @@ export const SocketProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         { event: '*', schema: 'public', table: 'activities' },
         (payload) => {
           console.log('🎯 Activity change:', payload.eventType);
-          loadRooms(); // Refresh rooms data
           
-          // Broadcast to specific components
-          const activityId = payload.new?.id || payload.old?.id;
-          const roomId = payload.new?.room_id || payload.old?.room_id;
-          const isActive = payload.new?.is_active;
-          if (activityId && roomId) {
-            broadcastActivityUpdate(activityId, roomId, isActive);
+          if (payload.eventType === 'UPDATE' && payload.new) {
+            // For updates, broadcast granular data change
+            const activityData = {
+              id: payload.new.id,
+              room_id: payload.new.room_id,
+              total_responses: payload.new.total_responses,
+              is_active: payload.new.is_active,
+              settings: payload.new.settings,
+              title: payload.new.title,
+              description: payload.new.description,
+              media_url: payload.new.media_url
+            };
+            
+            window.dispatchEvent(new CustomEvent('activity-data-changed', {
+              detail: activityData
+            }));
+            
+            // Also broadcast the traditional event for compatibility
+            broadcastActivityUpdate(payload.new.id, payload.new.room_id, payload.new.is_active);
+          } else {
+            // For INSERT/DELETE, still do full reload
+            loadRooms();
+            
+            const activityId = payload.new?.id || payload.old?.id;
+            const roomId = payload.new?.room_id || payload.old?.room_id;
+            const isActive = payload.new?.is_active;
+            if (activityId && roomId) {
+              broadcastActivityUpdate(activityId, roomId, isActive);
+            }
           }
         }
       )
@@ -131,16 +155,34 @@ export const SocketProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         { event: '*', schema: 'public', table: 'activity_options' },
         (payload) => {
           console.log('📝 Activity options change:', payload.eventType);
-          loadRooms(); // Refresh rooms data
+          
+          if (payload.eventType === 'UPDATE' && payload.new) {
+            // For updates, broadcast granular option data change
+            const optionData = {
+              id: payload.new.id,
+              activity_id: payload.new.activity_id,
+              responses: payload.new.responses,
+              is_correct: payload.new.is_correct,
+              text: payload.new.text,
+              media_url: payload.new.media_url,
+              option_order: payload.new.option_order
+            };
+            
+            window.dispatchEvent(new CustomEvent('option-data-changed', {
+              detail: optionData
+            }));
+          } else {
+            // For INSERT/DELETE, do full reload
+            loadRooms();
+          }
         }
       )
       .on('postgres_changes',
         { event: '*', schema: 'public', table: 'participant_responses' },
         (payload) => {
           console.log('👥 Response change:', payload.eventType);
-          
-          // Still refresh rooms for updated counts
-          loadRooms();
+          // Don't reload rooms for participant responses - the counts are updated via activity_options changes
+          // This prevents unnecessary full reloads when votes are submitted
         }
       );
 
