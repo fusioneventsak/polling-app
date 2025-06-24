@@ -614,9 +614,16 @@ const Enhanced3DScene: React.FC<{
         />
       </mesh>
       
-      <FloorStatsDisplay options={options} totalResponses={totalResponses} />
+      <FloorStatsDisplay 
+        options={options} 
+        totalResponses={totalResponses}
+        calculateCurvedPosition={calculateCurvedPosition}
+      />
       
-      <StandingImagesDisplay options={options} />
+      <StandingImagesDisplay 
+        options={options}
+        calculateCurvedPosition={calculateCurvedPosition}
+      />
       
       {options.map((option, index) => {
         const percentage = totalResponses > 0 ? Math.round((option.responses / totalResponses) * 100) : 0;
