@@ -1,32 +1,35 @@
-// src/contexts/SocketContext.tsx - Updated to use correct connectionManager methods
 import React, { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react';
 import { supabase, checkSupabaseConnection, retrySupabaseOperation } from '../lib/supabase';
-import { connectionManager } from '../lib/connectionManager';
 import { roomService } from '../services/roomService';
-import type { Room, Activity } from '../types';
+import type { Room } from '../types';
 
 interface SocketContextType {
   isConnected: boolean;
   rooms: Room[];
-  currentRoom: Room | null;
-  refreshRooms: () => Promise<void>;
   connectionStatus: 'connected' | 'disconnected' | 'reconnecting';
+  refreshRooms: () => Promise<void>;
 }
 
 const SocketContext = createContext<SocketContextType | undefined>(undefined);
 
-interface SocketProviderProps {
-  children: ReactNode;
+// Custom event types for broadcasting
+declare global {
+  interface WindowEventMap {
+    'room-updated': CustomEvent<{ roomId: string; roomCode?: string }>;
+    'activity-updated': CustomEvent<{ activityId: string; roomId: string; isActive?: boolean }>;
+    'responses-updated': CustomEvent<{ activityId: string; roomId: string }>;
+  }
 }
 
-export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
+export const SocketProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [isConnected, setIsConnected] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<'connected' | 'disconnected' | 'reconnecting'>('disconnected');
   const [rooms, setRooms] = useState<Room[]>([]);
-  const [currentRoom, setCurrentRoom] = useState<Room | null>(null);
 
   const loadRooms = useCallback(async () => {
+    setConnectionStatus('reconnecting');
     try {
+      // Check connection first
       const connectionOk = await checkSupabaseConnection();
       if (!connectionOk) {
         console.warn('SocketContext: Supabase connection not available');
@@ -54,185 +57,135 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
     await loadRooms();
   }, [loadRooms]);
 
+  // Broadcast room changes to listening components
+  const broadcastRoomUpdate = useCallback((roomId: string, roomCode?: string) => {
+    window.dispatchEvent(new CustomEvent('room-updated', {
+      detail: { roomId, roomCode }
+    }));
+  }, []);
+
+  const broadcastActivityUpdate = useCallback((activityId: string, roomId: string, isActive?: boolean) => {
+    window.dispatchEvent(new CustomEvent('activity-updated', {
+      detail: { activityId, roomId, isActive }
+    }));
+  }, []);
+
+  const broadcastResponseUpdate = useCallback((activityId: string, roomId: string) => {
+    window.dispatchEvent(new CustomEvent('responses-updated', {
+      detail: { activityId, roomId }
+    }));
+  }, []);
+
   useEffect(() => {
-    let connectionMonitor: NodeJS.Timeout | null = null;
-    let setupAttempts = 0;
-    const maxSetupAttempts = 3;
+    if (!supabase) {
+      console.warn('Supabase not available');
+      setIsConnected(false);
+      setConnectionStatus('disconnected');
+      return;
+    }
 
-    // Initialize connection
-    const initializeConnection = async () => {
-      if (!supabase) {
-        console.warn('Supabase not available - real-time features disabled');
-        setIsConnected(false);
-        setConnectionStatus('disconnected');
-        return;
-      }
-      
-      try {
-        setConnectionStatus('reconnecting');
-        const connectionOk = await checkSupabaseConnection();
-        
-        if (connectionOk) {
-          await loadRooms();
-          await setupGlobalSubscriptions();
-          setIsConnected(true);
-          setConnectionStatus('connected');
-        } else {
-          setIsConnected(false);
-          setConnectionStatus('disconnected');
-        }
-      } catch (error) {
-        console.error('Failed to initialize connection:', error);
-        setIsConnected(false);
-        setConnectionStatus('disconnected');
-      }
-    };
+    console.log('🔌 Setting up SINGLE global realtime subscription...');
+    setConnectionStatus('reconnecting');
 
-    const setupGlobalSubscriptions = async () => {
-      if (!supabase) return;
-
-      setupAttempts++;
-      
-      try {
-        console.log(`🔌 SocketContext: Setting up global subscriptions (attempt ${setupAttempts}/${maxSetupAttempts})...`);
-        
-        const channelName = 'global-updates';
-        
-        // Get channel
-        const channel = await connectionManager.getChannel(channelName);
-        if (!channel) {
-          console.warn('⚠️ Failed to get global channel, real-time features may be limited');
-          setConnectionStatus('disconnected');
-          return;
-        }
-
-        // Add event listeners with error handling
-        console.log('📡 SocketContext: Adding postgres_changes listeners...');
-        channel
-          .on('postgres_changes', 
-            { event: '*', schema: 'public', table: 'rooms' },
-            (payload) => {
-              try {
-                console.log('🏠 SocketContext: Room change received:', payload.eventType);
-                loadRooms();
-              } catch (error) {
-                console.warn('⚠️ Error handling room change:', error);
-              }
-            }
-          )
-          .on('postgres_changes',
-            { event: '*', schema: 'public', table: 'activities' },
-            (payload) => {
-              try {
-                console.log('🎯 SocketContext: Activity change received:', payload.eventType);
-                loadRooms();
-              } catch (error) {
-                console.warn('⚠️ Error handling activity change:', error);
-              }
-            }
-          )
-          .on('postgres_changes',
-            { event: '*', schema: 'public', table: 'activity_options' },
-            (payload) => {
-              try {
-                console.log('📝 SocketContext: Activity options change received:', payload.eventType);
-                loadRooms();
-              } catch (error) {
-                console.warn('⚠️ Error handling activity options change:', error);
-              }
-            }
-          )
-          .on('postgres_changes',
-            { event: '*', schema: 'public', table: 'participant_responses' },
-            (payload) => {
-              try {
-                console.log('👥 SocketContext: Response change received:', payload.eventType);
-                loadRooms();
-              } catch (error) {
-                console.warn('⚠️ Error handling response change:', error);
-              }
-            }
-          );
-
-        // Subscribe
-        console.log('🔌 SocketContext: Attempting subscription...');
-        const subscribed = await connectionManager.subscribe(channelName);
-        
-        if (subscribed) {
-          console.log('✅ SocketContext: Global subscriptions established');
-          setConnectionStatus('connected');
-          setupAttempts = 0; // Reset attempts on success
-        } else {
-          throw new Error(`Subscription failed for ${channelName}`);
-        }
-        
-      } catch (error) {
-        console.warn(`⚠️ SocketContext: Failed to setup global subscriptions (attempt ${setupAttempts}):`, error.message || error);
-        setConnectionStatus('disconnected');
-        
-        // Retry with exponential backoff, but only if we haven't exceeded max attempts
-        if (setupAttempts < maxSetupAttempts) {
-          const retryDelay = Math.min(setupAttempts * 5000, 15000);
-          console.log(`🔄 SocketContext: Retrying global subscription in ${retryDelay}ms...`);
+    // SINGLE CHANNEL for all realtime updates
+    const channel = supabase
+      .channel('global-app-updates')
+      .on('postgres_changes', 
+        { event: '*', schema: 'public', table: 'rooms' },
+        (payload) => {
+          console.log('🏠 Room change:', payload.eventType);
+          loadRooms(); // Refresh rooms data
           
-          setTimeout(() => {
-            if (supabase) {
-              setupGlobalSubscriptions();
+          // Broadcast to specific components
+          const roomId = payload.new?.id || payload.old?.id;
+          const roomCode = payload.new?.code || payload.old?.code;
+          if (roomId) {
+            broadcastRoomUpdate(roomId, roomCode);
+          }
+        }
+      )
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'activities' },
+        (payload) => {
+          console.log('🎯 Activity change:', payload.eventType);
+          loadRooms(); // Refresh rooms data
+          
+          // Broadcast to specific components
+          const activityId = payload.new?.id || payload.old?.id;
+          const roomId = payload.new?.room_id || payload.old?.room_id;
+          const isActive = payload.new?.is_active;
+          if (activityId && roomId) {
+            broadcastActivityUpdate(activityId, roomId, isActive);
+          }
+        }
+      )
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'activity_options' },
+        (payload) => {
+          console.log('📝 Activity options change:', payload.eventType);
+          loadRooms(); // Refresh rooms data
+          
+          // Find activity and room for broadcasting
+          const optionId = payload.new?.id || payload.old?.id;
+          const activityId = payload.new?.activity_id || payload.old?.activity_id;
+          if (activityId) {
+            // Find room ID from current rooms data
+            const room = rooms.find(r => r.activities?.some(a => a.id === activityId));
+            if (room) {
+              broadcastActivityUpdate(activityId, room.id);
             }
-          }, retryDelay);
-        } else {
-          console.warn('⚠️ SocketContext: Max global subscription attempts reached. App will work with manual refresh.');
-          setupAttempts = 0; // Reset for potential future attempts
+          }
         }
-      }
-    };
-    
-    // Start initialization
-    initializeConnection();
+      )
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'participant_responses' },
+        (payload) => {
+          console.log('👥 Response change:', payload.eventType);
+          
+          // Broadcast to specific components (no need to reload all rooms for responses)
+          const activityId = payload.new?.activity_id || payload.old?.activity_id;
+          if (activityId) {
+            // Find room ID from current rooms data
+            const room = rooms.find(r => r.activities?.some(a => a.id === activityId));
+            if (room) {
+              broadcastResponseUpdate(activityId, room.id);
+            }
+          }
+          
+          // Still refresh rooms for updated counts
+          loadRooms();
+        }
+      );
 
-    // Set up periodic connection monitoring
-    connectionMonitor = setInterval(async () => {
-      if (!supabase) return;
-      
-      try {
-        const connectionOk = await checkSupabaseConnection();
-        const wasConnected = isConnected;
-        
-        setIsConnected(connectionOk);
-        
-        if (!wasConnected && connectionOk) {
-          console.log('🔄 SocketContext: Connection restored, reinitializing...');
-          setConnectionStatus('reconnecting');
-          setupAttempts = 0; // Reset attempts when connection is restored
-          await setupGlobalSubscriptions();
-          await loadRooms();
-          setConnectionStatus('connected');
-        } else if (!connectionOk && wasConnected) {
-          console.warn('❌ SocketContext: Connection lost');
-          setConnectionStatus('disconnected');
-        }
-      } catch (error) {
-        console.warn('SocketContext: Connection monitor error:', error);
-        setIsConnected(false);
+    // Subscribe with simple error handling
+    channel.subscribe((status, err) => {
+      console.log('📡 Global subscription status:', status);
+      if (err) {
+        console.error('❌ Subscription error:', err);
         setConnectionStatus('disconnected');
+        setIsConnected(false);
       }
-    }, 30000); // Check every 30 seconds
+      if (status === 'SUBSCRIBED') {
+        console.log('✅ Global realtime subscriptions active');
+        setConnectionStatus('connected');
+        setIsConnected(true);
+      }
+    });
 
+    // Initial load
+    loadRooms();
+
+    // Cleanup
     return () => {
-      console.log('🧹 SocketContext: Cleaning up...');
-      if (connectionMonitor) {
-        clearInterval(connectionMonitor);
-      }
-      // FIXED: Use correct method name
-      connectionManager.cleanup('global-updates');
+      console.log('🧹 Cleaning up global subscription');
+      channel.unsubscribe();
     };
-  }, [loadRooms]);
+  }, [loadRooms, broadcastRoomUpdate, broadcastActivityUpdate, broadcastResponseUpdate, rooms]);
 
   const value = {
     isConnected,
     connectionStatus,
     rooms,
-    currentRoom,
     refreshRooms
   };
 

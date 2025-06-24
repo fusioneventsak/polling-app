@@ -1,10 +1,6 @@
-// src/pages/DisplayPage.tsx - Complete working version with proper exports
-
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { supabase } from '../lib/supabase';
-import { connectionManager } from '../lib/connectionManager';
 import { roomService } from '../services/roomService';
 import { useTheme } from '../components/ThemeProvider';
 import { Users, BarChart, Clock, MessageSquare, HelpCircle, Cloud, Trophy, Target, Calendar, Activity as ActivityIcon, TrendingUp, CheckCircle, Lock, QrCode, X } from 'lucide-react';
@@ -59,7 +55,7 @@ const QRCodeDisplay: React.FC<{ url: string; size?: number }> = ({ url, size = 2
   );
 };
 
-// Enhanced Activity Display Component
+// Enhanced Activity Display Component with Fixed Trivia Detection
 const ActivityDisplay = ({ currentRoom, currentTime, formatTime }: {
   currentRoom: Room;
   currentTime: Date;
@@ -68,17 +64,12 @@ const ActivityDisplay = ({ currentRoom, currentTime, formatTime }: {
   const activeActivity = React.useMemo(() => {
     if (!currentRoom?.activities) return null;
     
-    console.log('🔍 DisplayPage: Checking for active activity in room:', {
-      roomId: currentRoom.id,
-      currentActivityId: currentRoom.current_activity_id,
-      activitiesCount: currentRoom.activities.length
-    });
-    
     // Priority 1: Use current_activity_id from room
     if (currentRoom.current_activity_id) {
       const currentActivity = currentRoom.activities.find(a => a.id === currentRoom.current_activity_id) as Activity | undefined;
       if (currentActivity) {
-        console.log('🎯 DisplayPage: Found current activity by ID:', {
+        // Debug logging
+        console.log('🎯 Found current activity by ID:', {
           id: currentActivity.id,
           type: currentActivity.type,
           title: currentActivity.title,
@@ -103,13 +94,25 @@ const ActivityDisplay = ({ currentRoom, currentTime, formatTime }: {
     // Priority 2: Fallback to any activity marked as active
     const flaggedActive = currentRoom.activities?.find(a => a.is_active) as Activity | undefined;
     if (flaggedActive) {
-      console.log('🎯 DisplayPage: Found active activity by flag:', flaggedActive.type, flaggedActive.title);
+      console.log('🎯 Found active activity by flag:', flaggedActive.type, flaggedActive.title);
       return flaggedActive;
     }
     
-    console.log('❌ DisplayPage: No active activity found');
+    console.log('❌ No active activity found');
     return null;
   }, [currentRoom?.current_activity_id, currentRoom?.activities]);
+
+  // Debug logging for activity type detection
+  React.useEffect(() => {
+    if (activeActivity) {
+      console.log('🎮 Activity detected:', {
+        type: activeActivity.type,
+        isTrivia: activeActivity.type === 'trivia',
+        title: activeActivity.title,
+        options: activeActivity.options?.length
+      });
+    }
+  }, [activeActivity]);
 
   // Initialize trivia game hook only for trivia activities
   const triviaGame = useTriviaGame({
@@ -155,8 +158,15 @@ const ActivityDisplay = ({ currentRoom, currentTime, formatTime }: {
     );
   }
 
+  // FIXED: Explicit check for trivia type with debug logging
+  console.log('🔍 Checking activity type for display:', {
+    type: activeActivity.type,
+    isExactlyTrivia: activeActivity.type === 'trivia',
+    typeOfType: typeof activeActivity.type
+  });
+
   if (activeActivity.type === 'trivia') {
-    console.log('✅ DisplayPage: Rendering Trivia3DVisualization');
+    console.log('✅ Rendering Trivia3DVisualization');
     
     return (
       <div className="h-screen w-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 flex flex-col">
@@ -188,6 +198,19 @@ const ActivityDisplay = ({ currentRoom, currentTime, formatTime }: {
             <div className="text-slate-400">
               <span className="font-mono font-bold text-purple-400">{currentRoom.code}</span>
             </div>
+            {/* Game Phase Indicator */}
+            <div className="flex items-center gap-2">
+              <div className={`w-2 h-2 rounded-full ${
+                triviaGame.gameState.phase === 'answering' ? 'bg-green-400 animate-pulse' : 
+                triviaGame.gameState.phase === 'revealing' ? 'bg-yellow-400' :
+                'bg-slate-400'
+              }`}></div>
+              <span className="capitalize text-xs">
+                {triviaGame.gameState.phase === 'answering' ? 'Answering Time' : 
+                 triviaGame.gameState.phase === 'revealing' ? 'Revealing Answer' :
+                 triviaGame.gameState.phase === 'completed' ? 'Complete' : 'Waiting'}
+              </span>
+            </div>
           </div>
         </div>
 
@@ -218,8 +241,8 @@ const ActivityDisplay = ({ currentRoom, currentTime, formatTime }: {
     );
   }
 
-  // Default poll/survey display
-  console.log('📊 DisplayPage: Rendering default poll visualization for type:', activeActivity.type);
+  // Default poll/survey display (existing logic)
+  console.log('📊 Rendering default poll visualization for type:', activeActivity.type);
   
   return (
     <div className="h-screen w-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 flex flex-col">
@@ -275,7 +298,6 @@ const ActivityDisplay = ({ currentRoom, currentTime, formatTime }: {
   );
 };
 
-// Main DisplayPage Component
 export const DisplayPage: React.FC = () => {
   const { pollId } = useParams<{ pollId: string }>();
   const [currentRoom, setCurrentRoom] = useState<Room | null>(null);
@@ -309,17 +331,16 @@ export const DisplayPage: React.FC = () => {
         return;
       }
 
-      console.log('🏠 DisplayPage: Loaded room:', {
+      console.log('🏠 Loaded room:', {
         id: room.id,
         code: room.code,
         activities: room.activities?.length || 0,
-        currentActivityId: room.current_activity_id,
-        currentActivityType: room.current_activity_type
+        currentActivityId: room.current_activity_id
       });
 
       setCurrentRoom(room);
     } catch (err) {
-      console.error('DisplayPage: Failed to load room:', err);
+      console.error('Failed to load room:', err);
       setError('Failed to load room');
     } finally {
       setLoading(false);
@@ -331,140 +352,45 @@ export const DisplayPage: React.FC = () => {
     loadRoom();
   }, [loadRoom]);
 
-  // SIMPLIFIED: Real-time subscriptions using connection manager
+  // SIMPLIFIED: Listen to custom events from global subscription
   useEffect(() => {
-    if (!pollId || !supabase) return;
+    if (!pollId) return;
 
-    let isActive = true;
-    let retryCount = 0;
-    const maxRetries = 3;
+    console.log('🎧 DisplayPage: Setting up custom event listeners for room:', pollId);
 
-    const setupSubscriptions = async () => {
-      if (retryCount >= maxRetries) {
-        console.warn(`⚠️ DisplayPage: Max retry attempts reached for room ${pollId}`);
-        return;
-      }
-      
-      retryCount++;
-      
-      try {
-        console.log(`🔄 DisplayPage: Setting up subscriptions for room ${pollId} (attempt ${retryCount}/${maxRetries})`);
-
-        const channelName = `display_room_${pollId}`;
-        
-        // Step 1: Get channel
-        const channel = await connectionManager.getChannel(channelName);
-        if (!channel || !isActive) {
-          console.warn('⚠️ DisplayPage: Failed to get channel or component unmounted');
-          return;
-        }
-
-        // Step 2: Add event listeners BEFORE subscribing
-        console.log('📡 DisplayPage: Adding postgres_changes listeners...');
-        
-        channel
-          .on('postgres_changes', 
-            { 
-              event: '*', 
-              schema: 'public', 
-              table: 'rooms',
-              filter: `code=eq.${pollId}`
-            },
-            (payload) => {
-              if (!isActive) return;
-              try {
-                console.log('🏠 DisplayPage: Room change:', {
-                  eventType: payload.eventType,
-                  currentActivityId: payload.new?.current_activity_id
-                });
-                loadRoom();
-              } catch (error) {
-                console.warn('⚠️ DisplayPage: Error handling room change:', error);
-              }
-            }
-          )
-          .on('postgres_changes',
-            { 
-              event: '*', 
-              schema: 'public', 
-              table: 'activities'
-            },
-            (payload) => {
-              if (!isActive) return;
-              try {
-                console.log('🎯 DisplayPage: Activity change:', {
-                  eventType: payload.eventType,
-                  activityId: payload.new?.id || payload.old?.id,
-                  isActive: payload.new?.is_active,
-                  roomId: payload.new?.room_id || payload.old?.room_id
-                });
-                
-                // Only reload if this belongs to our room
-                if (currentRoom && (payload.new?.room_id === currentRoom.id || payload.old?.room_id === currentRoom.id)) {
-                  console.log('🔄 DisplayPage: Reloading for our room...');
-                  loadRoom();
-                }
-              } catch (error) {
-                console.warn('⚠️ DisplayPage: Error handling activity change:', error);
-              }
-            }
-          )
-          .on('postgres_changes',
-            { event: '*', schema: 'public', table: 'activity_options' },
-            (payload) => {
-              if (!isActive) return;
-              try {
-                console.log('📝 DisplayPage: Options change:', payload.eventType);
-                loadRoom();
-              } catch (error) {
-                console.warn('⚠️ DisplayPage: Error handling options change:', error);
-              }
-            }
-          )
-          .on('postgres_changes',
-            { event: '*', schema: 'public', table: 'participant_responses' },
-            (payload) => {
-              if (!isActive) return;
-              try {
-                console.log('👥 DisplayPage: Response change:', payload.eventType);
-                loadRoom();
-              } catch (error) {
-                console.warn('⚠️ DisplayPage: Error handling response change:', error);
-              }
-            }
-          );
-      } catch (error) {
-        console.error(`❌ DisplayPage: Failed to setup subscriptions for ${pollId} (attempt ${retryCount}):`, error);
-        
-        // Retry with exponential backoff if we haven't exceeded max retries
-        if (retryCount < maxRetries) {
-          const retryDelay = Math.min(retryCount * 2000, 10000);
-          console.log(`🔄 DisplayPage: Retrying subscription setup in ${retryDelay}ms...`);
-          
-          setTimeout(() => {
-            if (isActive) {
-              setupSubscriptions();
-            }
-          }, retryDelay);
-        } else {
-          console.warn(`⚠️ DisplayPage: Max retry attempts reached for room ${pollId}`);
-        }
+    const handleRoomUpdate = (event: CustomEvent<{ roomId: string; roomCode?: string }>) => {
+      console.log('🏠 DisplayPage: Room update event received:', event.detail);
+      if (event.detail.roomCode === pollId || currentRoom?.id === event.detail.roomId) {
+        loadRoom();
       }
     };
 
-    // Start setup
-    setupSubscriptions();
-    
-    // Cleanup
+    const handleActivityUpdate = (event: CustomEvent<{ activityId: string; roomId: string; isActive?: boolean }>) => {
+      console.log('🎯 DisplayPage: Activity update event received:', event.detail);
+      if (currentRoom?.id === event.detail.roomId) {
+        loadRoom();
+      }
+    };
+
+    const handleResponseUpdate = (event: CustomEvent<{ activityId: string; roomId: string }>) => {
+      console.log('👥 DisplayPage: Response update event received:', event.detail);
+      if (currentRoom?.id === event.detail.roomId) {
+        loadRoom();
+      }
+    };
+
+    // Add event listeners
+    window.addEventListener('room-updated', handleRoomUpdate);
+    window.addEventListener('activity-updated', handleActivityUpdate);
+    window.addEventListener('responses-updated', handleResponseUpdate);
+
     return () => {
-      console.log('🧹 DisplayPage: Component cleanup');
-      isActive = false;
-      
-      if (pollId) {
-        connectionManager.cleanup(`display_room_${pollId}`);
-      }
+      console.log('🧹 DisplayPage: Cleaning up event listeners');
+      window.removeEventListener('room-updated', handleRoomUpdate);
+      window.removeEventListener('activity-updated', handleActivityUpdate);
+      window.removeEventListener('responses-updated', handleResponseUpdate);
     };
-  }, [pollId, loadRoom, currentRoom?.id]);
+  }, [pollId, currentRoom?.id, loadRoom]);
 
   const getRoomStats = () => {
     if (!currentRoom) return null;
@@ -489,7 +415,7 @@ export const DisplayPage: React.FC = () => {
     });
   };
 
-  // Dashboard Component
+  // Enhanced Dashboard Component with QR Code
   const Dashboard = () => {
     const stats = getRoomStats();
     if (!stats || !currentRoom) return null;
@@ -514,6 +440,7 @@ export const DisplayPage: React.FC = () => {
         </div>
 
         <div className="flex-1 p-8">
+          {/* Main Content - QR Code Section */}
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -552,8 +479,9 @@ export const DisplayPage: React.FC = () => {
               </motion.div>
             </div>
 
-            {/* Stats Section */}
+            {/* Stats and Info Section */}
             <div>
+              {/* Stats Overview */}
               <motion.div 
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
@@ -601,12 +529,90 @@ export const DisplayPage: React.FC = () => {
                 </div>
               </motion.div>
 
+              {/* Activities List */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.4 }}
+                className="bg-slate-800/50 backdrop-blur-sm rounded-lg border border-slate-700/50 overflow-hidden"
+              >
+                <div className="p-6">
+                  <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+                    <BarChart className="w-5 h-5" />
+                    Recent Activities
+                  </h3>
+                  
+                  {allActivities.length > 0 ? (
+                    <div className="space-y-3 max-h-64 overflow-y-auto">
+                      {allActivities.slice(0, 5).map((activity, index) => {
+                        const isActive = activity.is_active || activity.id === currentRoom.current_activity_id;
+                        const participationRate = activity.total_responses > 0 
+                          ? Math.round((activity.total_responses / Math.max(currentRoom.participants, 1)) * 100)
+                          : 0;
+                        
+                        return (
+                          <motion.div
+                            key={activity.id}
+                            initial={{ opacity: 0, x: -20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: 0.5 + index * 0.1 }}
+                            className={`p-4 rounded-lg border transition-all ${
+                              isActive 
+                                ? 'bg-blue-900/30 border-blue-600/50' 
+                                : 'bg-slate-700/30 border-slate-600/50'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-3">
+                                {isActive && (
+                                  <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                                )}
+                                <div>
+                                  <h4 className="font-medium text-white truncate">
+                                    {activity.title}
+                                  </h4>
+                                  <p className="text-sm text-slate-400 capitalize">
+                                    {activity.type} • {activity.total_responses || 0} responses
+                                  </p>
+                                </div>
+                              </div>
+                              
+                              {activity.total_responses > 0 && (
+                                <div className="text-right">
+                                  <p className="text-sm font-medium text-white">
+                                    {participationRate}%
+                                  </p>
+                                  <div className="w-16 h-1 bg-slate-600 rounded-full mt-1">
+                                    <div 
+                                      className="h-full bg-blue-400 rounded-full transition-all duration-1000"
+                                      style={{ 
+                                        width: `${Math.min(100, participationRate)}%` 
+                                      }}
+                                    />
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </motion.div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8">
+                      <Target className="w-12 h-12 mx-auto text-slate-600 mb-3" />
+                      <p className="text-slate-400 mb-1">No Activities Yet</p>
+                      <p className="text-slate-500 text-sm">Activities will appear here when they are created</p>
+                    </div>
+                  )}
+                </div>
+              </motion.div>
+
               {/* Waiting Message */}
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.5 }}
-                className="text-center"
+                className="text-center mt-8"
               >
                 <div className="inline-flex items-center gap-3 px-6 py-3 bg-blue-900/30 border border-blue-600/50 rounded-full">
                   <div className="w-3 h-3 bg-blue-500 rounded-full animate-pulse"></div>
@@ -660,7 +666,7 @@ export const DisplayPage: React.FC = () => {
     );
   }
 
-  // Show dashboard when no activity is active
+  // Show dashboard with QR code when no activity is active
   if (!currentRoom?.current_activity_id && !currentRoom?.activities?.some(a => a.is_active)) {
     return <Dashboard />;
   }
@@ -674,6 +680,3 @@ export const DisplayPage: React.FC = () => {
     />
   );
 };
-
-// Also provide default export for compatibility
-export default DisplayPage;

@@ -83,107 +83,50 @@ function GameJoinPage() {
     }
   }, [joinedRoom?.activities]);
 
-  // Set up real-time subscriptions for joined room
+  // SIMPLIFIED: Listen to custom events from global subscription
   useEffect(() => {
-    if (!joinedRoom?.id || !supabase) return;
+    if (!joinedRoom?.id) return;
 
-    console.log('GameJoin: Setting up real-time subscriptions for room:', joinedRoom.id);
+    console.log('🎧 GameJoin: Setting up custom event listeners for room:', joinedRoom.id);
 
-    // Clean up existing subscription
-    if (subscriptionRef.current) {
-      subscriptionRef.current.unsubscribe();
-    }
-
-    const channel = supabase
-      .channel(`game-join-${joinedRoom.id}`)
-      .on('postgres_changes',
-        { 
-          event: '*', 
-          schema: 'public', 
-          table: 'rooms',
-          filter: `id=eq.${joinedRoom.id}`
-        },
-        async (payload) => {
-          console.log('GameJoin: Room change received:', {
-            eventType: payload.eventType,
-            roomId: payload.new?.id || payload.old?.id,
-            oldParticipants: payload.old?.participants,
-            newParticipants: payload.new?.participants
-          });
-          
-          if (payload.eventType === 'DELETE' || (payload.new && !payload.new.is_active)) {
-            console.log('GameJoin: Room deleted or deactivated');
-            setJoinedRoom(null);
-            setError('Room has been closed');
-            navigate('/game');
-            return;
-          }
-          
-          // Detect room reset (participants count reset to 0)
-          if (payload.eventType === 'UPDATE' && 
-              payload.old?.participants > 0 && 
-              payload.new?.participants === 0) {
-            console.log('GameJoin: Room reset detected - clearing all localStorage votes');
-            
-            // Clear all localStorage votes for this room's activities
-            if (joinedRoom.activities) {
-              const votedActivities = JSON.parse(localStorage.getItem('votedActivities') || '[]');
-              const roomActivityIds = joinedRoom.activities.map(a => a.id);
-              const filteredVotes = votedActivities.filter((id: string) => !roomActivityIds.includes(id));
-              localStorage.setItem('votedActivities', JSON.stringify(filteredVotes));
-              console.log('GameJoin: Cleared localStorage votes after room reset');
-            }
-          }
-          
-          await loadJoinedRoom(joinedRoom.code);
+    const handleRoomUpdate = (event: CustomEvent<{ roomId: string; roomCode?: string }>) => {
+      console.log('🏠 GameJoin: Room update event received:', event.detail);
+      if (event.detail.roomId === joinedRoom.id) {
+        // Room was reset - clear voting status
+        console.log('GameJoin: Room reset detected - clearing localStorage votes');
+        if (joinedRoom.activities) {
+          const votedActivities = JSON.parse(localStorage.getItem('votedActivities') || '[]');
+          const roomActivityIds = joinedRoom.activities.map(a => a.id);
+          const filteredVotes = votedActivities.filter((id: string) => !roomActivityIds.includes(id));
+          localStorage.setItem('votedActivities', JSON.stringify(filteredVotes));
         }
-      )
-      .on('postgres_changes',
-        { 
-          event: '*', 
-          schema: 'public', 
-          table: 'activities'
-        },
-        async (payload) => {
-          console.log('GameJoin: Activity change received:', {
-            eventType: payload.eventType,
-            activityId: payload.new?.id || payload.old?.id,
-            isActive: payload.new?.is_active,
-            roomId: payload.new?.room_id || payload.old?.room_id
-          });
-          
-          // Only reload if this change affects our room
-          if ((payload.new?.room_id === joinedRoom.id) || (payload.old?.room_id === joinedRoom.id)) {
-            await loadJoinedRoom(joinedRoom.code);
-            
-            // Navigate to active activity if one becomes active
-            if (payload.eventType === 'UPDATE' && payload.new?.is_active && !payload.old?.is_active) {
-              console.log('GameJoin: Activity activated, navigating:', payload.new.id);
-              navigate(`/vote/${payload.new.id}`);
-            }
-          }
-        }
-      );
-
-    subscriptionRef.current = channel;
-    channel.subscribe((status, err) => {
-      console.log('GameJoin: Subscription status:', status);
-      if (err) {
-        console.error('GameJoin: Subscription error:', err);
-      }
-      if (status === 'SUBSCRIBED') {
-        console.log('✅ GameJoin: Real-time subscriptions active');
-      }
-    });
-
-    return () => {
-      console.log('GameJoin: Cleaning up subscriptions');
-      if (subscriptionRef.current) {
-        subscriptionRef.current.unsubscribe();
-        subscriptionRef.current = null;
+        loadJoinedRoom(joinedRoom.code);
       }
     };
-  }, [joinedRoom?.id, navigate, loadJoinedRoom]);
+
+    const handleActivityUpdate = (event: CustomEvent<{ activityId: string; roomId: string; isActive?: boolean }>) => {
+      console.log('🎯 GameJoin: Activity update event received:', event.detail);
+      if (event.detail.roomId === joinedRoom.id) {
+        loadJoinedRoom(joinedRoom.code);
+        
+        // Navigate to active activity if one becomes active
+        if (event.detail.isActive === true) {
+          console.log('GameJoin: Activity activated, navigating:', event.detail.activityId);
+          navigate(`/vote/${event.detail.activityId}`);
+        }
+      }
+    };
+
+    // Add event listeners
+    window.addEventListener('room-updated', handleRoomUpdate);
+    window.addEventListener('activity-updated', handleActivityUpdate);
+
+    return () => {
+      console.log('🧹 GameJoin: Cleaning up event listeners');
+      window.removeEventListener('room-updated', handleRoomUpdate);
+      window.removeEventListener('activity-updated', handleActivityUpdate);
+    };
+  }, [joinedRoom?.id, navigate, loadJoinedRoom, joinedRoom?.code, joinedRoom?.activities]);
 
   // Auto-navigate to active activity when room is first loaded
   useEffect(() => {

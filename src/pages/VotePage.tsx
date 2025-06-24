@@ -176,140 +176,68 @@ export const VotePage: React.FC = () => {
     };
   }, [activity?.room?.settings, applyTheme, resetTheme]);
 
-  // Set up real-time subscriptions
+  // SIMPLIFIED: Listen to custom events from global subscription
   useEffect(() => {
-    if (!pollId || !supabase || !activity) return;
+    if (!pollId) return;
 
-    console.log('VotePage: Setting up real-time subscriptions for activity:', pollId);
+    console.log('🎧 VotePage: Setting up custom event listeners for activity:', pollId);
 
-    const channel = supabase
-      .channel(`vote-page-${pollId}`)
-      .on('postgres_changes',
-        { 
-          event: '*', 
-          schema: 'public', 
-          table: 'activities',
-          filter: `id=eq.${pollId}`
-        },
-        async (payload) => {
-          console.log('VotePage: Activity change received:', {
-            eventType: payload.eventType,
-            activityId: payload.new?.id || payload.old?.id,
-            oldIsActive: payload.old?.is_active,
-            newIsActive: payload.new?.is_active,
-            oldVotingLocked: payload.old?.settings?.voting_locked,
-            newVotingLocked: payload.new?.settings?.voting_locked
-          });
-          
-          // If activity was stopped, redirect back to room waiting area
-          if (payload.eventType === 'UPDATE' && payload.new?.is_active === false && payload.old?.is_active === true) {
-            console.log('VotePage: Activity stopped, redirecting to room waiting area');
-            if (roomCode) {
-              navigate(`/game?joined=${roomCode}`);
-            } else {
-              navigate('/game');
-            }
-            return;
+    const handleActivityUpdate = (event: CustomEvent<{ activityId: string; roomId: string; isActive?: boolean }>) => {
+      console.log('🎯 VotePage: Activity update event received:', event.detail);
+      if (event.detail.activityId === pollId) {
+        // If activity was stopped, redirect back to room waiting area
+        if (event.detail.isActive === false) {
+          console.log('VotePage: Activity stopped, redirecting to room waiting area');
+          if (roomCode) {
+            navigate(`/game?joined=${roomCode}`);
+          } else {
+            navigate('/game');
           }
-          
-          await loadActivity(true);
+          return;
         }
-      )
-      .on('postgres_changes',
-        { 
-          event: '*', 
-          schema: 'public', 
-          table: 'activity_options',
-          filter: `activity_id=eq.${pollId}`
-        },
-        async (payload) => {
-          console.log('VotePage: Activity options change received:', payload);
-          await loadActivity(true);
-        }
-      )
-      .on('postgres_changes',
-        { 
-          event: '*', 
-          schema: 'public', 
-          table: 'participant_responses',
-          filter: `activity_id=eq.${pollId}`
-        },
-        async (payload) => {
-          console.log('VotePage: Participant response change received:', {
-            eventType: payload.eventType,
-            activityId: payload.new?.activity_id || payload.old?.activity_id,
-            participantId: payload.new?.participant_id || payload.old?.participant_id,
-            optionId: payload.new?.option_id || payload.old?.option_id
-          });
-          
-          // If this is a DELETE event (could be from room reset), recheck voting status
-          if (payload.eventType === 'DELETE') {
-            console.log('VotePage: Response deleted - rechecking vote status');
-            await checkVotingStatus();
-          }
-          
-          // Always reload activity to get updated counts
-          await loadActivity(true);
-        }
-      );
-
-    // Subscribe to room changes to detect resets
-    if (activity.room_id) {
-      channel.on('postgres_changes', 
-        { 
-          event: '*', 
-          schema: 'public', 
-          table: 'rooms',
-          filter: `id=eq.${activity.room_id}`
-        },
-        async (payload) => {
-          console.log('VotePage: Room change received:', {
-            eventType: payload.eventType,
-            roomId: payload.new?.id || payload.old?.id,
-            oldParticipants: payload.old?.participants,
-            newParticipants: payload.new?.participants
-          });
-          
-          // Detect room reset (participants count reset to 0)
-          if (payload.eventType === 'UPDATE' && 
-              payload.old?.participants > 0 && 
-              payload.new?.participants === 0) {
-            console.log('VotePage: Room reset detected - clearing all localStorage votes');
-            
-            // Clear all localStorage votes for this room's activities
-            const votedActivities = JSON.parse(localStorage.getItem('votedActivities') || '[]');
-            const roomActivityIds = activity.room?.activities?.map(a => a.id) || [pollId];
-            const filteredVotes = votedActivities.filter((id: string) => !roomActivityIds.includes(id));
-            localStorage.setItem('votedActivities', JSON.stringify(filteredVotes));
-            
-            // Reset voting status for current activity
-            setHasVoted(false);
-            setSelectedOption(null);
-            
-            console.log('VotePage: Cleared localStorage votes after room reset');
-          }
-          
-          await loadActivity(true);
-        }
-      );
-    }
-
-    // Subscribe to the channel
-    channel.subscribe((status, err) => {
-      console.log('VotePage: Subscription status:', status);
-      if (err) {
-        console.error('VotePage: Subscription error:', err);
+        loadActivity(true);
       }
-      if (status === 'SUBSCRIBED') {
-        console.log('✅ VotePage: Real-time subscriptions active');
+    };
+
+    const handleResponseUpdate = (event: CustomEvent<{ activityId: string; roomId: string }>) => {
+      console.log('👥 VotePage: Response update event received:', event.detail);
+      if (event.detail.activityId === pollId) {
+        // Recheck voting status and reload activity
+        checkVotingStatus();
+        loadActivity(true);
       }
-    });
+    };
+
+    const handleRoomUpdate = (event: CustomEvent<{ roomId: string; roomCode?: string }>) => {
+      console.log('🏠 VotePage: Room update event received:', event.detail);
+      if (activity?.room_id === event.detail.roomId) {
+        // Room was reset - clear voting status
+        console.log('VotePage: Room reset detected - clearing localStorage votes');
+        const votedActivities = JSON.parse(localStorage.getItem('votedActivities') || '[]');
+        const roomActivityIds = activity.room?.activities?.map(a => a.id) || [pollId];
+        const filteredVotes = votedActivities.filter((id: string) => !roomActivityIds.includes(id));
+        localStorage.setItem('votedActivities', JSON.stringify(filteredVotes));
+        
+        // Reset voting status for current activity
+        setHasVoted(false);
+        setSelectedOption(null);
+        
+        loadActivity(true);
+      }
+    };
+
+    // Add event listeners
+    window.addEventListener('activity-updated', handleActivityUpdate);
+    window.addEventListener('responses-updated', handleResponseUpdate);
+    window.addEventListener('room-updated', handleRoomUpdate);
 
     return () => {
-      console.log('VotePage: Cleaning up subscriptions');
-      channel.unsubscribe();
+      console.log('🧹 VotePage: Cleaning up event listeners');
+      window.removeEventListener('activity-updated', handleActivityUpdate);
+      window.removeEventListener('responses-updated', handleResponseUpdate);
+      window.removeEventListener('room-updated', handleRoomUpdate);
     };
-  }, [pollId, navigate, roomCode, activity?.room_id, loadActivity, checkVotingStatus]);
+  }, [pollId, navigate, roomCode, activity?.room_id, loadActivity, checkVotingStatus, activity]);
 
   const handleVote = async (optionId: string) => {
     if (!activity || hasVoted || voting || !supabase) return;
