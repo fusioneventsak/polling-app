@@ -131,6 +131,120 @@ const StandingImagePlane: React.FC<{
   );
 };
 
+// Volumetric Light Beam Component with realistic atmospheric scattering
+const VolumetricLightBeam: React.FC<{
+  position: [number, number, number];
+  color: string;
+  intensity: number;
+  responses: number;
+}> = ({ position, color, intensity, responses }) => {
+  const beamRef = useRef<THREE.Group>(null);
+  
+  useFrame((state) => {
+    if (beamRef.current) {
+      // Subtle animation for the light beam
+      const time = state.clock.elapsedTime;
+      beamRef.current.children.forEach((child, index) => {
+        if (child instanceof THREE.Mesh) {
+          const material = child.material as THREE.MeshBasicMaterial;
+          if (material.opacity !== undefined) {
+            // Subtle pulsing based on responses
+            const baseOpacity = responses > 0 ? 0.15 : 0.03;
+            const pulse = Math.sin(time * 2 + index * 0.5) * 0.02;
+            material.opacity = baseOpacity + pulse;
+          }
+        }
+      });
+    }
+  });
+
+  return (
+    <group ref={beamRef}>
+      {/* Main Spotlight - This provides actual lighting */}
+      <spotLight
+        position={[position[0], 18, position[2]]}
+        target-position={[position[0], 0, position[2]]}
+        color={color}
+        intensity={responses > 0 ? intensity * 3 : intensity * 0.8}
+        angle={Math.PI / 8}
+        penumbra={0.4}
+        distance={25}
+        decay={1.5}
+        castShadow={true}
+        shadow-mapSize-width={1024}
+        shadow-mapSize-height={1024}
+      />
+      
+      {/* Atmospheric Scattering - Multiple layers for depth */}
+      {Array.from({ length: 8 }).map((_, i) => {
+        const height = 2 + i * 1.8;
+        const radius = 0.3 + i * 0.4;
+        const opacity = responses > 0 ? (0.08 - i * 0.008) : (0.02 - i * 0.002);
+        
+        return (
+          <mesh 
+            key={i}
+            position={[position[0], 16 - height, position[2]]}
+            rotation={[0, 0, 0]}
+          >
+            <cylinderGeometry args={[radius, radius + 0.2, height, 16]} />
+            <meshBasicMaterial
+              color={color}
+              transparent
+              opacity={Math.max(0.001, opacity)}
+              side={THREE.DoubleSide}
+              depthWrite={false}
+              blending={THREE.AdditiveBlending}
+            />
+          </mesh>
+        );
+      })}
+      
+      {/* Light Particles - Floating dust/particles in the beam */}
+      {responses > 0 && Array.from({ length: 12 }).map((_, i) => {
+        const angle = (i / 12) * Math.PI * 2;
+        const radius = Math.random() * 2;
+        const height = 2 + Math.random() * 12;
+        
+        return (
+          <mesh
+            key={`particle-${i}`}
+            position={[
+              position[0] + Math.cos(angle) * radius,
+              16 - height,
+              position[2] + Math.sin(angle) * radius
+            ]}
+          >
+            <sphereGeometry args={[0.02]} />
+            <meshBasicMaterial
+              color={color}
+              transparent
+              opacity={0.6}
+              emissive={color}
+              emissiveIntensity={0.3}
+            />
+          </mesh>
+        );
+      })}
+      
+      {/* Ground Light Pool - Where the light hits the floor */}
+      <mesh 
+        position={[position[0], 0.01, position[2]]} 
+        rotation={[-Math.PI / 2, 0, 0]}
+      >
+        <circleGeometry args={[3, 32]} />
+        <meshBasicMaterial
+          color={color}
+          transparent
+          opacity={responses > 0 ? 0.15 : 0.05}
+          blending={THREE.AdditiveBlending}
+          depthWrite={false}
+        />
+      </mesh>
+    </group>
+  );
+};
+
 // 3D Bar Component
 const Enhanced3DBar: React.FC<{
   position: [number, number, number];
@@ -205,54 +319,13 @@ const Enhanced3DBar: React.FC<{
 
   return (
     <group>
-      {/* Volumetric Light - Spotlight */}
-      <spotLight
-        position={[position[0], 15, position[2]]}
-        target-position={[position[0], 0, position[2]]}
+      {/* Volumetric Light Beam */}
+      <VolumetricLightBeam
+        position={position}
         color={barColor}
-        intensity={responses > 0 ? 2.5 : 0.5}
-        angle={Math.PI / 6}
-        penumbra={0.3}
-        distance={20}
-        decay={2}
-        castShadow={false}
+        intensity={responses > 0 ? 1.2 : 0.4}
+        responses={responses}
       />
-      
-      {/* Volumetric Light Beam - Outer Cone */}
-      <mesh position={[position[0], 12, position[2]]} rotation={[0, 0, 0]}>
-        <coneGeometry args={[4, 12, 8]} />
-        <meshBasicMaterial
-          color={barColor}
-          transparent
-          opacity={responses > 0 ? 0.08 : 0.02}
-          side={THREE.DoubleSide}
-          depthWrite={false}
-        />
-      </mesh>
-      
-      {/* Volumetric Light Beam - Inner Cone */}
-      <mesh position={[position[0], 10, position[2]]} rotation={[0, 0, 0]}>
-        <coneGeometry args={[2.5, 10, 8]} />
-        <meshBasicMaterial
-          color={barColor}
-          transparent
-          opacity={responses > 0 ? 0.15 : 0.05}
-          side={THREE.DoubleSide}
-          depthWrite={false}
-        />
-      </mesh>
-      
-      {/* Volumetric Light Beam - Core */}
-      <mesh position={[position[0], 8, position[2]]} rotation={[0, 0, 0]}>
-        <coneGeometry args={[1.5, 8, 8]} />
-        <meshBasicMaterial
-          color={barColor}
-          transparent
-          opacity={responses > 0 ? 0.25 : 0.08}
-          side={THREE.DoubleSide}
-          depthWrite={false}
-        />
-      </mesh>
       
       <mesh position={[position[0], 0.05, position[2]]}>
         <cylinderGeometry args={[3.2, 3.2, 0.25]} />
@@ -267,11 +340,13 @@ const Enhanced3DBar: React.FC<{
         <cylinderGeometry args={[2.4, 2.4, 1]} />
         <meshStandardMaterial 
           color={barColor}
-          metalness={0.9}
-          roughness={0.1}
+          metalness={0.7}
+          roughness={0.2}
           envMapIntensity={1.5}
           transparent
           opacity={0.95}
+          emissive={barColor}
+          emissiveIntensity={responses > 0 ? 0.1 : 0.02}
         />
       </mesh>
       
@@ -542,7 +617,7 @@ const Enhanced3DScene: React.FC<{
       <ambientLight intensity={0.8} />
       <directionalLight 
         position={[10, 20, 5]} 
-        intensity={3.0} 
+        intensity={1.5} 
         castShadow
         shadow-mapSize-width={2048}
         shadow-mapSize-height={2048}
@@ -554,20 +629,20 @@ const Enhanced3DScene: React.FC<{
       />
       <directionalLight 
         position={[-10, 15, 10]} 
-        intensity={2.5} 
+        intensity={1.2} 
         color="#ffffff"
       />
       <directionalLight 
         position={[0, 25, -10]} 
-        intensity={2.0} 
+        intensity={1.0} 
         color="#ffffff"
       />
-      <pointLight position={[-10, 10, 10]} intensity={1.5} color={themeColors.accentColor} />
-      <pointLight position={[10, 10, -10]} intensity={1.2} color={themeColors.secondaryColor} />
-      <pointLight position={[0, 15, 5]} intensity={1.8} color="#ffffff" />
+      <pointLight position={[-10, 10, 10]} intensity={0.8} color={themeColors.accentColor} />
+      <pointLight position={[10, 10, -10]} intensity={0.6} color={themeColors.secondaryColor} />
+      <pointLight position={[0, 15, 5]} intensity={0.9} color="#ffffff" />
       <spotLight 
         position={[0, 18, 0]} 
-        intensity={2.5} 
+        intensity={1.2} 
         angle={Math.PI / 3}
         penumbra={0.3}
         color="#ffffff"
@@ -582,7 +657,7 @@ const Enhanced3DScene: React.FC<{
           opacity={1.0}
           metalness={0.95}
           roughness={0.05}
-          envMapIntensity={2.0}
+          envMapIntensity={3.0}
         />
       </mesh>
       
