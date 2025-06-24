@@ -5,7 +5,6 @@ import { useParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../lib/supabase';
 import { connectionManager } from '../lib/connectionManager';
-import { connectionManager } from '../lib/connectionManager';
 import { roomService } from '../services/roomService';
 import { useTheme } from '../components/ThemeProvider';
 import { Users, BarChart, Clock, MessageSquare, HelpCircle, Cloud, Trophy, Target, Calendar, Activity as ActivityIcon, TrendingUp, CheckCircle, Lock, QrCode, X } from 'lucide-react';
