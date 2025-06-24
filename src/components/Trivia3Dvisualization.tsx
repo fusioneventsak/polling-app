@@ -35,7 +35,40 @@ const TriviaOptionCard: React.FC<{
 
   const percentage = totalResponses > 0 ? Math.round((option.responses / totalResponses) * 100) : 0;
 
+  // Create THREE.Color objects to prevent undefined value errors
+  const optionColor = useMemo(() => {
+    if (isRevealed && option.is_correct) {
+      return new THREE.Color('#10b981'); // Green for correct answer
+    }
+    if (isRevealed && !option.is_correct) {
+      return new THREE.Color('#6b7280'); // Gray for incorrect answers
+    }
+    // Rainbow colors during answering phase
+    const hue = (index * 360) / 4; // Assuming max 4 options
+    return new THREE.Color(`hsl(${hue}, 70%, 60%)`);
+  }, [isRevealed, option.is_correct, index]);
+
+  const glowColor = useMemo(() => {
+    if (isRevealed && option.is_correct) {
+      return new THREE.Color('#34d399'); // Brighter green glow
+    }
+    return optionColor;
+  }, [isRevealed, option.is_correct, optionColor]);
+
   // Animation loop
+  // Create THREE.Color objects to prevent undefined value errors
+  const barColor = useMemo(() => {
+    const colorValue = isCorrect ? '#10b981' : color;
+    return new THREE.Color(colorValue);
+  }, [color, isCorrect]);
+
+  const glowColor = useMemo(() => {
+    const colorValue = isCorrect ? '#34d399' : color;
+    return new THREE.Color(colorValue);
+  }, [color, isCorrect]);
+
+  const baseColor = useMemo(() => new THREE.Color("#1e293b"), []);
+  
   useFrame((state) => {
     if (meshRef.current) {
       // Gentle floating animation
@@ -43,25 +76,6 @@ const TriviaOptionCard: React.FC<{
       
       // Rotation based on phase
       if (isAnswering) {
-        meshRef.current.rotation.y = Math.sin(state.clock.elapsedTime * 2 + delay) * 0.1;
-      }
-      
-      // Scale animation when hovering
-      const targetScale = hovered ? 1.1 : 1;
-      meshRef.current.scale.lerp(new THREE.Vector3(targetScale, targetScale, targetScale), 0.1);
-    }
-  });
-
-  // Color logic for trivia
-  const getOptionColor = () => {
-    if (isRevealed && option.is_correct) {
-      return '#10b981'; // Green for correct answer
-    }
-    if (isRevealed && !option.is_correct) {
-      return '#6b7280'; // Gray for incorrect answers
-    }
-    // Rainbow colors during answering phase
-    const hue = (index * 360) / 4; // Assuming max 4 options
     return `hsl(${hue}, 70%, 60%)`;
   };
 
@@ -70,22 +84,13 @@ const TriviaOptionCard: React.FC<{
       return '#34d399'; // Brighter green glow
     }
     return getOptionColor();
-  };
-
-  return (
-    <group position={position}>
-      {/* Main Card */}
-      <mesh
-        ref={meshRef}
-        onPointerEnter={() => setHovered(true)}
-        onPointerLeave={() => setHovered(false)}
       >
         <boxGeometry args={[4, 6, 0.5]} />
         <meshPhysicalMaterial
-          color={getOptionColor()}
+          color={optionColor}
           transparent
           opacity={0.9}
-          roughness={0.2}
+          color={baseColor}
           metalness={0.8}
           clearcoat={1}
           clearcoatRoughness={0.1}
@@ -96,7 +101,7 @@ const TriviaOptionCard: React.FC<{
       <mesh position={[0, 0, -0.1]}>
         <boxGeometry args={[4.2, 6.2, 0.3]} />
         <meshBasicMaterial
-          color={getGlowColor()}
+          color={glowColor}
           transparent
           opacity={isRevealed && option.is_correct ? 0.4 : 0.1}
         />
