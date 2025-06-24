@@ -176,8 +176,8 @@ const SimplifiedLightBeam: React.FC<{
         position={[position[0], 12, position[2]]}
         rotation={[0, 0, 0]}
       >
-        {/* Corrected geometry: small radius at top (0.3), large at bottom (2.0) */}
-        <cylinderGeometry args={[2.0, 0.3, 20, 16]} />
+        {/* Reversed geometry: small radius at top (0.3), large at bottom (2.0) */}
+        <cylinderGeometry args={[0.3, 2.0, 20, 16]} />
         <meshBasicMaterial
           color={threeColor}
           transparent
@@ -192,7 +192,7 @@ const SimplifiedLightBeam: React.FC<{
         position={[position[0], 12, position[2]]}
         rotation={[0, 0, 0]}
       >
-        <cylinderGeometry args={[1.7, 0.25, 20, 16]} />
+        <cylinderGeometry args={[0.25, 1.7, 20, 16]} />
         <meshBasicMaterial
           color={threeColor}
           transparent
