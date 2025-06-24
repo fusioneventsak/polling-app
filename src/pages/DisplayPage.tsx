@@ -306,7 +306,21 @@ export const DisplayPage: React.FC = () => {
   // Derive currentRoom from the global rooms state
   const currentRoom = useMemo(() => {
     if (!pollId || !rooms) return null;
-    return rooms.find(room => room.code === pollId) || null;
+    const room = rooms.find(room => room.code === pollId) || null;
+    
+    // Debug logging for room changes
+    if (room) {
+      console.log('🏠 DisplayPage: Room found:', {
+        id: room.id,
+        code: room.code,
+        currentActivityId: room.current_activity_id,
+        activitiesCount: room.activities?.length || 0
+      });
+    } else {
+      console.log('❌ DisplayPage: Room not found for code:', pollId);
+    }
+    
+    return room;
   }, [pollId, rooms]);
 
   // Get all activities for stats
