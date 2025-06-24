@@ -61,10 +61,10 @@ const ActivityDisplay: React.FC<{
   };
 
   return (
-    <div className={`space-y-0 ${className}`}>
+    <div className={`h-full flex flex-col ${className}`}>
       {/* Activity header with real-time updates */}
       <motion.div 
-        className="text-center py-4"
+        className="text-center py-4 flex-shrink-0"
         key={`header-${renderKey}`}
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -93,7 +93,7 @@ const ActivityDisplay: React.FC<{
       </motion.div>
 
       {/* MAXIMIZED: 3D Visualization takes full space below header */}
-      <div className="h-[calc(100vh-80px)] w-full">
+      <div className="flex-1 min-h-0 w-full">
         <Enhanced3DPollVisualization
           key={`viz-${renderKey}`} // FIXED: Force re-render on data changes
           options={activity.options || []}
@@ -395,7 +395,7 @@ export const DisplayPage: React.FC = () => {
 
   return (
     <div 
-      className="min-h-screen"
+      className="h-screen flex flex-col overflow-hidden"
       style={{
         background: currentRoom?.settings?.theme?.background_gradient 
           ? `linear-gradient(to bottom right, ${currentRoom.settings.theme.background_gradient.replace('from-', '').replace('via-', '').replace('to-', '').split(' ').map(color => {
@@ -419,7 +419,7 @@ export const DisplayPage: React.FC = () => {
     >
       {/* FIXED: Enhanced header with connection status */}
       <motion.div 
-        className="bg-slate-900/80 backdrop-blur-sm border-b border-slate-700 px-6 py-4"
+        className="bg-slate-900/80 backdrop-blur-sm border-b border-slate-700 px-6 py-4 flex-shrink-0"
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
@@ -463,7 +463,7 @@ export const DisplayPage: React.FC = () => {
       {/* REMOVED: Stats grid for maximum canvas space */}
       
       {/* MAXIMIZED: Activity display with full screen canvas */}
-      <div className="h-[calc(100vh-140px)]">
+      <div className="flex-1 min-h-0">
         <AnimatePresence mode="wait">
           {activeActivity ? (
             <motion.div
