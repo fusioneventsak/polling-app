@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { supabase } from '../lib/supabase';
 import type { Activity, TriviaGameState, TriviaSettings } from '../types';
 
 interface UseTriviaGameProps {
@@ -48,51 +47,58 @@ export const useTriviaGame = ({ activity, roomId }: UseTriviaGameProps): UseTriv
     };
   }, []);
 
-  // Socket event listeners for trivia events
+  // Listen to custom events from global subscription instead of creating new subscriptions
   useEffect(() => {
-    if (!supabase) return;
+    if (!activity?.id) return;
 
-    const channel = supabase.channel(`trivia_${activity.id}`)
-      .on('broadcast', { event: 'trivia_started' }, (payload) => {
-        setGameState(prev => ({
-          ...prev,
-          isActive: true,
-          phase: 'countdown',
-          startTime: Date.now(),
-          endTime: Date.now() + (payload.payload.duration * 1000),
-          timeRemaining: payload.payload.duration,
-          correctAnswerRevealed: false
-        }));
+    console.log('🎮 TriviaGame: Setting up event listeners for activity:', activity.id);
+
+    const handleActivityUpdate = (event: CustomEvent<{ activityId: string; roomId: string; isActive?: boolean }>) => {
+      if (event.detail.activityId === activity.id) {
+        console.log('🎯 TriviaGame: Activity update received:', event.detail);
         
-        // Start answering phase after a brief countdown
-        setTimeout(() => {
-          setGameState(prev => ({ ...prev, phase: 'answering' }));
-        }, 3000);
-      })
-      .on('broadcast', { event: 'trivia_ended' }, (payload) => {
-        setGameState(prev => ({
-          ...prev,
-          isActive: false,
-          phase: 'revealing',
-          timeRemaining: 0
-        }));
-        
-        // Reveal answer after delay
-        setTimeout(() => {
+        if (event.detail.isActive === true) {
+          // Activity started
           setGameState(prev => ({
             ...prev,
-            correctAnswerRevealed: true,
-            phase: 'completed'
+            isActive: true,
+            phase: 'countdown',
+            startTime: Date.now(),
+            endTime: Date.now() + (countdownDuration * 1000),
+            timeRemaining: countdownDuration,
+            correctAnswerRevealed: false
           }));
-        }, revealDelay * 1000);
-      })
-      .on('broadcast', { event: 'trivia_countdown' }, (payload) => {
-        setGameState(prev => ({
-          ...prev,
-          timeRemaining: payload.payload.timeRemaining
-        }));
-      })
-      .on('broadcast', { event: 'trivia_reset' }, () => {
+          
+          // Start answering phase after a brief countdown
+          setTimeout(() => {
+            setGameState(prev => ({ ...prev, phase: 'answering' }));
+          }, 3000);
+          
+        } else if (event.detail.isActive === false) {
+          // Activity ended
+          setGameState(prev => ({
+            ...prev,
+            isActive: false,
+            phase: 'revealing',
+            timeRemaining: 0
+          }));
+          
+          // Reveal answer after delay
+          setTimeout(() => {
+            setGameState(prev => ({
+              ...prev,
+              correctAnswerRevealed: true,
+              phase: 'completed'
+            }));
+          }, revealDelay * 1000);
+        }
+      }
+    };
+
+    const handleRoomUpdate = (event: CustomEvent<{ roomId: string; roomCode?: string }>) => {
+      if (event.detail.roomId === roomId) {
+        console.log('🏠 TriviaGame: Room reset detected');
+        // Room was reset - reset trivia state
         setGameState({
           isActive: false,
           timeRemaining: 0,
@@ -100,67 +106,38 @@ export const useTriviaGame = ({ activity, roomId }: UseTriviaGameProps): UseTriv
           correctAnswerRevealed: false,
           participantScores: {}
         });
-      })
-      .subscribe();
+      }
+    };
+
+    // Add event listeners
+    window.addEventListener('activity-updated', handleActivityUpdate);
+    window.addEventListener('room-updated', handleRoomUpdate);
 
     return () => {
-      supabase.removeChannel(channel);
+      console.log('🧹 TriviaGame: Cleaning up event listeners');
+      window.removeEventListener('activity-updated', handleActivityUpdate);
+      window.removeEventListener('room-updated', handleRoomUpdate);
     };
-  }, [activity.id, revealDelay]);
+  }, [activity?.id, roomId, countdownDuration, revealDelay]);
 
   const startTrivia = useCallback(async () => {
-    if (!supabase) {
-      setError('Real-time features not available');
-      return;
-    }
-
     try {
       setLoading(true);
       setError(null);
 
-      // Update activity to active state
-      const { error: updateError } = await supabase
-        .from('activities')
-        .update({ 
-          is_active: true,
-          settings: {
-            ...activity.settings,
-            trivia_active: true,
-            started_at: new Date().toISOString()
-          }
-        })
-        .eq('id', activity.id);
-
-      if (updateError) throw updateError;
-
-      // Broadcast trivia start event
-      const { error: broadcastError } = await supabase.channel(`trivia_${activity.id}`)
-        .send({
-          type: 'broadcast',
-          event: 'trivia_started',
-          payload: { 
-            activityId: activity.id,
-            duration: countdownDuration 
-          }
-        });
-
-      if (broadcastError) throw broadcastError;
+      console.log('🎮 TriviaGame: Starting trivia (this should be handled by admin controls)');
+      // Note: Actual trivia starting should be handled by the admin controls
+      // This hook just manages the local game state based on activity updates
 
       // Start countdown timer
       let timeLeft = countdownDuration;
       timerRef.current = setInterval(async () => {
         timeLeft--;
         
-        // Broadcast countdown tick
-        await supabase.channel(`trivia_${activity.id}`)
-          .send({
-            type: 'broadcast',
-            event: 'trivia_countdown',
-            payload: { 
-              activityId: activity.id,
-              timeRemaining: timeLeft 
-            }
-          });
+        setGameState(prev => ({
+          ...prev,
+          timeRemaining: timeLeft
+        }));
 
         if (timeLeft <= 0) {
           if (timerRef.current) {
@@ -180,11 +157,6 @@ export const useTriviaGame = ({ activity, roomId }: UseTriviaGameProps): UseTriv
   }, [activity.id, activity.settings, countdownDuration]);
 
   const endTrivia = useCallback(async () => {
-    if (!supabase) {
-      setError('Real-time features not available');
-      return;
-    }
-
     try {
       setError(null);
 
@@ -194,36 +166,8 @@ export const useTriviaGame = ({ activity, roomId }: UseTriviaGameProps): UseTriv
         timerRef.current = null;
       }
 
-      // Update activity to inactive state
-      const { error: updateError } = await supabase
-        .from('activities')
-        .update({ 
-          is_active: false,
-          settings: {
-            ...activity.settings,
-            trivia_active: false,
-            ended_at: new Date().toISOString()
-          }
-        })
-        .eq('id', activity.id);
-
-      if (updateError) throw updateError;
-
-      // Find correct answer
-      const correctOption = activity.options?.find(opt => opt.is_correct);
-
-      // Broadcast trivia end event
-      const { error: broadcastError } = await supabase.channel(`trivia_${activity.id}`)
-        .send({
-          type: 'broadcast',
-          event: 'trivia_ended',
-          payload: { 
-            activityId: activity.id,
-            correctOptionId: correctOption?.id 
-          }
-        });
-
-      if (broadcastError) throw broadcastError;
+      console.log('🎮 TriviaGame: Ending trivia (this should be handled by admin controls)');
+      // Note: Actual trivia ending should be handled by the admin controls
 
     } catch (err) {
       console.error('Error ending trivia:', err);
@@ -232,26 +176,8 @@ export const useTriviaGame = ({ activity, roomId }: UseTriviaGameProps): UseTriv
   }, [activity.id, activity.settings, activity.options]);
 
   const revealAnswer = useCallback(async () => {
-    if (!supabase) {
-      setError('Real-time features not available');
-      return;
-    }
-
     try {
       setError(null);
-
-      // Broadcast answer reveal
-      const { error: broadcastError } = await supabase.channel(`trivia_${activity.id}`)
-        .send({
-          type: 'broadcast',
-          event: 'trivia_answer_revealed',
-          payload: { 
-            activityId: activity.id,
-            correctOption: activity.options?.find(opt => opt.is_correct)
-          }
-        });
-
-      if (broadcastError) throw broadcastError;
 
       setGameState(prev => ({
         ...prev,
@@ -285,40 +211,16 @@ export const useTriviaGame = ({ activity, roomId }: UseTriviaGameProps): UseTriv
       participantScores: {}
     });
 
-    // Broadcast reset event
-    if (supabase) {
-      supabase.channel(`trivia_${activity.id}`)
-        .send({
-          type: 'broadcast',
-          event: 'trivia_reset',
-          payload: { activityId: activity.id }
-        });
-    }
-
     setError(null);
   }, [activity.id]);
 
   const updateSettings = useCallback(async (newSettings: Partial<TriviaSettings>) => {
-    if (!supabase) {
-      setError('Real-time features not available');
-      return;
-    }
-
     try {
       setLoading(true);
       setError(null);
 
-      const updatedSettings = {
-        ...activity.settings,
-        ...newSettings
-      };
-
-      const { error: updateError } = await supabase
-        .from('activities')
-        .update({ settings: updatedSettings })
-        .eq('id', activity.id);
-
-      if (updateError) throw updateError;
+      console.log('🎮 TriviaGame: Updating settings (this should be handled by admin controls)');
+      // Note: Settings updates should be handled by the admin controls
 
     } catch (err) {
       console.error('Error updating trivia settings:', err);
