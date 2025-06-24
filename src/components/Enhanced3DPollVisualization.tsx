@@ -116,9 +116,9 @@ const StandingImagePlane: React.FC<{
     }
   }, [imageUrl]);
 
-  // FIXED: Good size images, right-side up
-  const imageWidth = 3.5;
-  const imageHeight = 2.8;
+  // FIXED: Much larger images
+  const imageWidth = 6; // Increased from 3.5
+  const imageHeight = 4.5; // Increased from 2.8
   const imageY = imageHeight / 2 + 0.2;
 
   if (hasError || !texture) {
@@ -416,45 +416,45 @@ const FloorStatsDisplay: React.FC<{
                 />
               </mesh>
               
-              {/* Percentage text - SMALLER SIZE */}
+              {/* Percentage text - MUCH SMALLER */}
               <Text
                 position={[curvedPos.x, 0.15, curvedPos.z + 3]}
-                fontSize={2.5} // FIXED: Smaller text (was 5.0)
+                fontSize={1.5} // FIXED: Much smaller (was 2.5)
                 color={barColorValue}
                 anchorX="center"
                 anchorY="middle"
                 rotation={[-Math.PI / 2, 0, 0]}
-                outlineWidth={0.1}
+                outlineWidth={0.05}
                 outlineColor={shadowColor}
                 fillOpacity={1}
               >
                 {percentage}%
               </Text>
               
-              {/* Vote count - SMALLER */}
+              {/* Vote count - MUCH SMALLER */}
               <Text
                 position={[curvedPos.x, 0.12, curvedPos.z + 5]}
-                fontSize={1.2} // FIXED: Smaller text (was 2.2)
+                fontSize={0.8} // FIXED: Much smaller (was 1.2)
                 color="#94a3b8"
                 anchorX="center"
                 anchorY="middle"
                 rotation={[-Math.PI / 2, 0, 0]}
-                outlineWidth={0.03}
+                outlineWidth={0.02}
                 outlineColor="#000000"
               >
                 {option.responses} votes
               </Text>
               
-              {/* Option text - SMALLER */}
+              {/* Option text - MUCH SMALLER */}
               <Text
                 position={[curvedPos.x, 0.12, curvedPos.z + 8]}
-                fontSize={textProps.fontSize * 1.2} // FIXED: Smaller multiplier (was 1.8)
+                fontSize={textProps.fontSize * 0.8} // FIXED: Smaller multiplier (was 1.2)
                 color="#ffffff"
                 anchorX="center"
                 anchorY="middle"
                 rotation={[-Math.PI / 2, 0, 0]}
                 maxWidth={textProps.maxWidth}
-                outlineWidth={Math.max(0.02, textProps.fontSize * 0.03)}
+                outlineWidth={Math.max(0.01, textProps.fontSize * 0.02)}
                 outlineColor="#1e293b"
                 textAlign="center"
                 lineHeight={1.2}
