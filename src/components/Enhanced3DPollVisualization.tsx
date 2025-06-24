@@ -20,29 +20,29 @@ interface Enhanced3DPollVisualizationProps {
   className?: string;
 }
 
-// FINAL: Perfect amphitheater layout matching reference image
-const getCurvedPosition = (index: number, totalCount: number, radius: number = 22) => {
-  // For small counts, use straight line with good spacing
+// FINAL: BIGGER amphitheater to prevent collisions
+const getCurvedPosition = (index: number, totalCount: number, radius: number = 28) => {
+  // For small counts, use straight line with MASSIVE spacing
   if (totalCount <= 2) {
-    const spacing = 18;
+    const spacing = 25; // Much bigger
     const totalWidth = (totalCount - 1) * spacing;
     const startX = -totalWidth / 2;
     return { x: startX + index * spacing, z: 0, rotationY: 0 };
   }
   
-  // For 3 options, slight curve
+  // For 3 options, huge spacing
   if (totalCount === 3) {
     const positions = [
-      { x: -18, z: -2, rotationY: 0.25 },
+      { x: -25, z: -2, rotationY: 0.25 },
       { x: 0, z: 0, rotationY: 0 },
-      { x: 18, z: -2, rotationY: -0.25 }
+      { x: 25, z: -2, rotationY: -0.25 }
     ];
     return positions[index];
   }
   
-  // For 4+ options, perfect amphitheater curve like reference
-  const adjustedRadius = Math.max(radius, totalCount * 3.5);
-  const maxAngle = Math.min(Math.PI * 1.0, totalCount * 0.32);
+  // For 4+ options, MASSIVE amphitheater to prevent collisions
+  const adjustedRadius = Math.max(radius, totalCount * 5); // Much bigger multiplier
+  const maxAngle = Math.min(Math.PI * 1.1, totalCount * 0.35);
   const angleStep = maxAngle / Math.max(totalCount - 1, 1);
   const startAngle = -maxAngle / 2;
   const angle = startAngle + index * angleStep;
@@ -377,11 +377,11 @@ const FloorStatsDisplay: React.FC<{
       {options.map((option, index) => {
         const percentage = totalResponses > 0 ? Math.round((option.responses / totalResponses) * 100) : 0;
         
-        // FINAL: Perfect spacing and container sizing
-        const baseSpacing = 10;
-        const spacing = Math.max(baseSpacing, Math.min(14, 80 / Math.max(options.length, 1))); 
+        // FINAL: MUCH LARGER spacing to prevent ANY collisions
+        const baseSpacing = 16; // Increased from 10
+        const spacing = Math.max(baseSpacing, Math.min(20, 120 / Math.max(options.length, 1))); // Much larger calculation 
         
-        const curvedPos = getCurvedPosition(index, options.length, 22);
+        const curvedPos = getCurvedPosition(index, options.length, 28);
         
         const hue = (index / Math.max(options.length - 1, 1)) * 300;
         const barColorValue = option.is_correct 
@@ -394,9 +394,9 @@ const FloorStatsDisplay: React.FC<{
         return (
           <group key={`${option.id}-${option.responses}`}>
             <group rotation={[0, -(curvedPos.rotationY || 0), 0]}>
-              {/* Floor panel - MUCH SMALLER to match text size */}
+              {/* Floor panel - SMALLER width to prevent collisions */}
               <mesh position={[curvedPos.x, 0.05, curvedPos.z + 6]} rotation={[-Math.PI / 2, 0, 0]}>
-                <planeGeometry args={[spacing * 0.7, 6]} />
+                <planeGeometry args={[spacing * 0.5, 5]} />
                 <meshStandardMaterial 
                   color={floorColor}
                   transparent
@@ -406,9 +406,9 @@ const FloorStatsDisplay: React.FC<{
                 />
               </mesh>
               
-              {/* Glow panel - SMALLER */}
+              {/* Glow panel - SMALLER width */}
               <mesh position={[curvedPos.x, 0.04, curvedPos.z + 6]} rotation={[-Math.PI / 2, 0, 0]}>
-                <planeGeometry args={[spacing * 0.75, 6.3]} />
+                <planeGeometry args={[spacing * 0.55, 5.2]} />
                 <meshBasicMaterial 
                   color={barColor}
                   transparent
@@ -481,7 +481,7 @@ const StandingImagesDisplay: React.FC<{
         }
         
         // FIXED: Use same radius and positioning as other elements
-        const curvedPos = getCurvedPosition(index, options.length, 22);
+        const curvedPos = getCurvedPosition(index, options.length, 28);
         
         const hue = (index / Math.max(options.length - 1, 1)) * 300;
         const glowColorValue = option.is_correct 
@@ -525,10 +525,10 @@ const Enhanced3DScene: React.FC<{
   const floorColor = useMemo(() => new THREE.Color("#1a1a1a"), []);
   const titleShadowColor = useMemo(() => new THREE.Color("#1e293b"), []);
   
-  // FINAL: Camera positioning to match reference image
+  // FINAL: Camera further back to see larger amphitheater
   useEffect(() => {
-    const startDistance = 55;
-    const startHeight = 25;
+    const startDistance = 70; // Further back
+    const startHeight = 30;
     
     camera.position.set(0, startHeight, startDistance);
     camera.lookAt(0, 0, 0);
@@ -536,14 +536,14 @@ const Enhanced3DScene: React.FC<{
     const animateCamera = () => {
       const targetX = 0;
       
-      // FINAL: Perfect camera position like reference
-      const baseHeight = 12;
-      const extraHeight = Math.max(0, (options.length - 3) * 0.5);
+      // FINAL: Camera for larger amphitheater
+      const baseHeight = 15; // Higher to see wider layout
+      const extraHeight = Math.max(0, (options.length - 3) * 1);
       const targetY = baseHeight + extraHeight;
       
-      // FINAL: Optimal distance for full amphitheater view
-      const baseDistance = 20;
-      const distanceAdjustment = Math.max(0, (options.length - 3) * 1.5);
+      // FINAL: Further distance for larger amphitheater
+      const baseDistance = 28; // Further back
+      const distanceAdjustment = Math.max(0, (options.length - 3) * 2.5);
       const targetZ = baseDistance + distanceAdjustment;
       
       const animationDuration = 3500;
@@ -562,9 +562,9 @@ const Enhanced3DScene: React.FC<{
         camera.position.y = startPos.y + (targetY - startPos.y) * easeProgress;
         camera.position.z = startPos.z + (targetZ - startPos.z) * easeProgress;
         
-        // FINAL: Look at center like reference
-        const lookAtY = 1.5;
-        camera.lookAt(0, lookAtY, -1);
+        // FINAL: Look at center of larger amphitheater
+        const lookAtY = 2;
+        camera.lookAt(0, lookAtY, -2);
         
         if (progress < 1) {
           requestAnimationFrame(animate);
@@ -619,7 +619,7 @@ const Enhanced3DScene: React.FC<{
           ? Math.max((option.responses / maxResponses) * maxHeight, 0.5)
           : 1.2; // Larger minimum height
         
-        const curvedPos = getCurvedPosition(index, options.length, 22);
+        const curvedPos = getCurvedPosition(index, options.length, 28);
         
         const hue = (index / Math.max(options.length - 1, 1)) * 300;
         const barColorValue = option.is_correct 
