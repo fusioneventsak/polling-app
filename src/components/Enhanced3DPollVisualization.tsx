@@ -525,28 +525,29 @@ const Enhanced3DScene: React.FC<{
   const floorColor = useMemo(() => new THREE.Color("#1a1a1a"), []);
   const titleShadowColor = useMemo(() => new THREE.Color("#1e293b"), []);
   
-  // FINAL: Camera further back to see larger amphitheater
+  // FIXED: Camera distance scales properly with option count + guaranteed fly-in
   useEffect(() => {
-    const startDistance = 70; // Further back
-    const startHeight = 30;
+    const startDistance = 80; // Further back starting position
+    const startHeight = 35;
     
+    // ALWAYS start from far away for dramatic fly-in
     camera.position.set(0, startHeight, startDistance);
     camera.lookAt(0, 0, 0);
     
     const animateCamera = () => {
       const targetX = 0;
       
-      // FINAL: Camera for larger amphitheater
-      const baseHeight = 15; // Higher to see wider layout
-      const extraHeight = Math.max(0, (options.length - 3) * 1);
+      // FIXED: Camera scales properly with option count
+      const baseHeight = 15;
+      const extraHeight = Math.max(0, (options.length - 3) * 1.5); // More height for more options
       const targetY = baseHeight + extraHeight;
       
-      // FINAL: Further distance for larger amphitheater
-      const baseDistance = 28; // Further back
-      const distanceAdjustment = Math.max(0, (options.length - 3) * 2.5);
+      // FIXED: Much further distance for polls with many options
+      const baseDistance = 25;
+      const distanceAdjustment = Math.max(0, (options.length - 3) * 4); // Much more distance per option
       const targetZ = baseDistance + distanceAdjustment;
       
-      const animationDuration = 3500;
+      const animationDuration = 4000; // Longer for more dramatic effect
       const startTime = Date.now();
       const startPos = camera.position.clone();
       
@@ -554,17 +555,18 @@ const Enhanced3DScene: React.FC<{
         const elapsed = Date.now() - startTime;
         const progress = Math.min(elapsed / animationDuration, 1);
         
-        const easeProgress = progress < 0.7 
-          ? Math.pow(progress, 0.4)
-          : 1 - 0.3 * Math.pow(1 - progress, 3);
+        // Smooth cinematic easing
+        const easeProgress = progress < 0.6 
+          ? Math.pow(progress, 0.3) // Slow start
+          : 1 - 0.4 * Math.pow(1 - progress, 4); // Smooth deceleration
         
         camera.position.x = startPos.x + (targetX - startPos.x) * easeProgress;
         camera.position.y = startPos.y + (targetY - startPos.y) * easeProgress;
         camera.position.z = startPos.z + (targetZ - startPos.z) * easeProgress;
         
-        // FINAL: Look at center of larger amphitheater
+        // Look at center of amphitheater
         const lookAtY = 2;
-        camera.lookAt(0, lookAtY, -2);
+        camera.lookAt(0, lookAtY, 0);
         
         if (progress < 1) {
           requestAnimationFrame(animate);
@@ -574,7 +576,8 @@ const Enhanced3DScene: React.FC<{
       animate();
     };
     
-    const timer = setTimeout(animateCamera, 100);
+    // ALWAYS trigger fly-in animation
+    const timer = setTimeout(animateCamera, 200); // Slight delay for better effect
     return () => clearTimeout(timer);
   }, [camera, options.length]);
   
@@ -644,28 +647,31 @@ const Enhanced3DScene: React.FC<{
         );
       })}
       
-      {/* ORIGINAL: Floating title */}
+      {/* FIXED: Title/Question IN FRONT of colored lights */}
       <Float speed={0.3} rotationIntensity={0.01} floatIntensity={0.05}>
         <Text
-          position={[0, 10, -2]}
+          position={[0, 12, 8]} // MOVED FORWARD - in front of lights
           fontSize={titleFontSize}
           color="#ffffff"
           anchorX="center"
           anchorY="middle"
-          maxWidth={25}
-          outlineWidth={0.05}
+          maxWidth={30}
+          outlineWidth={0.08}
           outlineColor="#000000"
+          renderOrder={100} // Ensure it renders in front
         >
           {activityTitle || 'Poll Options'}
         </Text>
         
+        {/* Title shadow */}
         <Text
-          position={[0.1, 9.9, -2.1]}
+          position={[0.1, 11.9, 7.9]} // Shadow slightly behind
           fontSize={titleFontSize}
           color={titleShadowColor}
           anchorX="center"
           anchorY="middle"
-          maxWidth={25}
+          maxWidth={30}
+          renderOrder={99}
         >
           {activityTitle || 'Poll Options'}
         </Text>
@@ -757,13 +763,13 @@ export const Enhanced3DPollVisualization: React.FC<Enhanced3DPollVisualizationPr
             enablePan={false}
             enableZoom={true}
             enableRotate={true}
-            minDistance={Math.max(12, 20 - options.length * 1)} // FIXED: Much closer min distance
-            maxDistance={Math.max(35, options.length * 3)} // FIXED: Closer max distance
-            minPolarAngle={Math.PI / 40} // FIXED: Better angle range
+            minDistance={Math.max(15, 28 - options.length * 1)} // FIXED: Closer min for small polls
+            maxDistance={Math.max(45, options.length * 6)} // FIXED: Much further max for big polls
+            minPolarAngle={Math.PI / 40}
             maxPolarAngle={Math.PI / 2.0}
             autoRotate={false}
             rotateSpeed={0.4}
-            target={[0, 2, 0]} // FIXED: Look at center
+            target={[0, 2, 2]} // Look at amphitheater center
           />
         </Canvas>
       </Suspense>
