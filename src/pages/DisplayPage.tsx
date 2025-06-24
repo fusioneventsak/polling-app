@@ -1,9 +1,10 @@
-// src/pages/DisplayPage.tsx - Complete Enhanced Version with Debug Logging
+// src/pages/DisplayPage.tsx - Complete Enhanced Version with Fixed WebSocket Connections
 
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../lib/supabase';
+import { connectionManager } from '../lib/connectionManager'; // ADDED: Connection manager import
 import { roomService } from '../services/roomService';
 import { useTheme } from '../components/ThemeProvider';
 import { Users, BarChart, Clock, MessageSquare, HelpCircle, Cloud, Trophy, Target, Calendar, Activity as ActivityIcon, TrendingUp, CheckCircle, Lock, QrCode, X } from 'lucide-react';
@@ -308,7 +309,6 @@ export const DisplayPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(new Date());
-  const subscriptionRef = useRef<any>(null);
   
   // Get all activities for stats
   const allActivities = currentRoom?.activities || [];
@@ -357,59 +357,83 @@ export const DisplayPage: React.FC = () => {
     loadRoom();
   }, [loadRoom]);
 
-  // Real-time subscriptions with enhanced logging
+  // FIXED: Real-time subscriptions using connection manager
   useEffect(() => {
     if (!pollId || !supabase) return;
 
-    // Clean up existing subscription
-    if (subscriptionRef.current) {
-      subscriptionRef.current.unsubscribe();
-    }
+    let isSubscriptionActive = true;
 
-    console.log('🔄 Setting up real-time subscription for room:', pollId);
+    const setupSubscriptions = async () => {
+      try {
+        console.log('🔄 Setting up real-time subscription for room:', pollId);
 
-    // Subscribe to room changes
-    subscriptionRef.current = supabase
-      .channel(`room_${pollId}`)
-      .on('postgres_changes', 
-        { event: '*', schema: 'public', table: 'rooms' },
-        (payload) => {
-          console.log('🏠 Room change:', payload);
-          loadRoom();
-        }
-      )
-      .on('postgres_changes',
-        { event: '*', schema: 'public', table: 'activities' },
-        (payload) => {
-          console.log('🎯 Activity change:', payload);
-          loadRoom();
-        }
-      )
-      .on('postgres_changes',
-        { event: '*', schema: 'public', table: 'activity_options' },
-        (payload) => {
-          console.log('📝 Option change:', payload);
-          loadRoom();
-        }
-      )
-      .on('postgres_changes',
-        { event: '*', schema: 'public', table: 'participant_responses' },
-        (payload) => {
-          console.log('👥 Response change:', payload);
-          loadRoom();
-        }
-      )
-      .subscribe((status, err) => {
-        console.log('📡 Subscription status:', status);
-        if (err) {
-          console.error('DisplayPage: Subscription error:', err);
-        }
-      });
+        // Use connection manager instead of direct supabase channel creation
+        const channel = await connectionManager.getOrCreateChannel(`room_${pollId}`);
 
+        // Only proceed if subscription is still active (component not unmounted)
+        if (!isSubscriptionActive) {
+          console.log('❌ Subscription cancelled - component unmounted');
+          return;
+        }
+
+        console.log('✅ Channel obtained, setting up event listeners...');
+
+        // Subscribe to room changes
+        channel
+          .on('postgres_changes', 
+            { event: '*', schema: 'public', table: 'rooms' },
+            (payload) => {
+              console.log('🏠 Room change:', payload);
+              loadRoom();
+            }
+          )
+          .on('postgres_changes',
+            { event: '*', schema: 'public', table: 'activities' },
+            (payload) => {
+              console.log('🎯 Activity change:', payload);
+              loadRoom();
+            }
+          )
+          .on('postgres_changes',
+            { event: '*', schema: 'public', table: 'activity_options' },
+            (payload) => {
+              console.log('📝 Option change:', payload);
+              loadRoom();
+            }
+          )
+          .on('postgres_changes',
+            { event: '*', schema: 'public', table: 'participant_responses' },
+            (payload) => {
+              console.log('👥 Response change:', payload);
+              loadRoom();
+            }
+          );
+
+        console.log('✅ DisplayPage subscriptions established');
+
+      } catch (error) {
+        console.error('❌ Failed to setup DisplayPage subscriptions:', error);
+        
+        // Retry after delay if subscription is still active
+        if (isSubscriptionActive) {
+          setTimeout(() => {
+            console.log('🔄 Retrying subscription setup...');
+            setupSubscriptions();
+          }, 3000);
+        }
+      }
+    };
+
+    // Start subscription setup
+    setupSubscriptions();
+
+    // Cleanup function
     return () => {
-      if (subscriptionRef.current) {
-        subscriptionRef.current.unsubscribe();
-        subscriptionRef.current = null;
+      console.log('🧹 Cleaning up DisplayPage subscriptions');
+      isSubscriptionActive = false;
+      
+      if (pollId) {
+        connectionManager.cleanupChannel(`room_${pollId}`);
       }
     };
   }, [pollId, loadRoom]);
