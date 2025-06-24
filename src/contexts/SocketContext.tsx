@@ -1,4 +1,4 @@
-// src/contexts/SocketContext.tsx - Updated with better error handling
+// src/contexts/SocketContext.tsx - Updated to use correct connectionManager methods
 import React, { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react';
 import { supabase, checkSupabaseConnection, retrySupabaseOperation } from '../lib/supabase';
 import { connectionManager } from '../lib/connectionManager';
@@ -94,55 +94,66 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
       setupAttempts++;
       
       try {
-        console.log(`🔌 Setting up global subscriptions (attempt ${setupAttempts})...`);
+        console.log(`🔌 SocketContext: Setting up global subscriptions (attempt ${setupAttempts})...`);
         
-        // Use a simple unique channel name
         const channelName = 'global-updates';
-        const channel = await connectionManager.getOrCreateChannel(channelName);
+        
+        // Get channel
+        const channel = await connectionManager.getChannel(channelName);
+        if (!channel) {
+          throw new Error('Failed to get global channel');
+        }
 
-        // Subscribe to all table changes
+        // Add event listeners
         channel
           .on('postgres_changes', 
             { event: '*', schema: 'public', table: 'rooms' },
             (payload) => {
-              console.log('🏠 Room change received:', payload);
+              console.log('🏠 SocketContext: Room change received:', payload);
               loadRooms();
             }
           )
           .on('postgres_changes',
             { event: '*', schema: 'public', table: 'activities' },
             (payload) => {
-              console.log('🎯 Activity change received:', payload);
+              console.log('🎯 SocketContext: Activity change received:', payload);
               loadRooms();
             }
           )
           .on('postgres_changes',
             { event: '*', schema: 'public', table: 'activity_options' },
             (payload) => {
-              console.log('📝 Activity options change received:', payload);
+              console.log('📝 SocketContext: Activity options change received:', payload);
               loadRooms();
             }
           )
           .on('postgres_changes',
             { event: '*', schema: 'public', table: 'participant_responses' },
             (payload) => {
-              console.log('👥 Response change received:', payload);
+              console.log('👥 SocketContext: Response change received:', payload);
               loadRooms();
             }
           );
 
-        console.log('✅ Global subscriptions established');
-        setConnectionStatus('connected');
-        setupAttempts = 0; // Reset attempts on success
+        // Subscribe
+        const subscribed = await connectionManager.subscribe(channelName);
+        
+        if (subscribed) {
+          console.log('✅ SocketContext: Global subscriptions established');
+          setConnectionStatus('connected');
+          setupAttempts = 0; // Reset attempts on success
+        } else {
+          throw new Error('Subscription failed');
+        }
         
       } catch (error) {
-        console.error('❌ Failed to setup global subscriptions:', error);
+        console.error('❌ SocketContext: Failed to setup global subscriptions:', error);
         setConnectionStatus('disconnected');
         
         // Retry with exponential backoff, but only if we haven't exceeded max attempts
         if (setupAttempts < maxSetupAttempts) {
-          const retryDelay = Math.min(setupAttempts * 3000, 10000); // 3s, 6s, 9s...
-          console.log(`🔄 Retrying global subscription setup in ${retryDelay}ms (attempt ${setupAttempts + 1}/${maxSetupAttempts})...`);
+          const retryDelay = Math.min(setupAttempts * 3000, 10000);
+          console.log(`🔄 SocketContext: Retrying global subscription setup in ${retryDelay}ms (attempt ${setupAttempts + 1}/${maxSetupAttempts})...`);
           
           setTimeout(() => {
             if (supabase) {
@@ -150,7 +161,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
             }
           }, retryDelay);
         } else {
-          console.warn('❌ Max global subscription setup attempts reached. Continuing without real-time updates.');
+          console.warn('❌ SocketContext: Max global subscription setup attempts reached. Continuing without real-time updates.');
           setupAttempts = 0; // Reset for potential future attempts
         }
       }
@@ -170,30 +181,30 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
         setIsConnected(connectionOk);
         
         if (!wasConnected && connectionOk) {
-          console.log('🔄 Connection restored, reinitializing...');
+          console.log('🔄 SocketContext: Connection restored, reinitializing...');
           setConnectionStatus('reconnecting');
           setupAttempts = 0; // Reset attempts when connection is restored
           await setupGlobalSubscriptions();
           await loadRooms();
           setConnectionStatus('connected');
         } else if (!connectionOk && wasConnected) {
-          console.warn('❌ Connection lost');
+          console.warn('❌ SocketContext: Connection lost');
           setConnectionStatus('disconnected');
         }
       } catch (error) {
-        console.warn('Connection monitor error:', error);
+        console.warn('SocketContext: Connection monitor error:', error);
         setIsConnected(false);
         setConnectionStatus('disconnected');
       }
     }, 30000); // Check every 30 seconds
 
     return () => {
-      console.log('🧹 Cleaning up SocketContext...');
+      console.log('🧹 SocketContext: Cleaning up...');
       if (connectionMonitor) {
         clearInterval(connectionMonitor);
       }
-      // Clean up global channels
-      connectionManager.cleanupChannel('global-updates');
+      // FIXED: Use correct method name
+      connectionManager.cleanup('global-updates');
     };
   }, [loadRooms]);
 
