@@ -281,6 +281,7 @@ export const DisplayPage: React.FC = () => {
   const [currentRoom, setCurrentRoom] = useState<Room | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [currentTime, setCurrentTime] = useState(new Date());
   
   // Get all activities for stats
   const allActivities = currentRoom?.activities || [];
@@ -431,7 +432,7 @@ export const DisplayPage: React.FC = () => {
                 console.warn('⚠️ DisplayPage: Error handling response change:', error);
               }
             }
-          )
+          );
       } catch (error) {
         console.error(`❌ DisplayPage: Failed to setup subscriptions for ${pollId} (attempt ${retryCount}):`, error);
         
@@ -449,8 +450,7 @@ export const DisplayPage: React.FC = () => {
           console.warn(`⚠️ DisplayPage: Max retry attempts reached for room ${pollId}`);
         }
       }
-      }
-    }
+    };
 
     // Start setup
     setupSubscriptions();
@@ -465,8 +465,6 @@ export const DisplayPage: React.FC = () => {
       }
     };
   }, [pollId, loadRoom, currentRoom?.id]);
-
-  const [currentTime, setCurrentTime] = useState(new Date());
 
   const getRoomStats = () => {
     if (!currentRoom) return null;
