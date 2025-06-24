@@ -1,4 +1,4 @@
-// src/lib/supabase.ts - Updated with better connection handling
+// src/lib/supabase.ts - Fixed transport configuration
 import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -14,18 +14,16 @@ export const supabase = supabaseUrl && supabaseAnonKey
   ? createClient(supabaseUrl, supabaseAnonKey, {
       realtime: {
         params: {
-          eventsPerSecond: 5, // Reduced from 10 to prevent rate limiting
+          eventsPerSecond: 5,
         },
-        heartbeatIntervalMs: 60000, // Increased from 30s to 60s
+        heartbeatIntervalMs: 60000,
         reconnectAfterMs: (tries) => {
-          // Exponential backoff with jitter
           const baseDelay = Math.min(tries * 2000, 30000);
           const jitter = Math.random() * 1000;
           return baseDelay + jitter;
         },
-        // Add connection limits
-        timeout: 20000, // 20 second connection timeout
-        transport: 'websocket', // Force websocket transport
+        timeout: 20000,
+        // REMOVE transport: 'websocket' - this causes the constructor error
         logger: (kind, msg, data) => {
           if (kind === 'error') {
             console.error(`🔴 Supabase Realtime ${kind}:`, msg, data);
@@ -35,7 +33,7 @@ export const supabase = supabaseUrl && supabaseAnonKey
         }
       },
       auth: {
-        persistSession: false, // Don't persist sessions for better connection management
+        persistSession: false,
         autoRefreshToken: false,
         detectSessionInUrl: false
       },
@@ -52,7 +50,7 @@ let isConnected = false;
 let reconnectAttempts = 0;
 const maxReconnectAttempts = 5;
 let lastConnectionCheck = 0;
-const CONNECTION_CHECK_INTERVAL = 5000; // 5 seconds
+const CONNECTION_CHECK_INTERVAL = 5000;
 
 // Function to check Supabase connection with caching
 export const checkSupabaseConnection = async (): Promise<boolean> => {
@@ -101,7 +99,6 @@ export const checkSupabaseConnection = async (): Promise<boolean> => {
     
     return true;
   } catch (error: any) {
-    // Check if it's a network error
     if (error.message?.includes('timeout') || error.message?.includes('Failed to fetch')) {
       console.error('❌ Supabase network connection failed - check internet connection and Supabase URL');
     } else {
@@ -122,7 +119,6 @@ export const retrySupabaseOperation = async <T>(
   
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      // Check connection before attempting operation
       const connectionOk = await checkSupabaseConnection();
       
       if (!connectionOk && attempt === 1) {
@@ -141,7 +137,7 @@ export const retrySupabaseOperation = async <T>(
       console.error(`❌ ${operationName} failed on attempt ${attempt}:`, error);
       
       if (attempt < maxRetries) {
-        const delay = Math.min(1000 * Math.pow(2, attempt - 1), 10000); // Max 10s delay
+        const delay = Math.min(1000 * Math.pow(2, attempt - 1), 10000);
         console.log(`⏳ Retrying ${operationName} in ${delay}ms...`);
         await new Promise(resolve => setTimeout(resolve, delay));
       }
@@ -155,7 +151,6 @@ export const retrySupabaseOperation = async <T>(
 export const handleSupabaseError = (error: any, operation: string): Error => {
   console.error(`Supabase ${operation} error:`, error);
   
-  // Handle specific error types
   if (error?.code === 'PGRST301') {
     return new Error('Database connection lost. Please check your internet connection.');
   }
@@ -185,7 +180,6 @@ export const handleSupabaseError = (error: any, operation: string): Error => {
 
 // Initialize connection monitoring only if supabase is available
 if (supabase) {
-  // Initial connection test with delay to avoid startup race conditions
   setTimeout(async () => {
     const connected = await checkSupabaseConnection();
     if (connected) {
@@ -195,7 +189,6 @@ if (supabase) {
     }
   }, 1000);
   
-  // Set up connection monitoring with exponential backoff
   const startConnectionMonitoring = () => {
     setInterval(async () => {
       if (!isConnected) {
@@ -211,9 +204,9 @@ if (supabase) {
           console.error('❌ Max reconnection attempts reached. Please refresh the page.');
         }
       } else {
-        reconnectAttempts = 0; // Reset counter when connected
+        reconnectAttempts = 0;
       }
-    }, 30000); // Check every 30 seconds
+    }, 30000);
   };
 
   startConnectionMonitoring();
