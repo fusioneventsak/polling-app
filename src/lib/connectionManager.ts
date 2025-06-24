@@ -6,6 +6,10 @@ class ConnectionManager {
   private channels: Map<string, RealtimeChannel> = new Map();
   private subscriptionStates: Map<string, 'idle' | 'subscribing' | 'subscribed' | 'error'> = new Map();
 
+  async getOrCreateChannel(channelName: string): Promise<RealtimeChannel | null> {
+    return this.getChannel(channelName);
+  }
+
   async getChannel(channelName: string): Promise<RealtimeChannel | null> {
     if (!supabase) {
       console.error('❌ Supabase client not available');

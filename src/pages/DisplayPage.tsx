@@ -331,111 +331,119 @@ export const DisplayPage: React.FC = () => {
     loadRoom();
   }, [loadRoom]);
 
-  // FIXED: Real-time subscriptions using connection manager
+  // SIMPLIFIED: Real-time subscriptions using connection manager
   useEffect(() => {
     if (!pollId || !supabase) return;
 
-    let isSubscriptionActive = true;
+    let isActive = true;
 
     const setupSubscriptions = async () => {
       try {
-        console.log('🔄 DisplayPage: Setting up real-time subscription for room:', pollId);
+        console.log('🔄 DisplayPage: Setting up subscriptions for room:', pollId);
 
-        // Step 1: Get or create the channel
         const channelName = `display_room_${pollId}`;
-        const channel = await connectionManager.getOrCreateChannel(channelName);
-
-        // Only proceed if subscription is still active (component not unmounted)
-        if (!isSubscriptionActive) {
-          console.log('❌ DisplayPage: Subscription cancelled - component unmounted');
+        
+        // Step 1: Get channel
+        const channel = await connectionManager.getChannel(channelName);
+        if (!channel || !isActive) {
+          console.log('❌ DisplayPage: Failed to get channel or component unmounted');
           return;
         }
 
-        console.log('✅ DisplayPage: Channel obtained, setting up event listeners...');
-
-        // Step 2: Define all event listeners
-        const listeners = [
-          {
-            event: '*',
-            schema: 'public',
-            table: 'rooms',
-            filter: `code=eq.${pollId}`,
-            callback: (payload: any) => {
-              console.log('🏠 DisplayPage: Room change received:', {
+        // Step 2: Add event listeners BEFORE subscribing
+        console.log('📡 DisplayPage: Adding event listeners...');
+        
+        channel
+          .on('postgres_changes', 
+            { 
+              event: '*', 
+              schema: 'public', 
+              table: 'rooms',
+              filter: `code=eq.${pollId}`
+            },
+            (payload) => {
+              if (!isActive) return;
+              console.log('🏠 DisplayPage: Room change:', {
                 eventType: payload.eventType,
-                currentActivityId: payload.new?.current_activity_id,
-                currentActivityType: payload.new?.current_activity_type
+                currentActivityId: payload.new?.current_activity_id
               });
               loadRoom();
             }
-          },
-          {
-            event: '*',
-            schema: 'public',
-            table: 'activities',
-            callback: (payload: any) => {
-              console.log('🎯 DisplayPage: Activity change received:', {
+          )
+          .on('postgres_changes',
+            { 
+              event: '*', 
+              schema: 'public', 
+              table: 'activities'
+            },
+            (payload) => {
+              if (!isActive) return;
+              console.log('🎯 DisplayPage: Activity change:', {
                 eventType: payload.eventType,
                 activityId: payload.new?.id || payload.old?.id,
                 isActive: payload.new?.is_active,
                 roomId: payload.new?.room_id || payload.old?.room_id
               });
               
-              // Only reload if this activity belongs to our room
+              // Only reload if this belongs to our room
               if (currentRoom && (payload.new?.room_id === currentRoom.id || payload.old?.room_id === currentRoom.id)) {
-                console.log('🔄 DisplayPage: Activity change is for our room, reloading...');
+                console.log('🔄 DisplayPage: Reloading for our room...');
                 loadRoom();
               }
             }
-          },
-          {
-            event: '*',
-            schema: 'public',
-            table: 'activity_options',
-            callback: (payload: any) => {
-              console.log('📝 DisplayPage: Option change received:', payload.eventType);
+          )
+          .on('postgres_changes',
+            { event: '*', schema: 'public', table: 'activity_options' },
+            (payload) => {
+              if (!isActive) return;
+              console.log('📝 DisplayPage: Options change:', payload.eventType);
               loadRoom();
             }
-          },
-          {
-            event: '*',
-            schema: 'public',
-            table: 'participant_responses',
-            callback: (payload: any) => {
-              console.log('👥 DisplayPage: Response change received:', payload.eventType);
+          )
+          .on('postgres_changes',
+            { event: '*', schema: 'public', table: 'participant_responses' },
+            (payload) => {
+              if (!isActive) return;
+              console.log('👥 DisplayPage: Response change:', payload.eventType);
               loadRoom();
             }
-          }
-        ];
+          );
 
-        // Step 3: Add event listeners and subscribe (this prevents multiple subscriptions)
-        await connectionManager.addEventListeners(channelName, listeners);
 
-        console.log('✅ DisplayPage: All subscriptions established successfully');
+        // Step 3: Subscribe to channel
+        console.log('🔌 DisplayPage: Subscribing to channel...');
+        const subscribed = await connectionManager.subscribe(channelName);
+        
+        if (subscribed && isActive) {
+          console.log('✅ DisplayPage: All subscriptions ready!');
+        } else {
+          console.error('❌ DisplayPage: Subscription failed');
+        }
+
 
       } catch (error) {
-        console.error('❌ DisplayPage: Failed to setup subscriptions:', error);
+        console.error('❌ DisplayPage: Setup error:', error);
         
-        // Retry after delay if subscription is still active
-        if (isSubscriptionActive) {
+        // Retry after delay
+        if (isActive) {
           setTimeout(() => {
-            console.log('🔄 DisplayPage: Retrying subscription setup...');
+            console.log('🔄 DisplayPage: Retrying...');
             setupSubscriptions();
-          }, 3000);
+          }, 5000);
         }
       }
     };
 
-    // Start subscription setup
+    // Start setup
     setupSubscriptions();
 
-    // Cleanup function
+    // Cleanup
     return () => {
-      console.log('🧹 DisplayPage: Cleaning up subscriptions');
-      isSubscriptionActive = false;
+      console.log('🧹 DisplayPage: Component cleanup');
+      isActive = false;
       
       if (pollId) {
-        connectionManager.cleanupChannel(`display_room_${pollId}`);
+        connectionManager.cleanup(`display_room_${pollId}`);
       }
     };
   }, [pollId, loadRoom, currentRoom?.id]);
