@@ -1,7 +1,6 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
-import { roomService } from '../services/roomService';
+import { useSocket } from '../contexts/SocketContext';
 import { useTheme } from '../components/ThemeProvider';
 import { Users, BarChart, Clock, MessageSquare, HelpCircle, Cloud, Trophy, Target, Calendar, Activity as ActivityIcon, TrendingUp, CheckCircle, Lock, QrCode, X } from 'lucide-react';
 import { Enhanced3DPollVisualization } from '../components/Enhanced3DPollVisualization';
@@ -300,11 +299,15 @@ const ActivityDisplay = ({ currentRoom, currentTime, formatTime }: {
 
 export const DisplayPage: React.FC = () => {
   const { pollId } = useParams<{ pollId: string }>();
-  const [currentRoom, setCurrentRoom] = useState<Room | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { rooms, isConnected, connectionStatus } = useSocket();
   const [currentTime, setCurrentTime] = useState(new Date());
   
+  // Derive currentRoom from the global rooms state
+  const currentRoom = useMemo(() => {
+    if (!pollId || !rooms) return null;
+    return rooms.find(room => room.code === pollId) || null;
+  }, [pollId, rooms]);
+
   // Get all activities for stats
   const allActivities = currentRoom?.activities || [];
 
@@ -316,81 +319,6 @@ export const DisplayPage: React.FC = () => {
 
     return () => clearInterval(timer);
   }, []);
-
-  // Load room data
-  const loadRoom = useCallback(async () => {
-    if (!pollId) return;
-
-    try {
-      setLoading(true);
-      setError(null);
-      
-      const room = await roomService.getRoomByCode(pollId);
-      if (!room) {
-        setError('Room not found');
-        return;
-      }
-
-      console.log('🏠 Loaded room:', {
-        id: room.id,
-        code: room.code,
-        activities: room.activities?.length || 0,
-        currentActivityId: room.current_activity_id
-      });
-
-      setCurrentRoom(room);
-    } catch (err) {
-      console.error('Failed to load room:', err);
-      setError('Failed to load room');
-    } finally {
-      setLoading(false);
-    }
-  }, [pollId]);
-
-  // Initial load
-  useEffect(() => {
-    loadRoom();
-  }, [loadRoom]);
-
-  // SIMPLIFIED: Listen to custom events from global subscription
-  useEffect(() => {
-    if (!pollId) return;
-
-    console.log('🎧 DisplayPage: Setting up custom event listeners for room:', pollId);
-
-    const handleRoomUpdate = (event: CustomEvent<{ roomId: string; roomCode?: string }>) => {
-      console.log('🏠 DisplayPage: Room update event received:', event.detail);
-      if (event.detail.roomCode === pollId || currentRoom?.id === event.detail.roomId) {
-        loadRoom();
-      }
-    };
-
-    const handleActivityUpdate = (event: CustomEvent<{ activityId: string; roomId: string; isActive?: boolean }>) => {
-      console.log('🎯 DisplayPage: Activity update event received:', event.detail);
-      if (currentRoom?.id === event.detail.roomId) {
-        loadRoom();
-      }
-    };
-
-    const handleResponseUpdate = (event: CustomEvent<{ activityId: string; roomId: string }>) => {
-      console.log('👥 DisplayPage: Response update event received:', event.detail);
-      if (currentRoom?.id === event.detail.roomId) {
-        loadRoom();
-      }
-    };
-
-    // Add event listeners
-    window.addEventListener('room-updated', handleRoomUpdate);
-    window.addEventListener('activity-updated', handleActivityUpdate);
-    window.addEventListener('responses-updated', handleResponseUpdate);
-
-    return () => {
-      console.log('🧹 DisplayPage: Cleaning up event listeners');
-      window.removeEventListener('room-updated', handleRoomUpdate);
-      window.removeEventListener('activity-updated', handleActivityUpdate);
-      window.removeEventListener('responses-updated', handleResponseUpdate);
-    };
-  }, [pollId, currentRoom?.id, loadRoom]);
 
   const getRoomStats = () => {
     if (!currentRoom) return null;
@@ -626,30 +554,31 @@ export const DisplayPage: React.FC = () => {
     );
   };
 
-  if (loading) {
+  // Show connection status
+  if (connectionStatus === 'disconnected') {
     return (
-      <div className="h-screen w-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 flex items-center justify-center">
+      <div className="h-screen w-screen bg-gradient-to-br from-slate-900 via-red-900 to-slate-900 flex items-center justify-center">
         <div className="text-center">
-          <div className="w-20 h-20 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-6"></div>
-          <h2 className="text-2xl font-bold text-white mb-2">Loading...</h2>
-          <p className="text-slate-400">Connecting to room {pollId}</p>
+          <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
+            <X className="w-8 h-8 text-red-400" />
+          </div>
+          <h2 className="text-2xl font-bold text-white mb-2">Connection Lost</h2>
+          <p className="text-slate-400 mb-6">Unable to connect to the server</p>
+          <p className="text-sm text-slate-500">
+            Please check your internet connection and try refreshing the page.
+          </p>
         </div>
       </div>
     );
   }
 
-  if (error) {
+  if (connectionStatus === 'reconnecting') {
     return (
       <div className="h-screen w-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 flex items-center justify-center">
         <div className="text-center">
-          <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
-            <X className="w-8 h-8 text-red-400" />
-          </div>
-          <h2 className="text-2xl font-bold text-white mb-2">Room Not Found</h2>
-          <p className="text-slate-400 mb-6">{error}</p>
-          <p className="text-sm text-slate-500">
-            Please check the room code and try again.
-          </p>
+          <div className="w-20 h-20 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-6"></div>
+          <h2 className="text-2xl font-bold text-white mb-2">Reconnecting...</h2>
+          <p className="text-slate-400">Restoring connection to room {pollId}</p>
         </div>
       </div>
     );
@@ -657,10 +586,16 @@ export const DisplayPage: React.FC = () => {
 
   if (!currentRoom) {
     return (
-      <div className="h-screen w-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 flex items-center justify-center">
+      <div className="h-screen w-screen bg-gradient-to-br from-slate-900 via-red-900 to-slate-900 flex items-center justify-center">
         <div className="text-center">
-          <h2 className="text-2xl font-bold text-white mb-2">Room Not Available</h2>
-          <p className="text-slate-400">Please try again later.</p>
+          <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
+            <X className="w-8 h-8 text-red-400" />
+          </div>
+          <h2 className="text-2xl font-bold text-white mb-2">Room Not Found</h2>
+          <p className="text-slate-400 mb-6">Room with code "{pollId}" does not exist or is no longer active</p>
+          <p className="text-sm text-slate-500">
+            Please check the room code and try again.
+          </p>
         </div>
       </div>
     );
