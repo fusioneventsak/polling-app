@@ -49,28 +49,28 @@ const calculateFitFontSize = (text: string, spacing: number) => {
   };
 };
 
-// Shared curve calculation function with tighter spacing and more curve
+// Shared curve calculation function with subtle curve
 const getCurvedPosition = (index: number, totalItems: number, baseZ: number = -8) => {
-  // Smaller radius for tighter grouping
-  const baseRadius = 15; // Reduced from 25
-  const radiusMultiplier = Math.max(1, Math.sqrt(totalItems / 3)); // Less aggressive scaling
+  // Smaller radius for subtle curve
+  const baseRadius = 20; // Increased for gentler curve
+  const radiusMultiplier = Math.max(1, Math.sqrt(totalItems / 4)); // Less aggressive scaling
   const radius = baseRadius * radiusMultiplier;
   
-  // More dramatic curve - wider angle spread
-  const minSpread = Math.PI / 3; // 60 degrees minimum (was 30)
-  const maxSpread = Math.PI / 1.2; // ~150 degrees maximum (was ~100)
-  const spread = minSpread + (maxSpread - minSpread) * Math.min(1, (totalItems - 1) / 5);
+  // Subtle curve - much smaller angle spread
+  const minSpread = Math.PI / 8; // 22.5 degrees minimum (was 60)
+  const maxSpread = Math.PI / 4; // 45 degrees maximum (was 150)
+  const spread = minSpread + (maxSpread - minSpread) * Math.min(1, (totalItems - 1) / 6);
   
   const step = totalItems > 1 ? spread / (totalItems - 1) : 0;
   const angle = -spread / 2 + index * step;
   
-  // More pronounced depth variation for dramatic curve
-  const depthVariation = 5 + totalItems * 1.5; // Increased curve depth
+  // Minimal depth variation for subtle curve
+  const depthVariation = 2 + totalItems * 0.5; // Much smaller depth change
   
   return {
     x: Math.sin(angle) * radius,
     z: baseZ - Math.cos(angle) * depthVariation, // Curve toward audience
-    rotationY: angle * 0.7 // Add rotation to face the center (reduced intensity)
+    rotationY: angle * 0.3 // Reduced rotation intensity
   };
 };
 
@@ -260,6 +260,7 @@ const Enhanced3DBar: React.FC<{
   delay: number;
   maxHeight: number;
   index: number;
+  rotationY?: number; // Add rotation prop
 }> = ({ 
   position, 
   height, 
@@ -270,7 +271,8 @@ const Enhanced3DBar: React.FC<{
   isCorrect, 
   delay,
   maxHeight,
-  index
+  index,
+  rotationY = 0 // Default to no rotation
 }) => {
   const meshRef = useRef<THREE.Mesh>(null);
   const glowRef = useRef<THREE.Mesh>(null);
@@ -317,15 +319,15 @@ const Enhanced3DBar: React.FC<{
 
   return (
     <group>
-      <SimplifiedLightBeam
-        position={position}
-        color={barColorValue}
-        intensity={responses > 0 ? 1.0 : 0.3}
-        responses={responses}
-      />
-      
-      {/* Apply NEGATIVE rotation to bars for tilting toward camera (amphitheater style) */}
-      <group rotation={[0, -(getCurvedPosition(index, 1).rotationY || 0), 0]}>
+      {/* Apply unified rotation to entire group so light and bar stay together */}
+      <group rotation={[0, -(rotationY || 0), 0]}>
+        <SimplifiedLightBeam
+          position={position}
+          color={barColorValue}
+          intensity={responses > 0 ? 1.0 : 0.3}
+          responses={responses}
+        />
+        
         <mesh position={[position[0], 0.05, position[2]]}>
           <cylinderGeometry args={[3.2, 3.2, 0.25]} />
           <meshStandardMaterial 
